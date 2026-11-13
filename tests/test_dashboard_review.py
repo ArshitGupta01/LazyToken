@@ -1,0 +1,32 @@
+import http.client
+import json
+import os
+import tempfile
+import threading
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import dashboard
+import kn
+
+class LocalReviewTests(unittest.TestCase):
+    def test_review_requires_same_origin_and_session_token(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ,{'KN_HOME':temp}):
+            root=Path(temp)/'project';root.mkdir();(root/'source.py').write_text('class Account: pass',encoding='utf-8')
+            db=kn.connect(Path(temp)/'network.sqlite3');kn.sync(root,db)
+            p=kn.feature_call('propose',{'project':str(root.resolve()),'kind':'lesson','name':'Account','summary':'Account behavior','task':'Fix','evidence':'Source','paths':['source.py']},db);db.close()
+            server=dashboard.LocalServer(('127.0.0.1',0),dashboard.Handler);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+            try:
+                port=server.server_port; host=f'127.0.0.1:{port}'
+                conn=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
+                payload=json.dumps({'project':str(root.resolve()),'id':p['id'],'action':'approve'})
+                conn.request('POST','/api/review',payload,{'Content-Type':'application/json','Origin':'http://attacker.example','X-LazyToken-Review':server.review_token});response=conn.getresponse();self.assertEqual(response.status,403);response.read()
+                conn.request('POST','/api/review',payload,{'Content-Type':'application/json','Origin':'http://'+host,'X-LazyToken-Review':'wrong'});response=conn.getresponse();self.assertEqual(response.status,403);response.read()
+                conn.request('POST','/api/review',payload,{'Content-Type':'application/json','Origin':'http://'+host,'X-LazyToken-Review':server.review_token});response=conn.getresponse();self.assertEqual(response.status,200);self.assertEqual(json.loads(response.read())['status'],'approved')
+                conn.close()
+            finally:
+                server.shutdown();server.server_close();thread.join()
+
+if __name__=='__main__': unittest.main()

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101513"><title>LazyToken · Explorer</title><link rel="stylesheet" href="/styles.css?v=3"></head>
+<body>
+<div class="app-shell">
+  <header class="topbar"><a class="brand" href="/"><span class="brand-mark"><i></i><i></i><i></i></span><span>LAZYTOKEN <b>KNOWLEDGE NETWORK</b></span></a><div class="header-meta"><span class="live-dot"></span> LOCAL GRAPH <span class="divider">/</span> LOCAL REVIEW</div><button id="refresh" class="icon-button" title="Refresh graph" aria-label="Refresh graph">↻</button></header>
+  <main class="workspace">
+    <aside class="sidebar">
+      <div class="eyebrow">NETWORK EXPLORER <span>01</span></div><h1>Knowledge<br><em>explorer.</em></h1><p class="intro">Browse assets and the connections between them.</p>
+      <label class="searchbox"><span>⌕</span><input id="search" placeholder="Find an asset…" autocomplete="off"><kbd>/</kbd></label>
+      <div class="section-head"><span>PROJECT SCOPE</span><span class="tiny-dot"></span></div><div class="scope-tabs"><button class="scope active" data-project="">Shared graph</button><select id="project"><option value="">Choose a project…</option></select></div>
+      <div class="section-head kind-heading"><span>ASSET TYPES</span><button id="clear-filters" class="text-button">RESET</button></div><div id="filters" class="filters"></div><button id="workspace-open" class="workspace-open">Knowledge workspace <span>↗</span></button>
+      <div class="sidebar-foot"><div class="scope-note"><span class="shield">◈</span><span>Project relationships stay scoped to their source.</span></div><span class="local-tag"><i></i> PRIVATE · ON THIS DEVICE</span></div>
+    </aside>
+    <section class="graph-area" aria-label="Interactive knowledge graph"><div class="graph-topline"><div><span class="eyebrow">2D RELATIONSHIP MAP</span><span id="scope-label" class="scope-label">Shared knowledge</span></div><div class="graph-actions"><button id="fit" class="small-button">FIT VIEW <span>⌖</span></button><button id="zoom-out" class="round-button" aria-label="Zoom out">−</button><button id="zoom-in" class="round-button" aria-label="Zoom in">+</button></div></div>
+      <div class="canvas-wrap"><canvas id="graph"></canvas><div id="loading" class="loading"><span class="loader"></span>Connecting to local graph…</div><div id="empty" class="empty" hidden><b>No matching knowledge yet</b><span>Try another search or switch project scope.</span></div><div class="canvas-hint">DRAG TO EXPLORE <span>·</span> SCROLL TO ZOOM</div><div id="tooltip" class="tooltip" hidden></div></div>
+      <footer class="graph-footer"><div class="stat"><strong id="node-count">—</strong><span>NODES</span></div><div class="stat"><strong id="edge-count">—</strong><span>RELATIONSHIPS</span></div><div class="stat wide"><strong id="evidence-count">—</strong><span>EVIDENCE LINKS</span></div><div class="legend"><i class="legend-line"></i> relationship <i class="legend-node"></i> asset</div></footer>
+    </section>
+    <aside id="inspector" class="inspector"><div class="inspector-empty"><span class="inspect-orbit">◎</span><div class="eyebrow">NODE INSPECTOR</div><h2>Pick a point<br>of knowledge.</h2><p>Select any node to see what it means and how it connects.</p></div><div id="detail" hidden></div></aside>
+  </main>
+</div><section id="knowledge-workspace" class="knowledge-workspace" hidden aria-label="Knowledge workspace"><header><div><span class="eyebrow">LAZYTOKEN</span><h2>Knowledge workspace</h2></div><button id="workspace-close" aria-label="Close workspace">✕</button></header><nav class="workspace-nav" aria-label="Workspace sections"><button data-view="search">Search</button><button data-view="proposals">Memory review</button><button data-view="benchmark_list">Benchmarks</button><button data-view="dependencies">Dependencies</button><button data-view="discover">Patterns</button></nav><p id="workspace-scope" class="workspace-scope"></p><div id="workspace-body" class="workspace-body"></div></section><script src="/app.js?v=3" defer></script><script src="/features-ui.js" defer></script></body></html>

@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "status": "draft_not_executed",
+  "note": "Candidate tasks require human review and pinned independent source snapshots before real comparisons. No benchmark runs are included.",
+  "tasks": [
+    {
+      "id": "TH01",
+      "project": "TheekHai",
+      "category": "bug_fix",
+      "prompt": "Inspect session refresh failure handling and fix any loss of a valid session caused by a transient provider error.",
+      "acceptance": "Add focused tests distinguishing transient errors from invalid credentials; preserve authorization checks."
+    },
+    {
+      "id": "TH02",
+      "project": "TheekHai",
+      "category": "bug_fix",
+      "prompt": "Inspect how complaint API failures are shown in the web client and fix a failure path that leaves the user without a useful error.",
+      "acceptance": "Show a specific recoverable error and cover it in an existing web test."
+    },
+    {
+      "id": "TH03",
+      "project": "TheekHai",
+      "category": "feature",
+      "prompt": "Add a case-insensitive search over existing legal source titles in the relevant backend search flow.",
+      "acceptance": "Add focused tests and preserve approval and authorization rules."
+    },
+    {
+      "id": "TH04",
+      "project": "TheekHai",
+      "category": "feature",
+      "prompt": "Add a clear loading indicator to the web case list using its existing loading state.",
+      "acceptance": "Add an accessible label and verify the loading and loaded states."
+    },
+    {
+      "id": "TH05",
+      "project": "TheekHai",
+      "category": "investigation",
+      "prompt": "Identify where browser sessions are issued, validated, refreshed, and cleared.",
+      "acceptance": "Return a concise map of existing paths and symbols supported by source references."
+    },
+    {
+      "id": "TH06",
+      "project": "TheekHai",
+      "category": "investigation",
+      "prompt": "Find how complaint workflow transitions are validated and persisted.",
+      "acceptance": "Explain the flow and cite the relevant implementation and tests."
+    },
+    {
+      "id": "TH07",
+      "project": "TheekHai",
+      "category": "repeat_investigation",
+      "prompt": "After previously investigating browser sessions, find the code responsible for recovery session expiry.",
+      "acceptance": "Identify exact symbols and distinguish recovery sessions from ordinary browser sessions."
+    },
+    {
+      "id": "TH08",
+      "project": "TheekHai",
+      "category": "repeat_investigation",
+      "prompt": "After mapping complaint workflow, identify the existing review and reopen conditions.",
+      "acceptance": "Cite the actual workflow implementation and tests without restating the entire prior map."
+    },
+    {
+      "id": "TH09",
+      "project": "TheekHai",
+      "category": "continuation",
+      "prompt": "Continue an interrupted task to add an accessible empty state to the web case list; first inspect existing code and tests.",
+      "acceptance": "Make a minimal change and verify empty versus error states."
+    },
+    {
+      "id": "TH10",
+      "project": "TheekHai",
+      "category": "continuation",
+      "prompt": "Continue an interrupted task to improve a Kotlin account-screen error message without changing the API contract.",
+      "acceptance": "Preserve existing behavior and add a focused test where practical."
+    },
+    {
+      "id": "TH11",
+      "project": "TheekHai",
+      "category": "cross_project",
+      "prompt": "Find an existing input validation pattern appropriate for adapting to a separate local notebook project.",
+      "acceptance": "Cite the source and explain which parts are generic and which are project specific."
+    },
+    {
+      "id": "TH12",
+      "project": "TheekHai",
+      "category": "cross_project",
+      "prompt": "Identify a reusable test isolation pattern for adapting to a different project.",
+      "acceptance": "Describe the pattern and avoid treating TheekHai-specific state as global behavior."
+    },
+    {
+      "id": "NB01",
+      "project": "fixture_notebook",
+      "category": "bug_fix",
+      "prompt": "Fix notebook entry IDs so deleting an entry cannot cause an ID to be reused.",
+      "acceptance": "Add tests for deletion followed by addition; preserve existing records."
+    },
+    {
+      "id": "NB02",
+      "project": "fixture_notebook",
+      "category": "bug_fix",
+      "prompt": "Handle malformed notebook JSON without silently overwriting existing data.",
+      "acceptance": "Add a focused test that confirms the original file remains unchanged."
+    },
+    {
+      "id": "NB03",
+      "project": "fixture_notebook",
+      "category": "feature",
+      "prompt": "Add case-insensitive tag filtering to the notebook.",
+      "acceptance": "Add tests for matching tags and no matches."
+    },
+    {
+      "id": "NB04",
+      "project": "fixture_notebook",
+      "category": "feature",
+      "prompt": "Add an operation to unarchive an entry by ID.",
+      "acceptance": "Test success and missing ID; preserve other entries."
+    },
+    {
+      "id": "NB05",
+      "project": "fixture_notebook",
+      "category": "feature",
+      "prompt": "Add an optional flag that excludes archived entries from notebook search.",
+      "acceptance": "Keep current default behavior and test both modes."
+    },
+    {
+      "id": "NB06",
+      "project": "fixture_notebook",
+      "category": "feature",
+      "prompt": "Validate that new entries have non-empty titles.",
+      "acceptance": "Reject whitespace-only titles and add a regression test."
+    },
+    {
+      "id": "NB07",
+      "project": "fixture_notebook",
+      "category": "investigation",
+      "prompt": "Find how notebook entries are loaded, stored, and searched.",
+      "acceptance": "Give a concise source-grounded map of functions and the file format."
+    },
+    {
+      "id": "NB08",
+      "project": "fixture_notebook",
+      "category": "repeat_investigation",
+      "prompt": "After investigating notebook storage, identify the exact archive behavior and its failure case.",
+      "acceptance": "Cite the implementation without repeating the full storage map."
+    },
+    {
+      "id": "NB09",
+      "project": "fixture_notebook",
+      "category": "continuation",
+      "prompt": "Continue an interrupted task to add a count of archived notebook entries.",
+      "acceptance": "Implement a small method and focused tests without changing the file format."
+    },
+    {
+      "id": "NB10",
+      "project": "fixture_notebook",
+      "category": "continuation",
+      "prompt": "Continue an interrupted task to make search ignore leading and trailing query whitespace.",
+      "acceptance": "Add a regression test and preserve case-insensitive matching."
+    },
+    {
+      "id": "NB11",
+      "project": "fixture_notebook",
+      "category": "cross_project",
+      "prompt": "Adapt a generic input-validation lesson from another project to notebook titles.",
+      "acceptance": "Implement only the generic validation, cite the local evidence, and do not import external project-specific assumptions."
+    },
+    {
+      "id": "NB12",
+      "project": "fixture_notebook",
+      "category": "cross_project",
+      "prompt": "Apply a general temporary-directory test isolation pattern to notebook tests.",
+      "acceptance": "Use local tests and avoid dependencies on another project or its secrets."
+    }
+  ]
+}
