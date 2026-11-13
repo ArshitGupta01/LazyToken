@@ -78,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
                 try: result = kn.feature_call(action,args,conn)
                 finally: conn.close()
                 return self._json(result,400 if "error" in result else 200)
-            except sqlite3.Error:
+            except (sqlite3.Error,RuntimeError):
                 return self._json({"error":"Unable to read local database"},500)
         if parsed.path == "/api/projects":
             return self._json(read_projects())
@@ -119,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
             try: result=kn.feature_call("review",args,conn)
             finally: conn.close()
             return self._json(result,400 if "error" in result else 200)
-        except (ValueError, UnicodeDecodeError, sqlite3.Error):
+        except (ValueError, UnicodeDecodeError, sqlite3.Error, RuntimeError):
             return self._json({"error":"Unable to process review"},400)
 
     def log_message(self, fmt: str, *args: object) -> None:
@@ -145,6 +145,10 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
+    # Initialize additive schema updates before opening graph reads in read-only mode.
+    if database_path().is_file():
+        conn = kn.connect(database_path())
+        conn.close()
     server = LocalServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{server.server_address[1]}"
     print(f"Knowledge Graph Explorer: {url} (loopback only; Ctrl+C to stop)", flush=True)

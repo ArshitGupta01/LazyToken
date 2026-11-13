@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -32,7 +33,7 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         kn.add_asset({'kind':'lesson','name':'old','summary':'existing'},self.db)
         self.db.close()
         self.db = kn.connect(Path(self.temp.name) / 'test.sqlite3')
-        self.assertEqual(self.db.execute('SELECT count(*) FROM lazytoken_migrations').fetchone()[0],1)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM lazytoken_migrations').fetchone()[0],4)
         self.assertEqual(self.db.execute("SELECT count(*) FROM assets WHERE name='old'").fetchone()[0],1)
 
     def test_default_location_uses_existing_legacy_store_when_needed(self):
@@ -42,6 +43,20 @@ class LazyTokenFeaturesTests(unittest.TestCase):
             self.assertEqual(kn.data_root(),legacy)
             preferred=local/'TheekHai'/'KnowledgeNetwork';preferred.mkdir(parents=True);(preferred/'network.sqlite3').touch()
             self.assertEqual(kn.data_root(),preferred)
+
+    def test_existing_database_gets_backup_before_migration(self):
+        path=Path(self.temp.name)/'legacy.sqlite3'
+        old=sqlite3.connect(path);old.execute('CREATE TABLE legacy_marker(value TEXT)');old.execute("INSERT INTO legacy_marker VALUES('preserved')");old.commit();old.close()
+        upgraded=kn.connect(path);upgraded.close()
+        backups=list(Path(self.temp.name).glob('legacy.sqlite3.pre-v4-*.sqlite3'))
+        self.assertEqual(len(backups),1)
+        copy=sqlite3.connect(backups[0]);self.assertEqual(copy.execute('SELECT value FROM legacy_marker').fetchone()[0],'preserved');copy.close()
+
+    def test_future_schema_is_not_modified(self):
+        path=Path(self.temp.name)/'future.sqlite3'
+        db=sqlite3.connect(path);db.execute('CREATE TABLE lazytoken_migrations(version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)');db.execute('INSERT INTO lazytoken_migrations VALUES(99,1)');db.commit();db.close()
+        with self.assertRaises(RuntimeError): kn.connect(path)
+        db=sqlite3.connect(path);self.assertEqual(db.execute('SELECT version FROM lazytoken_migrations').fetchone()[0],99);db.close()
 
     def test_proposal_review_freshness_and_isolation(self):
         proposal=self.run_action('propose',project=self.project,kind='lesson',name='Session fix',summary='Use the session service',task='Fix login',evidence='Verified by tests',paths=['AccountService.kt'])
@@ -69,6 +84,41 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         self.assertEqual(self.run_action('review',project=self.project,id=p['id'],action='reject')['status'],'rejected')
         self.assertEqual(self.db.execute("SELECT count(*) FROM assets WHERE name='Decision'").fetchone()[0],0)
 
+    def test_reopening_does_not_promote_project_relationship_to_global(self):
+        kn.add_asset({'kind':'framework','name':'Source','summary':'Source'},self.db)
+        kn.add_asset({'kind':'framework','name':'Target','summary':'Target'},self.db)
+        kn.link_assets({'source':'Source','target':'Target','relation':'uses','weight':.8,'evidence':'Project-only evidence','project':self.project},self.db)
+        self.db.close();self.db=kn.connect(Path(self.temp.name)/'test.sqlite3')
+        scopes=[r[0] for r in self.db.execute("SELECT scope FROM asset_link_evidence WHERE relation='uses'")]
+        self.assertEqual(scopes,[self.project])
+        ranked=self.run_action('search',project=self.project,query='Source')['results']
+        self.assertTrue(any(item.get('name')=='Target' and 'project' in item.get('why','') for item in ranked))
+        other=Path(self.temp.name)/'unrelated';other.mkdir();kn.sync(other,self.db)
+        self.assertEqual(kn.get_master_graph(self.db,project=str(other))['edge_count'],0)
+        self.assertNotIn('Target',str(self.run_action('search',project=str(other),query='Source')['results']))
+        kn.link_assets({'source':'Source','target':'Target','relation':'uses','weight':.8,'evidence':'Separately declared global evidence','project':'*'},self.db)
+        audit=self.run_action('audit_scopes')
+        self.assertEqual(len(audit['ambiguous_global_and_project']),1)
+        self.assertEqual(len(audit['ambiguous_global_and_project'][0]['evidence']),2)
+
+    def test_memory_outcome_dedup_verification_and_supersession(self):
+        args={'project':self.project,'kind':'lesson','name':'Session recovery','summary':'Use refresh','task':'Fix login','problem':'Expired session','attempts':'Retry once','resolution':'Refresh token','evidence':'Reviewed source','paths':['AuthClient.kt']}
+        proposal=self.run_action('propose',**args)
+        duplicate=self.run_action('propose',**args)
+        self.assertEqual(duplicate['existing_id'],proposal['id'])
+        result=self.run_action('review',project=self.project,id=proposal['id'],action='approve',verified=True)
+        self.assertEqual(result['status'],'approved')
+        memory=self.run_action('proposals',project=self.project)['proposals'][0]
+        self.assertEqual((memory['problem'],memory['attempts'],memory['resolution'],memory['verification_state']),('Expired session','Retry once','Refresh token','verified'))
+        self.assertEqual(self.run_action('review',project=self.project,id=proposal['id'],action='supersede')['status'],'superseded')
+        self.assertNotIn('Session recovery',str(self.run_action('search',project=self.project,query='Session recovery')['results']))
+        self.assertNotIn('Session recovery',str(kn.get_master_graph(self.db,project=self.project)['nodes']))
+
+    def test_mcp_direct_memory_write_requires_proposal(self):
+        result=kn.call('record_asset',{'kind':'lesson','name':'Unreviewed','summary':'Not yet reviewed','project':self.project},self.db)
+        self.assertIn('error',result)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM assets WHERE name='Unreviewed'").fetchone()[0],0)
+
     def test_metadata_search_budget_and_dependencies(self):
         results=self.run_action('search',project=self.project,query='Where is user authentication handled?')['results']
         self.assertTrue(any('Account' in str(r) or 'Auth' in str(r) for r in results))
@@ -78,6 +128,34 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         deps=self.run_action('dependencies',project=self.project)['dependencies']
         self.assertEqual(deps[0]['status'],'provisional')
         self.assertEqual(deps[0]['candidates'][0]['name'],'AuthClient')
+
+    def test_optional_fts_is_scoped_and_updates_after_changes(self):
+        try: self.db.execute('SELECT 1 FROM lazytoken_fts LIMIT 1')
+        except sqlite3.OperationalError: self.skipTest('SQLite build has no FTS5')
+        file=self.root/'ProfileRegistry.py';file.write_text('class ProfileRegistry: pass',encoding='utf-8');kn.sync(self.root,self.db)
+        result=self.run_action('search',project=self.project,query='profil')['results']
+        self.assertTrue(any(r.get('name')=='ProfileRegistry' for r in result))
+        other=Path(self.temp.name)/'other-fts';other.mkdir();kn.sync(other,self.db)
+        self.assertFalse(self.run_action('search',project=str(other),query='profil')['results'])
+        file.unlink();kn.sync(self.root,self.db)
+        self.assertFalse(any(r.get('name')=='ProfileRegistry' for r in self.run_action('search',project=self.project,query='profil')['results']))
+
+    def test_fts_absence_keeps_lexical_search_working(self):
+        try: self.db.execute('DROP TABLE lazytoken_fts');self.db.commit()
+        except sqlite3.OperationalError: pass
+        kn.sync(self.root,self.db)
+        self.assertTrue(self.run_action('search',project=self.project,query='auth')['results'])
+
+    def test_source_range_is_explicit_bounded_and_project_scoped(self):
+        source=self.root/'example.py';source.write_text('class Example:\n    password = "pretend-value"\n    MY_SECRET = "another-pretend-value"\n',encoding='utf-8');kn.sync(self.root,self.db)
+        result=kn.call('inspect_source_range',{'project':self.project,'path':'example.py','start_line':1,'end_line':3},self.db)
+        self.assertEqual(result['lines'][1]['text'],'[redacted: possible credential]')
+        self.assertNotIn('pretend-value',str(result))
+        self.assertEqual(result['lines'][2]['text'],'[redacted: possible credential]')
+        self.assertIn('error',kn.call('inspect_source_range',{'project':self.project,'path':'../example.py','start_line':1,'end_line':3},self.db))
+        self.assertIn('error',kn.call('inspect_source_range',{'project':self.project,'path':'example.py','start_line':1,'end_line':81},self.db))
+        source.write_text('class Changed: pass',encoding='utf-8')
+        self.assertIn('error',kn.call('inspect_source_range',{'project':self.project,'path':'example.py','start_line':1,'end_line':1},self.db))
 
     def test_benchmark_missing_values_and_pairing(self):
         self.run_action('benchmark_record',task='Synthetic task',variant='baseline',model='model',settings={'temperature':0},input_tokens=40,output_tokens=10)
@@ -97,5 +175,3 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         self.assertIn('not a model tokenizer',value['budget_type'])
 
 if __name__ == '__main__': unittest.main()
-
-

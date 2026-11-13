@@ -10,3 +10,5 @@ mcp_config.json
 .env.*
 .venv/
 benchmark/results/
+build/
+release/

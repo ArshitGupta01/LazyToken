@@ -158,13 +158,13 @@ Build this first.
 
 This becomes the main intelligence layer.
 
-- [ ] Introduce a primary task-aware retrieval function such as `get_task_context`.
+- [x] Introduce a primary task-aware retrieval function such as `get_task_context`.
 - [ ] Accept explicit token budgets.
 - [ ] Return ranked, deduplicated, relevance-explained results.
-- [ ] Start with tiny context breadcrumbs, not source dumps.
+- [x] Start with tiny context breadcrumbs, not source dumps.
 - [ ] Allow progressive expansion only when needed.
-- [ ] Support compact / balanced / deep modes.
-- [ ] Return an abstain/no-confident-match outcome when appropriate.
+- [x] Support compact / balanced / deep modes.
+- [x] Return an abstain/no-confident-match outcome when appropriate.
 - [ ] Respect strict project isolation.
 
 ### P0-03 — Zero-retrieval decision mode
@@ -178,7 +178,7 @@ This is critical for best possible token savings.
 
 ### P0-04 — Session-aware context deduplication
 
-- [ ] Track what context has already been supplied in the active task/session.
+- [x] Track what context has already been supplied in the active task/session.
 - [ ] Avoid repeating the same summaries or graph results.
 - [ ] Avoid resending identical evidence unless explicitly requested.
 - [ ] Compress updates relative to already-sent context.
@@ -202,12 +202,12 @@ This is critical for best possible token savings.
 
 Inspired by Ponytail principles, but owned by LazyToken.
 
-- [ ] Reuse-before-create policy.
-- [ ] Prefer minimal safe diffs.
-- [ ] Avoid unnecessary new dependencies.
-- [ ] Preserve security and validation.
-- [ ] Encourage test discipline.
-- [ ] Prefer existing project capabilities before inventing new layers.
+- [x] Reuse-before-create policy.
+- [x] Prefer minimal safe diffs.
+- [x] Avoid unnecessary new dependencies.
+- [x] Preserve security and validation.
+- [x] Encourage test discipline.
+- [x] Prefer existing project capabilities before inventing new layers.
 - [ ] Offer built-in review and audit flows.
 
 ### P0-08 — Automatic memory proposals
@@ -252,10 +252,10 @@ Planned commands, not current claims:
 ### P1-03 — Better code search, built in
 
 - [ ] Improve path, declaration, and import search.
-- [ ] Add SQLite FTS5 where available.
+- [x] Add SQLite FTS5 where available.
 - [ ] Improve identifier normalization and splitting.
 - [ ] Add limited code dependency signals.
-- [ ] Add on-demand source range inspection.
+- [x] Add on-demand source range inspection.
 - [ ] Add optional semantic search only if benchmarked benefit justifies it.
 
 ### P1-04 — Freshness and provenance system
@@ -512,8 +512,8 @@ Ponytail uses the MIT License, so selective code reuse may be possible if done c
 ### M3 — Product experience
 - [ ] Package Windows-first all-in-one build.
 - [ ] Add setup wizard and CLI.
-- [ ] Add local dashboard.
-- [ ] Add 2D graph view.
+- [x] Add local dashboard.
+- [x] Add 2D graph view.
 - [ ] Add analytics panel.
 
 ### M4 — Visual differentiation

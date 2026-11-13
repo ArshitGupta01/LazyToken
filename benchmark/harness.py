@@ -82,6 +82,12 @@ def compare(runs):
     return comparisons
 
 
+def csv_safe(value):
+    """Keep user-supplied text from becoming a spreadsheet formula."""
+    if isinstance(value,str) and value.startswith(('=','+','-','@','\t','\r')): return "'"+value
+    return value
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--corpus',default=str(Path(__file__).with_name('corpus.json')))
@@ -102,7 +108,10 @@ def main(argv=None):
             if args.command=='export-json': json.dump({'runs':rows,'comparisons':comparisons},f,ensure_ascii=False,indent=2)
             else:
                 writer=csv.DictWriter(f,fieldnames=list(FIELDS)+['reported_total_tokens','total_with_indexing']);writer.writeheader()
-                for row in rows: writer.writerow({**row,'settings':json.dumps(row['settings'],sort_keys=True,ensure_ascii=False)})
+                for row in rows:
+                    safe={key:csv_safe(value) for key,value in row.items()}
+                    safe['settings']=json.dumps(row['settings'],sort_keys=True,ensure_ascii=False)
+                    writer.writerow(safe)
         print('Exported '+args.output);return 0
     except (ValueError,OSError,json.JSONDecodeError) as exc:
         print(str(exc),file=sys.stderr);return 2

@@ -77,8 +77,9 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.assertEqual(seeded["linked"], 6)
         result = kn.search("Ktor backend", self.db)
         self.assertEqual(result["results"][0]["name"], "Ktor")
-        self.assertEqual(result["results"][0]["used_in"], ["TheekHai"])
-        graph=kn.get_master_graph(self.db)
+        self.assertEqual(result["results"][0]["used_in"], [])
+        self.assertEqual(kn.get_master_graph(self.db)['edge_count'],0)
+        graph=kn.get_master_graph(self.db,project=str(self.root))
         self.assertEqual(graph["node_count"],6)
         self.assertEqual(graph["edge_count"],6)
 

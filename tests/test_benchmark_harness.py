@@ -47,4 +47,10 @@ class BenchmarkHarnessTests(unittest.TestCase):
             with output.open(encoding='utf-8',newline='') as file: self.assertEqual(next(csv.DictReader(file))['task_id'],'NB01')
             before=output.read_bytes();self.assertEqual(harness.main(['export-json',str(source),str(output)]),2);self.assertEqual(output.read_bytes(),before)
 
+    def test_csv_export_escapes_formula_text(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source=Path(temp)/'runs.json';source.write_text(json.dumps([{**self.base,'notes':'=HYPERLINK("bad")'}]),encoding='utf-8')
+            output=Path(temp)/'export.csv';self.assertEqual(harness.main(['export-csv',str(source),str(output)]),0)
+            with output.open(encoding='utf-8',newline='') as file: self.assertTrue(next(csv.DictReader(file))['notes'].startswith("'="))
+
 if __name__=='__main__': unittest.main()
