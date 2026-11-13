@@ -50,7 +50,7 @@ python .\kn.py report
 python -m unittest discover -s .\tests -p test_*.py
 ```
 
-## Local 2D graph dashboard
+## Local graph dashboard
 
 After installing/seeding the pilot, start the local graph explorer from PowerShell:
 
@@ -91,7 +91,7 @@ Do not run matched tasks until explicitly requested. When ready, use comparable 
 
 Optional session IDs retain only hashes and metadata keys, scoped by project. Unchanged breadcrumbs are omitted on later calls; file or asset changes can be returned again. Use MCP `clear_context_session` (or CLI action `clear_session`) to remove that session’s fingerprints. `LazyToken.exe checkpoint --project <path> --session-id <id>` returns a small session reference for continuation after compaction. The built-in `coding_efficiency_policy` MCP tool and `POLICY.md` describe reuse, safe changes, and verification.
 
-The graph’s 2D mode is the default. Optional 3D mode uses the same data and filters; its depth is a visual layout aid, not a measured semantic distance. Drag empty space to orbit, Shift-drag to pan, scroll to zoom, and click a node to inspect it. Memory status distinguishes current, stale, and unverified evidence. Project-scoped links appear only for the selected project; when exactly one project is indexed, the dashboard selects it on opening. The shared view shows global links only.
+The graph’s 2D mode is the default. Optional 3D mode loads a locally bundled Three.js WebGL renderer on demand and shares the project, search, filters, and inspector with 2D. Its depth is a visual layout aid, not a measured semantic distance. In 3D, drag to orbit, right-drag to pan, scroll to zoom, and click a node to inspect it. If WebGL is unavailable, the dashboard returns to 2D. For responsiveness the dashboard displays up to 500 nodes and 3,000 relationships and indicates when results are truncated. The bundled renderer works offline; see `THIRD_PARTY_NOTICES.md` for its license. Memory status distinguishes current, stale, and unverified evidence. Project-scoped links appear only for the selected project; when exactly one project is indexed, the dashboard selects it on opening. The shared view shows global links only.
 
 An earlier legacy-link migration could create ambiguous global duplicates for project-scoped relationships. New migrations do not promote already-scoped links. Run `python .\kn.py lazytoken audit_scopes` to list possible global/project overlaps and unresolved legacy links for human review; it never deletes or changes them. Existing ambiguous links are not automatically removed. Database upgrades create a sibling SQLite backup before changing an existing pre-v4 database.
 

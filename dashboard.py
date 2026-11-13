@@ -29,7 +29,7 @@ def read_graph(project: str = "") -> dict:
     conn = sqlite3.connect(f"file:{quote(path.as_posix(), safe='/:')}?mode=ro", uri=True, timeout=2)
     conn.row_factory = sqlite3.Row
     try:
-        return kn.get_master_graph(conn, 500, project)
+        return kn.get_master_graph(conn, 500, project, edge_limit=3000)
     finally:
         conn.close()
 
@@ -86,7 +86,7 @@ class Handler(BaseHTTPRequestHandler):
             params = parse_qs(parsed.query)
             result = read_graph(params.get("project", [""])[0][:1000])
             return self._json(result, 400 if "error" in result else 200)
-        if parsed.path not in ("/", "/index.html", "/app.js", "/features-ui.js", "/styles.css"):
+        if parsed.path not in ("/", "/index.html", "/app.js", "/features-ui.js", "/styles.css", "/graph3d.js", "/vendor/three.module.js", "/vendor/three.core.js", "/vendor/OrbitControls.js"):
             return self._json({"error": "Not found"}, 404)
         target = HERE / ("index.html" if parsed.path in ("/", "/index.html") else parsed.path.lstrip("/"))
         body = target.read_bytes()

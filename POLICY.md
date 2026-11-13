@@ -11,3 +11,5 @@ Use this guidance as project-local assistance, subject to the user's instruction
 7. Review changes for correctness, maintainability, and regressions before claiming completion.
 8. Propose reusable lessons with evidence; a human explicitly approves and verifies them.
 9. Measure total provider usage and outcome before claiming token savings.
+
+Before choosing a minimal change, trace the affected data flow and consider error handling, access checks, expected load, and accessibility. Review the surrounding behavior as well as the diff; describe concrete failure modes and checks that were not performed. These original guidelines were informed by reviewing [Ponytail](https://github.com/DietrichGebert/ponytail); LazyToken does not require it as a dependency or reuse its code.

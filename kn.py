@@ -406,30 +406,33 @@ def link_assets(args: dict[str,Any], conn: sqlite3.Connection) -> dict[str,Any]:
     return {"linked":True,"source":source,"target":target,"relation":relation,"weight":weight,"scope":scope}
 
 
-def get_master_graph(conn:sqlite3.Connection,limit:int=50,project:str="")->dict[str,Any]:
+def get_master_graph(conn:sqlite3.Connection,limit:int=50,project:str="",edge_limit:int|None=None)->dict[str,Any]:
     project_id=resolve_project(project,conn) if project else ""
     if project and not project_id:return {"error":"Unknown project. Run sync_project with its absolute path first."}
-    if project_id:
-        nodes=conn.execute("SELECT id,kind,name,summary,tags,source,scope,project_id FROM assets WHERE scope='global' OR (scope='project' AND project_id=?) ORDER BY kind,name LIMIT ?",(project_id,limit)).fetchall()
-    else:
-        nodes=conn.execute("SELECT id,kind,name,summary,tags,source,scope,project_id FROM assets WHERE scope='global' ORDER BY kind,name LIMIT ?",(limit,)).fetchall()
-    nodes=[n for n in nodes if not conn.execute("SELECT 1 FROM memory_proposals WHERE asset_id=? AND status='superseded'",(n['id'],)).fetchone()]
+    condition="(scope='global' OR (scope='project' AND project_id=?))" if project_id else "scope='global'"
+    values=(project_id,) if project_id else ()
+    condition+=" AND NOT EXISTS (SELECT 1 FROM memory_proposals m WHERE m.asset_id=assets.id AND m.status='superseded')"
+    total_nodes=conn.execute(f"SELECT count(*) FROM assets WHERE {condition}",values).fetchone()[0]
+    nodes=conn.execute(f"SELECT id,kind,name,summary,tags,source,scope,project_id FROM assets WHERE {condition} ORDER BY kind,name LIMIT ?",(*values,limit)).fetchall()
     ids={int(n["id"]) for n in nodes}
-    edges=[]
+    edges=[];edges_truncated=False
     if project_id:
         edge_rows=conn.execute("SELECT e.source_id,e.target_id,e.relation,e.scope,e.weight,e.evidence,a.name source_name,b.name target_name FROM asset_link_evidence e JOIN assets a ON a.id=e.source_id JOIN assets b ON b.id=e.target_id WHERE e.scope='*' OR e.scope=? ORDER BY a.name,b.name,e.relation",(project_id,))
     else:
         edge_rows=conn.execute("SELECT e.source_id,e.target_id,e.relation,e.scope,e.weight,e.evidence,a.name source_name,b.name target_name FROM asset_link_evidence e JOIN assets a ON a.id=e.source_id JOIN assets b ON b.id=e.target_id WHERE e.scope='*' ORDER BY a.name,b.name,e.scope,e.relation")
     for edge in edge_rows:
         if edge["source_id"] in ids and edge["target_id"] in ids:
-            edges.append({"source":edge["source_name"],"target":edge["target_name"],"relation":edge["relation"],"weight":edge["weight"],"scope":edge["scope"],"evidence":edge["evidence"]})
+            if edge_limit is not None and len(edges)>=edge_limit:
+                edges_truncated=True
+                break
+            edges.append({"source":edge["source_name"],"target":edge["target_name"],"source_id":edge["source_id"],"target_id":edge["target_id"],"relation":edge["relation"],"weight":edge["weight"],"scope":edge["scope"],"evidence":edge["evidence"]})
     result_nodes=[]
     for node in nodes:
         item=dict(node)
         memory=conn.execute("SELECT id FROM memory_proposals WHERE asset_id=? AND status='approved'",(item['id'],)).fetchone()
         if memory: item.update(features.health(conn,memory['id']))
         result_nodes.append(item)
-    return {"nodes":result_nodes,"edges":edges,"node_count":len(nodes),"edge_count":len(edges),"note":"Weights express evidence strength for deterministic spreading activation; they are not trained neural parameters."}
+    return {"nodes":result_nodes,"edges":edges,"node_count":len(nodes),"edge_count":len(edges),"total_nodes":total_nodes,"nodes_truncated":total_nodes>len(nodes),"edges_truncated":edges_truncated,"note":"Weights express evidence strength for deterministic spreading activation; they are not trained neural parameters."}
 
 
 SEED_ASSETS = [

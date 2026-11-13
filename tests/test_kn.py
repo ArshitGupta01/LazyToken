@@ -82,6 +82,11 @@ class KnowledgeNetworkTests(unittest.TestCase):
         graph=kn.get_master_graph(self.db,project=str(self.root))
         self.assertEqual(graph["node_count"],6)
         self.assertEqual(graph["edge_count"],6)
+        self.assertTrue(all(isinstance(e['source_id'],int) and isinstance(e['target_id'],int) for e in graph['edges']))
+        bounded=kn.get_master_graph(self.db,limit=3,project=str(self.root),edge_limit=1)
+        self.assertEqual((bounded['total_nodes'],bounded['node_count'],bounded['edge_count']),(6,3,1))
+        self.assertTrue(bounded['nodes_truncated'])
+        self.assertTrue(bounded['edges_truncated'])
 
     def test_search_spreads_activation_to_related_assets(self):
         kn.sync(self.root, self.db)
@@ -116,6 +121,18 @@ class KnowledgeNetworkTests(unittest.TestCase):
         kn.sync(other,self.db)
         other_results=kn.search("TheekHai-only",self.db,str(other))
         self.assertEqual(other_results["results"],[])
+
+    def test_graph_edges_identify_duplicate_names_by_id(self):
+        kn.sync(self.root,self.db)
+        shared=kn.add_asset({'kind':'framework','name':'Same name','summary':'Shared asset'},self.db)
+        local=kn.add_asset({'kind':'lesson','name':'Same name','summary':'Project note','scope':'project','project':str(self.root)},self.db)
+        target=kn.add_asset({'kind':'framework','name':'Other asset','summary':'Target'},self.db)
+        result=kn.link_assets({'source':'Same name','target':'Other asset','relation':'relates','weight':.7,'evidence':'Project evidence','project':str(self.root)},self.db)
+        self.assertTrue(result['linked'])
+        graph=kn.get_master_graph(self.db,project=str(self.root))
+        self.assertEqual(graph['edges'][0]['source_id'],local['id'])
+        self.assertEqual(graph['edges'][0]['target_id'],target['id'])
+        self.assertNotEqual(shared['id'],local['id'])
 
     def test_old_unscoped_edges_migrate_to_their_shared_project(self):
         legacy=Path(self.tmp.name)/"legacy.sqlite3"
