@@ -1,0 +1,42 @@
+name: Verify LazyToken
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  checks:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m black --check .
+      - run: npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css tests/workspace.test.cjs
+      - run: python -m unittest discover -s tests -p "test_*.py"
+      - run: node --check app.js
+      - run: node --check graph3d.js
+      - run: node --check features-ui.js
+      - if: runner.os == 'Windows'
+        run: python -m pip install PyInstaller==6.19.0 tokenizers==0.19.1
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: ./build_release.ps1 -Output ./release/ci-candidate
+      - if: runner.os == 'Windows'
+        run: ./release/ci-candidate/LazyToken/LazyToken.exe doctor
+      - if: runner.os == 'Windows'
+        run: python tests/smoke_release.py release/ci-candidate
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lazytoken-windows-candidate
+          path: |
+            release/ci-candidate/*.zip
+            release/ci-candidate/SHA256SUMS
+            release/ci-candidate/bootstrap.ps1

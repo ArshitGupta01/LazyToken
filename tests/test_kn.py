@@ -5,6 +5,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import kn
+from legacy_seed_fixture import seed_fixture
 
 
 class KnowledgeNetworkTests(unittest.TestCase):
@@ -14,7 +15,10 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.root.mkdir()
         (self.root / ".gitignore").write_text("ignored.txt\n", encoding="utf-8")
         (self.root / "README.md").write_text("TheekHai project pilot\n", encoding="utf-8")
-        (self.root / "src.kt").write_text("package demo\nimport demo.core.Api\nclass AccountStore {\n fun lookupAccount(id: String) {}\n}\n", encoding="utf-8")
+        (self.root / "src.kt").write_text(
+            "package demo\nimport demo.core.Api\nclass AccountStore {\n fun lookupAccount(id: String) {}\n}\n",
+            encoding="utf-8",
+        )
         (self.root / ".env").write_text("API_KEY=do-not-index", encoding="utf-8")
         (self.root / "ignored.txt").write_text("ignored", encoding="utf-8")
         self.db_path = Path(self.tmp.name) / "graph.sqlite3"
@@ -56,15 +60,25 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.assertTrue(all(row.get("project") == "TheekHai" for row in scoped["results"]))
 
     def test_symbol_search_uses_identifier_words_not_substrings(self):
-        (self.root/"nav.kt").write_text("class SidebarNavItem {}\nclass ViteServer {}\n",encoding="utf-8")
-        kn.sync(self.root,self.db)
-        result=kn.search("Vite TypeScript",self.db,str(self.root))
-        names=[r["name"] for r in result["results"] if r["type"]=="symbol"]
-        self.assertIn("ViteServer",names)
-        self.assertNotIn("SidebarNavItem",names)
+        (self.root / "nav.kt").write_text(
+            "class SidebarNavItem {}\nclass ViteServer {}\n", encoding="utf-8"
+        )
+        kn.sync(self.root, self.db)
+        result = kn.search("Vite TypeScript", self.db, str(self.root))
+        names = [r["name"] for r in result["results"] if r["type"] == "symbol"]
+        self.assertIn("ViteServer", names)
+        self.assertNotIn("SidebarNavItem", names)
 
     def test_assets_and_budget_estimate(self):
-        saved = kn.add_asset({"kind":"pattern","name":"small-context","summary":"Retrieve only task-relevant context","tags":"tokens"}, self.db)
+        saved = kn.add_asset(
+            {
+                "kind": "pattern",
+                "name": "small-context",
+                "summary": "Retrieve only task-relevant context",
+                "tags": "tokens",
+            },
+            self.db,
+        )
         self.assertTrue(saved["saved"])
         result = kn.search("small-context", self.db)
         self.assertEqual(result["results"][0]["type"], "asset")
@@ -72,73 +86,114 @@ class KnowledgeNetworkTests(unittest.TestCase):
 
     def test_seeded_master_asset_links_to_project(self):
         kn.sync(self.root, self.db)
-        seeded = kn.seed_project(self.root, self.db)
+        seeded = seed_fixture(self.root, self.db)
         self.assertEqual(seeded["seeded"], 6)
         self.assertEqual(seeded["linked"], 6)
         result = kn.search("Ktor backend", self.db)
         self.assertEqual(result["results"][0]["name"], "Ktor")
         self.assertEqual(result["results"][0]["used_in"], [])
-        self.assertEqual(kn.get_master_graph(self.db)['edge_count'],0)
-        graph=kn.get_master_graph(self.db,project=str(self.root))
-        self.assertEqual(graph["node_count"],6)
-        self.assertEqual(graph["edge_count"],6)
-        self.assertTrue(all(isinstance(e['source_id'],int) and isinstance(e['target_id'],int) for e in graph['edges']))
-        bounded=kn.get_master_graph(self.db,limit=3,project=str(self.root),edge_limit=1)
-        self.assertEqual((bounded['total_nodes'],bounded['node_count'],bounded['edge_count']),(6,3,1))
-        self.assertTrue(bounded['nodes_truncated'])
-        self.assertTrue(bounded['edges_truncated'])
+        self.assertEqual(kn.get_master_graph(self.db)["edge_count"], 0)
+        graph = kn.get_master_graph(self.db, project=str(self.root))
+        self.assertEqual(graph["node_count"], 6)
+        self.assertEqual(graph["edge_count"], 6)
+        self.assertTrue(
+            all(
+                isinstance(e["source_id"], int) and isinstance(e["target_id"], int)
+                for e in graph["edges"]
+            )
+        )
+        bounded = kn.get_master_graph(self.db, limit=3, project=str(self.root), edge_limit=1)
+        self.assertEqual(
+            (bounded["total_nodes"], bounded["node_count"], bounded["edge_count"]), (6, 3, 1)
+        )
+        self.assertTrue(bounded["nodes_truncated"])
+        self.assertTrue(bounded["edges_truncated"])
 
     def test_search_spreads_activation_to_related_assets(self):
         kn.sync(self.root, self.db)
-        kn.seed_project(self.root, self.db)
-        result=kn.search("Vite TypeScript",self.db,str(self.root))
-        names=[r["name"] for r in result["results"] if r["type"]=="asset"]
-        self.assertEqual(names[:2],["Vite + TypeScript","Ktor"])
-        self.assertLess(result["results"][1]["activation"],1.0)
+        seed_fixture(self.root, self.db)
+        result = kn.search("Vite TypeScript", self.db, str(self.root))
+        names = [r["name"] for r in result["results"] if r["type"] == "asset"]
+        self.assertEqual(names[:2], ["Vite + TypeScript", "Ktor"])
+        self.assertLess(result["results"][1]["activation"], 1.0)
 
     def test_new_project_does_not_inherit_theekhai_links_or_seed_assets(self):
-        kn.sync(self.root,self.db)
-        kn.seed_project(self.root,self.db)
-        other=Path(self.tmp.name)/"new-app"
+        kn.sync(self.root, self.db)
+        seed_fixture(self.root, self.db)
+        other = Path(self.tmp.name) / "new-app"
         other.mkdir()
-        (other/"README.md").write_text("New app",encoding="utf-8")
-        kn.sync(other,self.db)
-        seed=kn.seed_project(other,self.db)
-        self.assertEqual(seed["asset_edges"],0)
-        other_search=kn.search("Vite TypeScript",self.db,str(other))
-        names=[r["name"] for r in other_search["results"] if r["type"]=="asset"]
-        self.assertEqual(names,["Vite + TypeScript"])
-        other_graph=kn.get_master_graph(self.db,project=str(other))
-        self.assertEqual(other_graph["edge_count"],0)
+        (other / "README.md").write_text("New app", encoding="utf-8")
+        kn.sync(other, self.db)
+        seed = seed_fixture(other, self.db)
+        self.assertEqual(seed["asset_edges"], 0)
+        other_search = kn.search("Vite TypeScript", self.db, str(other))
+        names = [r["name"] for r in other_search["results"] if r["type"] == "asset"]
+        self.assertEqual(names, ["Vite + TypeScript"])
+        other_graph = kn.get_master_graph(self.db, project=str(other))
+        self.assertEqual(other_graph["edge_count"], 0)
 
     def test_project_scoped_lesson_stays_in_its_project(self):
-        kn.sync(self.root,self.db)
-        saved=kn.add_asset({"kind":"lesson","name":"TheekHai-only","summary":"Project-specific lesson","scope":"project","project":str(self.root)},self.db)
+        kn.sync(self.root, self.db)
+        saved = kn.add_asset(
+            {
+                "kind": "lesson",
+                "name": "TheekHai-only",
+                "summary": "Project-specific lesson",
+                "scope": "project",
+                "project": str(self.root),
+            },
+            self.db,
+        )
         self.assertTrue(saved["saved"])
-        self.assertIn("TheekHai-only",str(kn.search("TheekHai-only",self.db,str(self.root))))
-        other=Path(self.tmp.name)/"second-app"
+        self.assertIn("TheekHai-only", str(kn.search("TheekHai-only", self.db, str(self.root))))
+        other = Path(self.tmp.name) / "second-app"
         other.mkdir()
-        kn.sync(other,self.db)
-        other_results=kn.search("TheekHai-only",self.db,str(other))
-        self.assertEqual(other_results["results"],[])
+        kn.sync(other, self.db)
+        other_results = kn.search("TheekHai-only", self.db, str(other))
+        self.assertEqual(other_results["results"], [])
 
     def test_graph_edges_identify_duplicate_names_by_id(self):
-        kn.sync(self.root,self.db)
-        shared=kn.add_asset({'kind':'framework','name':'Same name','summary':'Shared asset'},self.db)
-        local=kn.add_asset({'kind':'lesson','name':'Same name','summary':'Project note','scope':'project','project':str(self.root)},self.db)
-        target=kn.add_asset({'kind':'framework','name':'Other asset','summary':'Target'},self.db)
-        result=kn.link_assets({'source':'Same name','target':'Other asset','relation':'relates','weight':.7,'evidence':'Project evidence','project':str(self.root)},self.db)
-        self.assertTrue(result['linked'])
-        graph=kn.get_master_graph(self.db,project=str(self.root))
-        self.assertEqual(graph['edges'][0]['source_id'],local['id'])
-        self.assertEqual(graph['edges'][0]['target_id'],target['id'])
-        self.assertNotEqual(shared['id'],local['id'])
+        kn.sync(self.root, self.db)
+        shared = kn.add_asset(
+            {"kind": "framework", "name": "Same name", "summary": "Shared asset"}, self.db
+        )
+        local = kn.add_asset(
+            {
+                "kind": "lesson",
+                "name": "Same name",
+                "summary": "Project note",
+                "scope": "project",
+                "project": str(self.root),
+            },
+            self.db,
+        )
+        target = kn.add_asset(
+            {"kind": "framework", "name": "Other asset", "summary": "Target"}, self.db
+        )
+        result = kn.link_assets(
+            {
+                "source": "Same name",
+                "target": "Other asset",
+                "relation": "relates",
+                "weight": 0.7,
+                "evidence": "Project evidence",
+                "project": str(self.root),
+            },
+            self.db,
+        )
+        self.assertTrue(result["linked"])
+        graph = kn.get_master_graph(self.db, project=str(self.root))
+        self.assertEqual(graph["edges"][0]["source_id"], local["id"])
+        self.assertEqual(graph["edges"][0]["target_id"], target["id"])
+        self.assertNotEqual(shared["id"], local["id"])
 
     def test_old_unscoped_edges_migrate_to_their_shared_project(self):
-        legacy=Path(self.tmp.name)/"legacy.sqlite3"
+        legacy = Path(self.tmp.name) / "legacy.sqlite3"
         import sqlite3
-        old=sqlite3.connect(legacy)
-        old.executescript("""
+
+        old = sqlite3.connect(legacy)
+        old.executescript(
+            """
           CREATE TABLE projects(id TEXT PRIMARY KEY, root TEXT NOT NULL, updated_at INTEGER NOT NULL DEFAULT 0);
           CREATE TABLE assets(id INTEGER PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL, summary TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
           CREATE TABLE asset_projects(asset_id INTEGER NOT NULL, project_id TEXT NOT NULL, relation TEXT NOT NULL DEFAULT 'used_in', PRIMARY KEY(asset_id,project_id,relation));
@@ -149,18 +204,28 @@ class KnowledgeNetworkTests(unittest.TestCase):
           INSERT INTO asset_projects VALUES(1,'D:\\LegacyApp','used_in');
           INSERT INTO asset_projects VALUES(2,'D:\\LegacyApp','used_in');
           INSERT INTO asset_links VALUES(1,2,'uses',0.9,'README.md evidence',1);
-        """)
+        """
+        )
         old.close()
-        migrated=kn.connect(legacy)
-        edge=migrated.execute("SELECT scope,evidence FROM asset_link_evidence").fetchone()
-        self.assertEqual(edge["scope"],"D:\\LegacyApp")
-        self.assertEqual(edge["evidence"],"README.md evidence")
+        migrated = kn.connect(legacy)
+        edge = migrated.execute("SELECT scope,evidence FROM asset_link_evidence").fetchone()
+        self.assertEqual(edge["scope"], "D:\\LegacyApp")
+        self.assertEqual(edge["evidence"], "README.md evidence")
         migrated.close()
 
     def test_measurement_uses_actual_inputs_and_reports_net_tokens(self):
-        result = kn.measure_task({"task":"same change","baseline_tokens":1200,"network_tokens":700,"indexing_tokens":100}, self.db)
-        self.assertEqual(result["net_tokens_saved"], 400)
-        self.assertEqual(result["percent_saved"], 33.3)
+        result = kn.measure_task(
+            {
+                "task": "same change",
+                "baseline_tokens": 1200,
+                "network_tokens": 700,
+                "indexing_tokens": 100,
+            },
+            self.db,
+        )
+        self.assertEqual(result["recorded_difference"], 400)
+        self.assertIsNone(result["net_tokens_saved"])
+        self.assertIsNone(result["percent_saved"])
 
 
 if __name__ == "__main__":

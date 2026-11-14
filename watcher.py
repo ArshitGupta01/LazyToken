@@ -1,0 +1,319 @@
+"""Single-worker, metadata-first automatic synchronization for selected projects."""
+
+from __future__ import annotations
+import json
+import os
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
+import time
+
+_CHILDREN = {}
+
+
+class StoreLock:
+    def __init__(self, path, create=True):
+        self.path = Path(path)
+        self.file = None
+        self.create = create
+        self.error = None
+
+    def acquire(self):
+        from onboarding import regular_path
+
+        if not self.create and not self.path.is_file():
+            return False
+        flags = os.O_RDWR | (os.O_CREAT if self.create else 0)
+        try:
+            regular_path(self.path)
+            self.file = os.fdopen(os.open(self.path, flags, 0o600), "r+b")
+            if self.create and self.path.stat().st_size == 0:
+                self.file.write(b"0")
+                self.file.flush()
+            self.file.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(self.file.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self.file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except (OSError, ValueError):
+            if self.file is None:
+                self.error = "Watcher lock is inaccessible or unsafe."
+            if self.file:
+                self.file.close()
+                self.file = None
+            return False
+
+    def close(self):
+        if self.file:
+            self.file.close()
+            self.file = None
+
+
+def status(directory):
+    directory = Path(directory)
+    path = directory / "watch-status.json"
+    try:
+        result = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (ValueError, OSError):
+        result = {"warning": "Watcher status file is unreadable."}
+    if not isinstance(result, dict):
+        result = {"warning": "Watcher status file is invalid."}
+    lock = StoreLock(directory / "watch.lock", create=False)
+    if not (directory / "watch.lock").is_file():
+        running = False
+    else:
+        acquired = lock.acquire()
+        running = not acquired and not lock.error
+        if lock.error:
+            result["error"] = lock.error
+        lock.close()
+    result["running"] = running
+    return result
+
+
+# shortcut: metadata polling may miss timestamp-preserving edits; periodic full verification catches them.
+def snapshot(kn, root):
+    if not root.is_dir():
+        return None
+    values = {}
+    for relative in kn.list_files(root):
+        try:
+            stat = (root / relative).stat()
+            values[relative] = (stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size, stat.st_ino)
+        except OSError:
+            values[relative] = ("unreadable",)
+    return values
+
+
+class ProjectWatcher:
+    def __init__(self, kn, connection, debounce=1.0, full_interval=300.0):
+        self.kn = kn
+        self.db = connection
+        self.debounce = debounce
+        self.full_interval = full_interval
+        self.projects = {}
+
+    def tick(self, now=None):
+        now = time.monotonic() if now is None else now
+        indexed = self.db.execute("SELECT id,root FROM projects ORDER BY root").fetchall()
+        active = {row["id"] for row in indexed}
+        self.projects = {key: value for key, value in self.projects.items() if key in active}
+        for row in indexed:
+            project = row["id"]
+            root = Path(row["root"])
+            state = self.projects.setdefault(
+                project,
+                {
+                    "observed": None,
+                    "applied": None,
+                    "pending_since": None,
+                    "last_change": now,
+                    "last_full": None,
+                },
+            )
+            try:
+                current = snapshot(self.kn, root)
+            except (OSError, subprocess.SubprocessError):
+                current = None
+            if current is None:
+                if state.get("state") != "unavailable":
+                    self.db.execute(
+                        "INSERT OR IGNORE INTO index_errors SELECT project_id,path FROM files WHERE project_id=?",
+                        (project,),
+                    )
+                    self.db.commit()
+                state["state"] = "unavailable"
+                state["error"] = "Repository unavailable; existing index preserved."
+                state["observed"] = None
+                state["applied"] = None
+                continue
+            if current != state["observed"]:
+                state["observed"] = current
+                state["last_change"] = now
+                if state["pending_since"] is None:
+                    state["pending_since"] = now
+            retry = 10 if state.get("error_count", 0) else self.full_interval
+            full = (
+                state["applied"] is None
+                or state["last_full"] is None
+                or now - state["last_full"] >= retry
+            )
+            changed = current != state["applied"]
+            settled = now - state["last_change"] >= self.debounce
+            overdue = state["pending_since"] is not None and now - state["pending_since"] >= 10
+            if not full and not (changed and (settled or overdue)):
+                continue
+            hints = (
+                None
+                if full
+                else {
+                    path
+                    for path in current.keys() | state["applied"].keys()
+                    if current.get(path) != state["applied"].get(path)
+                }
+            )
+            try:
+                result = self.kn.sync(root, self.db, changed_hint=hints)
+                if "error" in result:
+                    raise OSError("Repository became unavailable")
+                state.update(
+                    state="watching",
+                    applied=current,
+                    pending_since=None,
+                    last_sync=int(time.time()),
+                    error_count=result["error_count"],
+                    last_result={
+                        key: result[key] for key in ("added", "changed", "removed", "error_count")
+                    },
+                )
+                state.pop("error", None)
+                if full:
+                    state["last_full"] = now
+            except (OSError, sqlite3.Error, subprocess.SubprocessError):
+                self.db.rollback()
+                state["state"] = "retrying"
+                state["error"] = "Sync failed; retrying without discarding the previous index."
+                state["applied"] = None
+        return {
+            project: {
+                key: value
+                for key, value in state.items()
+                if key not in ("observed", "applied", "pending_since", "last_change", "last_full")
+            }
+            for project, state in self.projects.items()
+        }
+
+
+def run(kn, interval=2.0, debounce=1.0):
+    directory = kn.data_root()
+    directory.mkdir(parents=True, exist_ok=True)
+    lock = StoreLock(directory / "watch.lock")
+    if not lock.acquire():
+        return {"error": lock.error} if lock.error else {"already_running": True}
+    from onboarding import atomic_write
+
+    stop = directory / "watch-stop.json"
+    connection = None
+    try:
+        stop.unlink(missing_ok=True)
+        connection = kn.connect()
+        engine = ProjectWatcher(kn, connection, debounce=debounce)
+        while True:
+            if stop.exists():
+                break
+            report = {
+                "pid": os.getpid(),
+                "updated_at": int(time.time()),
+                "interval_seconds": interval,
+            }
+            try:
+                report["projects"] = engine.tick()
+            except sqlite3.Error:
+                connection.rollback()
+                report["error"] = "Database temporarily unavailable; automatic sync will retry."
+            atomic_write(directory / "watch-status.json", json.dumps(report).encode())
+            deadline = time.monotonic() + interval
+            while time.monotonic() < deadline and not stop.exists():
+                time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if connection:
+            connection.close()
+        atomic_write(
+            directory / "watch-status.json",
+            json.dumps({"pid": os.getpid(), "stopped_at": int(time.time())}).encode(),
+        )
+        lock.close()
+    return {"stopped": True}
+
+
+def ensure(kn, connection):
+    row = connection.execute("PRAGMA database_list").fetchone()
+    expected = kn.data_root() / "network.sqlite3"
+    if not row or not row[2] or Path(row[2]).resolve() != expected.resolve():
+        return {
+            "running": False,
+            "note": "Automatic worker applies to the configured network.sqlite3 store only.",
+        }
+    if not connection.execute("SELECT 1 FROM projects LIMIT 1").fetchone():
+        return {"running": False, "note": "No selected repositories."}
+    return start(kn)
+
+
+def start(kn, force=False, interval=2.0, debounce=1.0):
+    if not force and os.environ.get("LAZYTOKEN_DISABLE_AUTOWATCH") == "1":
+        return {"running": False, "disabled": True}
+    directory = kn.data_root()
+    if not (directory / "network.sqlite3").is_file():
+        return {"running": False, "note": "Initialize storage and add a selected repository first."}
+    existing = status(directory)
+    if existing["running"]:
+        return existing
+    args = [sys.executable]
+    if not getattr(sys, "frozen", False):
+        args.append(str(Path(kn.__file__).resolve()))
+    args += ["watch", "run", "--interval", str(interval), "--debounce", str(debounce)]
+    env = {**os.environ, "KN_HOME": str(directory.resolve())}
+    options = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "env": env,
+        "close_fds": True,
+    }
+    if os.name == "nt":
+        options["creationflags"] = subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+    else:
+        options["start_new_session"] = True
+    process = subprocess.Popen(args, **options)
+    _CHILDREN[str(directory.resolve())] = process
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        result = status(directory)
+        if result["running"] and result.get("pid") == process.pid:
+            return result
+        if process.poll() is not None:
+            return {
+                "running": False,
+                "error": "Watcher did not start; run lazytoken watch run to see local errors.",
+            }
+        time.sleep(0.05)
+    return {
+        "running": status(directory)["running"],
+        "note": "Watcher initialization is in progress; use watch status.",
+    }
+
+
+def stop(kn):
+    directory = kn.data_root()
+
+    def reap():
+        process = _CHILDREN.pop(str(directory.resolve()), None)
+        if process:
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                _CHILDREN[str(directory.resolve())] = process
+
+    if not status(directory)["running"]:
+        reap()
+        return {"stopped": True}
+    from onboarding import atomic_write
+
+    atomic_write(directory / "watch-stop.json", b"{}")
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        if not status(directory)["running"]:
+            reap()
+            return {"stopped": True}
+        time.sleep(0.1)
+    return {
+        "error": "Watcher is still finishing a sync. Retry watch stop before lifecycle maintenance."
+    }

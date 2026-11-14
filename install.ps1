@@ -1,77 +1,96 @@
-param(
-    [string]$ProjectRoot = $PSScriptRoot,
-    [switch]$ConfigureClients,
-    [switch]$InstallCodeGraphRag
-)
-$ErrorActionPreference = 'Stop'
-$ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
-$Python = Get-Command python -ErrorAction SilentlyContinue
-if (-not $Python) { throw 'Python is not on PATH. Install Python 3.11 or newer, then reopen PowerShell.' }
-$Version = & $Python.Source -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'
-if ($LASTEXITCODE -ne 0 -or [version]$Version -lt [version]'3.11') { throw "Python 3.11+ required; found $Version" }
-$DataRoot = if ($env:KN_HOME) { $env:KN_HOME } else { Join-Path $env:LOCALAPPDATA 'TheekHai\KnowledgeNetwork' }
-New-Item -ItemType Directory -Force -Path $DataRoot | Out-Null
-$env:KN_HOME = $DataRoot
-& $Python.Source (Join-Path $PSScriptRoot 'kn.py') sync $ProjectRoot
-if ($LASTEXITCODE -ne 0) { throw 'Initial project indexing failed.' }
-& $Python.Source (Join-Path $PSScriptRoot 'kn.py') seed $ProjectRoot
-if ($LASTEXITCODE -ne 0) { throw 'Initial reusable asset graph setup failed.' }
-& $Python.Source -m unittest discover -s (Join-Path $PSScriptRoot 'tests') -p 'test_*.py'
-if ($LASTEXITCODE -ne 0) { throw 'Knowledge Network self-checks failed.' }
-
-if ($InstallCodeGraphRag) {
-    $Uv = Get-Command uv -ErrorAction SilentlyContinue
-    if (-not $Uv) { throw 'Install uv first (https://docs.astral.sh/uv/getting-started/installation/) or omit -InstallCodeGraphRag.' }
-    & $Uv.Source tool install 'code-graph-rag[treesitter-full,ast-grep,semantic]'
-    if ($LASTEXITCODE -ne 0) { throw 'Code-Graph-RAG installation failed; the core pilot remains independently usable.' }
+param([string]$Version='latest',[string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Programs\LazyToken'),[string]$PackagePath,[string]$ExpectedSha256,[string]$PublisherThumbprint,[switch]$Upgrade,[switch]$NoPathRegistration)
+$ErrorActionPreference='Stop'
+function Get-Sha256([string]$Path) {
+    # Keep bootstrap hashing independent of optional PowerShell modules.
+    $Stream = [IO.File]::OpenRead($Path)
+    $Hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        return [BitConverter]::ToString($Hasher.ComputeHash($Stream)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $Stream.Dispose()
+        $Hasher.Dispose()
+    }
 }
 
-$Config = [ordered]@{
-    mcpServers = [ordered]@{
-        lazytoken = [ordered]@{
-            command = $Python.Source
-            args = @((Join-Path $PSScriptRoot 'kn.py'), 'mcp')
-            env = @{ KN_HOME = $DataRoot }
+$ProgressPreference='SilentlyContinue'
+$PublisherRecord=Join-Path $InstallRoot '.publisher.json'
+if (Test-Path -LiteralPath $PublisherRecord) {
+    $Pinned=(Get-Content -Raw -LiteralPath $PublisherRecord | ConvertFrom-Json).thumbprint
+    if ($PublisherThumbprint -and $Pinned -ne $PublisherThumbprint) {throw 'Publisher differs from the existing installation pin.'}
+    $PublisherThumbprint=$Pinned
+}
+if ($PublisherThumbprint -and $PublisherThumbprint -notmatch '^[a-fA-F0-9]{40}$') {throw 'Invalid trusted publisher certificate thumbprint.'}
+if ($env:OS -ne 'Windows_NT' -or -not [Environment]::Is64BitOperatingSystem) { throw 'Windows x64 is required.' }
+$Architecture=if ($env:PROCESSOR_ARCHITEW6432) {$env:PROCESSOR_ARCHITEW6432} else {$env:PROCESSOR_ARCHITECTURE}
+if ($Architecture -ne 'AMD64') { throw 'No verified package for this Windows architecture.' }
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+$TempRoot=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+$Stage=Join-Path $TempRoot ('LazyToken-install-'+[guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $Stage | Out-Null
+try {
+    if (-not $PackagePath) {
+        if ($Version -ne 'latest' -and $Version -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?$') { throw 'Invalid version tag.' }
+        $Api=if ($Version -eq 'latest') {'https://api.github.com/repos/ArshitGupta01/LazyToken/releases/latest'} else {'https://api.github.com/repos/ArshitGupta01/LazyToken/releases/tags/'+$Version}
+        try {$Release=Invoke-RestMethod -Uri $Api -Headers @{Accept='application/vnd.github+json';'User-Agent'='LazyToken-installer'}} catch {throw 'No accessible verified release. Nothing installed. Publication of a tested release is required.'}
+        if ($Release.draft -or $Release.tag_name -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?$') {throw 'Unsupported release metadata.'}
+        $Name='lazytoken-'+$Release.tag_name+'-windows-x64.zip'
+        $Assets=@($Release.assets | Where-Object {$_.name -eq $Name})
+        if ($Assets.Count -ne 1) {throw "Missing unique artifact: $Name"}
+        $Asset=$Assets[0]
+        if ($Asset.digest -notmatch '^sha256:([a-fA-F0-9]{64})$') {throw 'Release lacks a trusted SHA-256 digest; refused.'}
+        $PublishedHash=$Matches[1]
+        if ($ExpectedSha256 -and $ExpectedSha256 -ne $PublishedHash) {throw 'Independent checksum differs from release metadata.'}
+        $ExpectedSha256=$PublishedHash
+        if ($Asset.size -le 0 -or $Asset.size -gt 268435456) {throw 'Unsupported artifact size.'}
+        $Prefix='https://github.com/ArshitGupta01/LazyToken/releases/download/'+$Release.tag_name+'/'
+        if (-not $Asset.browser_download_url.StartsWith($Prefix,[StringComparison]::Ordinal)) {throw 'Unexpected download location.'}
+        $PackagePath=Join-Path $Stage $Name
+        Invoke-WebRequest -UseBasicParsing -Uri $Asset.browser_download_url -OutFile $PackagePath
+    }
+    if ($ExpectedSha256 -notmatch '^[a-fA-F0-9]{64}$') {throw 'A trusted SHA-256 is mandatory.'}
+    if (-not (Test-Path -LiteralPath $PackagePath -PathType Leaf) -or (Get-Item -LiteralPath $PackagePath).Length -gt 268435456) {throw 'Artifact missing or too large.'}
+    if ((Get-Sha256 $PackagePath) -ne $ExpectedSha256) {throw 'SHA-256 mismatch. No downloaded code was executed.'}
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $Archive=[IO.Compression.ZipFile]::OpenRead([IO.Path]::GetFullPath($PackagePath))
+    $Extract=Join-Path $Stage 'verified'
+    New-Item -ItemType Directory -Path $Extract | Out-Null
+    try {
+        $Seen=@{};[long]$Total=0
+        if ($Archive.Entries.Count -gt 5000) {throw 'Too many archive entries.'}
+        foreach ($Entry in $Archive.Entries) {
+            $Name=$Entry.FullName.Replace('\','/');$Parts=$Name.Split('/')
+            if ($Name.StartsWith('/') -or $Name.Contains(':') -or $Parts -contains '..' -or $Parts -contains '.' -or (($Entry.ExternalAttributes -shr 16) -band 0xF000) -eq 0xA000) {throw 'Unsafe archive path or symlink.'}
+            foreach ($Part in $Parts) {if ($Part -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)' -or $Part.EndsWith('.') -or $Part.EndsWith(' ')) {throw 'Unsupported Windows archive name.'}}
+            if ($Seen.ContainsKey($Name.ToLowerInvariant())) {throw 'Duplicate archive entry.'};$Seen[$Name.ToLowerInvariant()]=$true
+            $Total+=$Entry.Length
+            if ($Total -gt 1073741824 -or $Entry.Length -gt 134217728) {throw 'Expanded archive exceeds limits.'}
+            $Target=[IO.Path]::GetFullPath((Join-Path $Extract $Name))
+            if (-not $Target.StartsWith($Extract+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) {throw 'Archive leaves extraction root.'}
+        }
+        foreach ($Entry in $Archive.Entries) {
+            $Target=[IO.Path]::GetFullPath((Join-Path $Extract $Entry.FullName))
+            if ($Entry.FullName.EndsWith('/')) {New-Item -ItemType Directory -Force -Path $Target | Out-Null} else {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Target) | Out-Null
+                [IO.Compression.ZipFileExtensions]::ExtractToFile($Entry,$Target,$false)
+            }
+        }
+    } finally {$Archive.Dispose()}
+    foreach ($Required in @('install.ps1','LazyToken\release-manifest.json','LazyToken\LazyToken.exe','LazyToken\_internal\python311.dll','LazyToken\_internal\index.html','LazyToken\_internal\vendor\three.module.js')) {if (-not (Test-Path -LiteralPath (Join-Path $Extract $Required) -PathType Leaf)) {throw "Incomplete artifact: $Required"}}
+    if ($PublisherThumbprint) {
+        if (-not (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue)) {throw 'Authenticode verification unavailable; refusing the publisher-pinned install.'}
+        foreach ($SignedFile in @('install.ps1','LazyToken\LazyToken.exe')) {
+            $Signature=Get-AuthenticodeSignature -LiteralPath (Join-Path $Extract $SignedFile)
+            if ($Signature.Status -ne 'Valid' -or $Signature.SignerCertificate.Thumbprint -ne $PublisherThumbprint) {throw 'Trusted publisher signature verification failed.'}
         }
     }
-} | ConvertTo-Json -Depth 8
-$ConfigPath = Join-Path $PSScriptRoot 'mcp_config.json'
-$Config | Set-Content -LiteralPath $ConfigPath -Encoding utf8
-Write-Host "Knowledge Network initialized. MCP snippet: $ConfigPath"
-Write-Host "Shared local data: $DataRoot"
-if (-not $ConfigureClients) { Write-Host 'Add the mcpServers entry to Antigravity and Codex using the documented client setup steps, or rerun with -ConfigureClients.' }
-if ($ConfigureClients) {
-    $Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $AntigravityConfig = Join-Path $env:USERPROFILE '.gemini\config\mcp_config.json'
-    $AntigravityDir = Split-Path -Parent $AntigravityConfig
-    New-Item -ItemType Directory -Force -Path $AntigravityDir | Out-Null
-    if (Test-Path -LiteralPath $AntigravityConfig) {
-        $Antigravity = Get-Content -LiteralPath $AntigravityConfig -Raw | ConvertFrom-Json
-        if (-not $Antigravity.mcpServers) { $Antigravity | Add-Member -NotePropertyName mcpServers -NotePropertyValue ([pscustomobject]@{}) }
-    } else {
-        $Antigravity = [pscustomobject]@{ mcpServers = [pscustomobject]@{} }
-    }
-    $Entry = $Config | ConvertFrom-Json
-    $Existing = $Antigravity.mcpServers.PSObject.Properties['lazytoken']
-    if (-not $Existing) {
-        if (Test-Path -LiteralPath $AntigravityConfig) { Copy-Item -LiteralPath $AntigravityConfig -Destination "$AntigravityConfig.$Stamp.bak" }
-        $Antigravity.mcpServers | Add-Member -NotePropertyName lazytoken -NotePropertyValue $Entry.mcpServers.lazytoken
-        $Antigravity | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $AntigravityConfig -Encoding utf8
-    }
-    $null = Get-Content -LiteralPath $AntigravityConfig -Raw | ConvertFrom-Json
-
-    $Codex = Get-Command codex -ErrorAction SilentlyContinue
-    if (-not $Codex) { throw 'Antigravity was configured, but Codex CLI was not found. Add the generated TOML entry manually; see README.md.' }
-    $CodexConfig = Join-Path $env:USERPROFILE '.codex\config.toml'
-    & $Codex.Source mcp get lazytoken 2>$null | Out-Null
-    $CodexAlreadyConfigured = $LASTEXITCODE -eq 0
-    if (-not $CodexAlreadyConfigured) {
-        if (Test-Path -LiteralPath $CodexConfig) { Copy-Item -LiteralPath $CodexConfig -Destination "$CodexConfig.$Stamp.bak" }
-        $AddArgs = @('mcp','add','lazytoken','--env',"KN_HOME=$DataRoot",'--',$Python.Source,(Join-Path $PSScriptRoot 'kn.py'),'mcp')
-        & $Codex.Source @AddArgs | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'Codex MCP registration failed. Restore its timestamped backup if needed, then use the README manual setup.' }
-    }
-    & $Codex.Source mcp get lazytoken | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Codex did not confirm the new MCP registration.' }
-    Write-Host "Antigravity and Codex MCP entries are present. Any changed settings files were backed up with a timestamp. Restart both clients to load the MCP server."
+    $Options=@{Action=$(if ($Upgrade) {'upgrade'} else {'install'});InstallRoot=$InstallRoot;Source=(Join-Path $Extract 'LazyToken')}
+    $PreviouslyRegistered=Test-Path -LiteralPath (Join-Path $InstallRoot '.path-registration.json')
+    if (-not $NoPathRegistration -and (-not $Upgrade -or $PreviouslyRegistered)) {$Options.RegisterPath=$true}
+    & (Join-Path $Extract 'install.ps1') @Options
+    if (-not $?) {throw 'Managed install failed; prior version retained.'}
+    if ($PublisherThumbprint) {@{thumbprint=$PublisherThumbprint} | ConvertTo-Json | Set-Content -LiteralPath $PublisherRecord -Encoding UTF8}
+    Write-Host 'Open a new terminal. Run lazytoken init, then lazytoken add <repository>.'
+} finally {
+    $Resolved=[IO.Path]::GetFullPath($Stage)
+    if ($Resolved.StartsWith($TempRoot,[StringComparison]::OrdinalIgnoreCase) -and (Split-Path -Leaf $Resolved) -match '^LazyToken-install-[a-f0-9]{32}$' -and (Test-Path -LiteralPath $Resolved) -and -not ((Get-Item -LiteralPath $Resolved).Attributes -band [IO.FileAttributes]::ReparsePoint)) {Remove-Item -LiteralPath $Resolved -Recurse -Force}
 }

@@ -1,91 +1,91 @@
 {
-  "version": 1,
+  "version": 2,
   "status": "draft_not_executed",
-  "note": "Candidate tasks require human review and pinned independent source snapshots before real comparisons. No benchmark runs are included.",
+  "note": "Draft unexecuted tasks. Select an explicit repository, confirm applicability and pin independent source snapshots before any authorized agent experiment.",
   "tasks": [
     {
-      "id": "TH01",
-      "project": "TheekHai",
+      "id": "RP01",
+      "project": "selected_repository",
       "category": "bug_fix",
-      "prompt": "Inspect session refresh failure handling and fix any loss of a valid session caused by a transient provider error.",
-      "acceptance": "Add focused tests distinguishing transient errors from invalid credentials; preserve authorization checks."
+      "prompt": "Inspect authentication error handling and fix one verified transient-error/session-loss bug.",
+      "acceptance": "First confirm applicability; add focused regression tests and preserve authorization checks."
     },
     {
-      "id": "TH02",
-      "project": "TheekHai",
+      "id": "RP02",
+      "project": "selected_repository",
       "category": "bug_fix",
-      "prompt": "Inspect how complaint API failures are shown in the web client and fix a failure path that leaves the user without a useful error.",
-      "acceptance": "Show a specific recoverable error and cover it in an existing web test."
+      "prompt": "Inspect file persistence and fix one verified atomic-write or corrupted-input failure.",
+      "acceptance": "First reproduce the issue and add a focused test."
     },
     {
-      "id": "TH03",
-      "project": "TheekHai",
+      "id": "RP03",
+      "project": "selected_repository",
       "category": "feature",
-      "prompt": "Add a case-insensitive search over existing legal source titles in the relevant backend search flow.",
-      "acceptance": "Add focused tests and preserve approval and authorization rules."
+      "prompt": "Add a small accessible empty state to an existing list UI, if applicable.",
+      "acceptance": "Preserve error states; verify empty and populated states."
     },
     {
-      "id": "TH04",
-      "project": "TheekHai",
+      "id": "RP04",
+      "project": "selected_repository",
       "category": "feature",
-      "prompt": "Add a clear loading indicator to the web case list using its existing loading state.",
-      "acceptance": "Add an accessible label and verify the loading and loaded states."
+      "prompt": "Add validation to an existing public input boundary.",
+      "acceptance": "Reuse conventions and test invalid and valid inputs."
     },
     {
-      "id": "TH05",
-      "project": "TheekHai",
+      "id": "RP05",
+      "project": "selected_repository",
       "category": "investigation",
-      "prompt": "Identify where browser sessions are issued, validated, refreshed, and cleared.",
-      "acceptance": "Return a concise map of existing paths and symbols supported by source references."
+      "prompt": "Identify where user authentication is handled in this selected repository.",
+      "acceptance": "Cite exact files and symbols; abstain if the feature does not exist."
     },
     {
-      "id": "TH06",
-      "project": "TheekHai",
+      "id": "RP06",
+      "project": "selected_repository",
       "category": "investigation",
-      "prompt": "Find how complaint workflow transitions are validated and persisted.",
-      "acceptance": "Explain the flow and cite the relevant implementation and tests."
+      "prompt": "Map the selected repository persistence boundaries.",
+      "acceptance": "Cite evidence and distinguish confirmed from unresolved dependencies."
     },
     {
-      "id": "TH07",
-      "project": "TheekHai",
+      "id": "RP07",
+      "project": "selected_repository",
       "category": "repeat_investigation",
-      "prompt": "After previously investigating browser sessions, find the code responsible for recovery session expiry.",
-      "acceptance": "Identify exact symbols and distinguish recovery sessions from ordinary browser sessions."
+      "prompt": "Using prior authentication investigation, locate session-expiry behavior.",
+      "acceptance": "Reuse prior context where valid and cite current evidence."
     },
     {
-      "id": "TH08",
-      "project": "TheekHai",
+      "id": "RP08",
+      "project": "selected_repository",
       "category": "repeat_investigation",
-      "prompt": "After mapping complaint workflow, identify the existing review and reopen conditions.",
-      "acceptance": "Cite the actual workflow implementation and tests without restating the entire prior map."
+      "prompt": "Using prior persistence investigation, locate recovery behavior.",
+      "acceptance": "Identify current implementation; abstain if not present."
     },
     {
-      "id": "TH09",
-      "project": "TheekHai",
+      "id": "RP09",
+      "project": "selected_repository",
       "category": "continuation",
-      "prompt": "Continue an interrupted task to add an accessible empty state to the web case list; first inspect existing code and tests.",
-      "acceptance": "Make a minimal change and verify empty versus error states."
+      "prompt": "Continue an interrupted validation change after context compaction.",
+      "acceptance": "Inspect the actual state, preserve unrelated work, and run applicable tests."
     },
     {
-      "id": "TH10",
-      "project": "TheekHai",
+      "id": "RP10",
+      "project": "selected_repository",
       "category": "continuation",
-      "prompt": "Continue an interrupted task to improve a Kotlin account-screen error message without changing the API contract.",
-      "acceptance": "Preserve existing behavior and add a focused test where practical."
+      "prompt": "Continue an interrupted empty-state change after context compaction.",
+      "acceptance": "Verify the actual changes and relevant accessibility behavior."
     },
     {
-      "id": "TH11",
-      "project": "TheekHai",
+      "id": "RP11",
+      "project": "selected_repository",
       "category": "cross_project",
-      "prompt": "Find an existing input validation pattern appropriate for adapting to a separate local notebook project.",
-      "acceptance": "Cite the source and explain which parts are generic and which are project specific."
+      "prompt": "Identify a reusable validation pattern for review by a different project.",
+      "acceptance": "Cite evidence; keep project-specific facts scoped and proposed."
     },
     {
-      "id": "TH12",
-      "project": "TheekHai",
+      "id": "RP12",
+      "project": "selected_repository",
       "category": "cross_project",
-      "prompt": "Identify a reusable test isolation pattern for adapting to a different project.",
-      "acceptance": "Describe the pattern and avoid treating TheekHai-specific state as global behavior."
+      "prompt": "Evaluate whether a prior debugging lesson applies to this selected project.",
+      "acceptance": "Verify compatibility; reject or adapt unsupported assumptions."
     },
     {
       "id": "NB01",

@@ -1,0 +1,2 @@
+# Formatting only; the installed CLI has no dependency on this tool.
+black==24.10.0

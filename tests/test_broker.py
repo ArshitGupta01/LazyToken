@@ -4,58 +4,211 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 import sys
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import kn
+
 
 class ContextBrokerTests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(); self.root=Path(self.temp.name)/'project';self.root.mkdir()
-        (self.root/'AuthService.py').write_text('class AuthService:\n    pass\n',encoding='utf-8')
-        self.db=kn.connect(Path(self.temp.name)/'store.sqlite3');kn.sync(self.root,self.db);self.project=str(self.root.resolve())
-    def tearDown(self): self.db.close();self.temp.cleanup()
-    def call(self,**args): return kn.call('get_task_context',{'project':self.project,'task':'authentication auth',**args},self.db)
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name) / "project"
+        self.root.mkdir()
+        (self.root / "AuthService.py").write_text(
+            "class AuthService:\n    pass\n", encoding="utf-8"
+        )
+        self.db = kn.connect(Path(self.temp.name) / "store.sqlite3")
+        kn.sync(self.root, self.db)
+        self.project = str(self.root.resolve())
+
+    def tearDown(self):
+        self.db.close()
+        self.temp.cleanup()
+
+    def call(self, **args):
+        return kn.call(
+            "get_task_context",
+            {"project": self.project, "task": "authentication auth", **args},
+            self.db,
+        )
+
     def test_budget_explanation_and_session_dedup(self):
-        first=self.call(session_id='session-1',budget=500)
-        self.assertEqual(first['decision'],'retrieve');self.assertTrue(first['results']);self.assertLessEqual(first['estimated_tokens'],500)
-        self.assertTrue(all('why' in x for x in first['results']))
-        second=self.call(session_id='session-1',budget=500)
-        self.assertEqual(second['results'],[]);self.assertGreater(second['suppressed_seen'],0)
-        checkpoint=kn.feature_call('checkpoint',{'project':self.project,'session_id':'session-1'},self.db)
-        self.assertGreater(checkpoint['supplied_items'],0)
-        self.assertNotIn('class AuthService',str(checkpoint))
-        self.assertTrue(self.call(session_id='session-1',budget=500,include_seen=True)['results'])
-        self.assertGreater(kn.call('clear_context_session',{'project':self.project,'session_id':'session-1'},self.db)['cleared'],0)
-        self.assertTrue(self.call(session_id='session-1',budget=500)['results'])
+        first = self.call(session_id="session-1", budget=500)
+        self.assertEqual(first["decision"], "retrieve")
+        self.assertTrue(first["results"])
+        self.assertLessEqual(first["estimated_tokens"], 500)
+        self.assertTrue(all("why" in x for x in first["results"]))
+        second = self.call(session_id="session-1", budget=500)
+        self.assertEqual(second["results"], [])
+        self.assertGreater(second["suppressed_seen"], 0)
+        checkpoint = kn.feature_call(
+            "checkpoint", {"project": self.project, "session_id": "session-1"}, self.db
+        )
+        self.assertGreater(checkpoint["supplied_items"], 0)
+        self.assertNotIn("class AuthService", str(checkpoint))
+        self.assertTrue(self.call(session_id="session-1", budget=500, include_seen=True)["results"])
+        self.assertGreater(
+            kn.call(
+                "clear_context_session",
+                {"project": self.project, "session_id": "session-1"},
+                self.db,
+            )["cleared"],
+            0,
+        )
+        self.assertTrue(self.call(session_id="session-1", budget=500)["results"])
+
     def test_changed_file_is_resent_and_project_sessions_are_isolated(self):
-        self.call(session_id='one',budget=500)
-        (self.root/'AuthService.py').write_text('class AuthService:\n    value = 1\n',encoding='utf-8');kn.sync(self.root,self.db)
-        self.assertTrue(self.call(session_id='one',budget=500)['results'])
-        other=Path(self.temp.name)/'other';other.mkdir();(other/'AuthService.py').write_text('class AuthService: pass',encoding='utf-8');kn.sync(other,self.db)
-        result=kn.call('get_task_context',{'project':str(other.resolve()),'task':'auth','session_id':'one'},self.db)
-        self.assertTrue(result['results']);self.assertTrue(all('project' not in x for x in result['results']))
+        self.call(session_id="one", budget=500)
+        (self.root / "AuthService.py").write_text(
+            "class AuthService:\n    value = 1\n", encoding="utf-8"
+        )
+        kn.sync(self.root, self.db)
+        self.assertTrue(self.call(session_id="one", budget=500)["results"])
+        other = Path(self.temp.name) / "other"
+        other.mkdir()
+        (other / "AuthService.py").write_text("class AuthService: pass", encoding="utf-8")
+        kn.sync(other, self.db)
+        result = kn.call(
+            "get_task_context",
+            {"project": str(other.resolve()), "task": "auth", "session_id": "one"},
+            self.db,
+        )
+        self.assertTrue(result["results"])
+        self.assertTrue(all("project" not in x for x in result["results"]))
+
     def test_skip_abstain_and_invalid_budget(self):
-        self.assertEqual(self.call(skip_retrieval=True)['decision'],'skip')
-        self.assertEqual(kn.call('get_task_context',{'project':self.project,'task':'zebra quantum nonexistent'},self.db)['decision'],'abstain')
-        self.assertIn('error',self.call(budget=5))
+        self.assertEqual(self.call(skip_retrieval=True)["decision"], "skip")
+        self.assertEqual(
+            kn.call(
+                "get_task_context",
+                {"project": self.project, "task": "zebra quantum nonexistent"},
+                self.db,
+            )["decision"],
+            "abstain",
+        )
+        self.assertIn("error", self.call(budget=5))
+
     def test_directory_traversal_and_symlink_escape_are_excluded(self):
-        self.assertFalse(kn.safe_relative('../secret.py'))
-        outside=Path(self.temp.name)/'outside';outside.mkdir();(outside/'secret.py').write_text('secret',encoding='utf-8')
-        link=self.root/'linked'
-        try: link.symlink_to(outside,target_is_directory=True)
-        except OSError: self.skipTest('Creating directory symlinks requires privileges on this platform')
-        self.assertFalse(kn.safe_file(self.root,'linked/secret.py'))
+        self.assertFalse(kn.safe_relative("../secret.py"))
+        outside = Path(self.temp.name) / "outside"
+        outside.mkdir()
+        (outside / "secret.py").write_text("secret", encoding="utf-8")
+        link = self.root / "linked"
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            self.skipTest("Creating directory symlinks requires privileges on this platform")
+        self.assertFalse(kn.safe_file(self.root, "linked/secret.py"))
 
     def test_fallback_indexing_respects_gitignore_without_git(self):
-        (self.root/'.gitignore').write_text('private/\n*.secret.py\n!safe.secret.py\n',encoding='utf-8')
-        (self.root/'private').mkdir();(self.root/'private'/'notes.py').write_text('class Private: pass')
-        (self.root/'safe.secret.py').write_text('class ShouldStayExcluded: pass')
-        nested=self.root/'nested';nested.mkdir();(nested/'.gitignore').write_text('ignored.py\n');(nested/'ignored.py').write_text('class Ignored: pass');(nested/'allowed.py').write_text('class Allowed: pass')
-        with patch('kn.subprocess.run',side_effect=FileNotFoundError): files=kn.list_files(self.root)
-        self.assertIn('nested/allowed.py',files)
-        self.assertNotIn('private/notes.py',files)
-        self.assertNotIn('safe.secret.py',files)
-        self.assertNotIn('nested/ignored.py',files)
-        self.assertFalse(kn.safe_relative('config/service-account.json'))
-        self.assertFalse(kn.safe_relative('.env.local/data.py'))
+        (self.root / ".gitignore").write_text(
+            "private/\n*.secret.py\n!safe.secret.py\n", encoding="utf-8"
+        )
+        (self.root / "private").mkdir()
+        (self.root / "private" / "notes.py").write_text("class Private: pass")
+        (self.root / "safe.secret.py").write_text("class ShouldStayExcluded: pass")
+        nested = self.root / "nested"
+        nested.mkdir()
+        (nested / ".gitignore").write_text("ignored.py\n")
+        (nested / "ignored.py").write_text("class Ignored: pass")
+        (nested / "allowed.py").write_text("class Allowed: pass")
+        with patch("kn.subprocess.run", side_effect=FileNotFoundError):
+            files = kn.list_files(self.root)
+        self.assertIn("nested/allowed.py", files)
+        self.assertNotIn("private/notes.py", files)
+        self.assertNotIn("safe.secret.py", files)
+        self.assertNotIn("nested/ignored.py", files)
+        self.assertFalse(kn.safe_relative("config/service-account.json"))
+        self.assertFalse(kn.safe_relative(".env.local/data.py"))
 
-if __name__=='__main__': unittest.main()
+    def test_cache_reused_and_invalidated_after_own_and_external_writes(self):
+        import features
+
+        with patch("features.ranked_search", wraps=features.ranked_search) as search:
+            self.call(budget=600)
+            self.call(budget=600)
+            self.assertEqual(search.call_count, 1)
+            (self.root / "AuthService.py").write_text("class AuthService: value = 3")
+            kn.sync(self.root, self.db)
+            self.call(budget=600)
+            self.assertEqual(search.call_count, 2)
+            other = kn.connect(Path(self.temp.name) / "store.sqlite3")
+            other.execute(
+                "UPDATE files SET digest='new-digest' WHERE project_id=?", (self.project,)
+            )
+            other.commit()
+            other.close()
+            self.call(budget=600)
+            self.assertEqual(search.call_count, 3)
+
+    def test_offline_strict_budget_and_explicit_fallback(self):
+        import os
+
+        with patch.dict(
+            os.environ, {"LAZYTOKEN_TOKENIZER_MODEL": "", "LAZYTOKEN_TOKENIZER_FILE": ""}
+        ):
+            self.assertIn("error", self.call(model="unsupported", strict_budget=True, budget=600))
+            fallback = self.call(model="unsupported", budget=600)
+            self.assertIn("estimate", fallback["budget_type"])
+            self.assertIn("tokenizer_fallback", fallback)
+        # A deterministic injected counter verifies full-payload enforcement without downloading a model.
+        with patch(
+            "token_budget.counter",
+            return_value=(lambda text: len(text.encode("utf-8")), "test-byte-tokenizer", None),
+        ):
+            result = self.call(budget=1400)
+            encoded = json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+            self.assertLessEqual(len(encoded.encode("utf-8")), 1400)
+            self.assertGreaterEqual(result["used_tokens"], len(encoded.encode("utf-8")))
+            self.assertIn("error", self.call(budget=100))
+
+    def test_complete_text_skip_avoids_search_and_progressive_expansion(self):
+        with patch("features.ranked_search", side_effect=AssertionError("must not retrieve")):
+            result = self.call(
+                task="rewrite this text: supplied text", context_is_complete=True, budget=600
+            )
+            self.assertEqual(result["decision"], "skip")
+        first = self.call(session_id="expand", budget=600)
+        following = self.call(session_id="expand", mode="deep", budget=1200)
+        prior = {(x["type"], x.get("path"), x.get("name")) for x in first["results"]}
+        self.assertFalse(
+            prior & {(x["type"], x.get("path"), x.get("name")) for x in following["results"]}
+        )
+
+    def test_local_tokenizer_disables_saved_padding_and_truncation(self):
+        import os
+
+        try:
+            from tokenizers import Tokenizer, models, pre_tokenizers
+        except ImportError:
+            self.skipTest("Optional offline tokenizers adapter is not installed")
+        tokenizer = Tokenizer(models.WordLevel({"[UNK]": 0}, unk_token="[UNK]"))
+        tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()
+        tokenizer.enable_truncation(1)
+        tokenizer.enable_padding(length=2000)
+        path = Path(self.temp.name) / "tokenizer.json"
+        tokenizer.save(str(path))
+        with patch.dict(
+            os.environ,
+            {"LAZYTOKEN_TOKENIZER_MODEL": "fixture-words", "LAZYTOKEN_TOKENIZER_FILE": str(path)},
+        ):
+            import token_budget
+
+            count, kind, fallback = token_budget.counter(
+                {"model": "fixture-words", "strict_budget": True}, kn.estimate
+            )
+            self.assertEqual(count("one two three"), 3)
+            self.assertIsNone(fallback)
+            result = self.call(model="fixture-words", strict_budget=True, budget=600)
+            self.assertNotIn("error", result)
+            self.assertLessEqual(
+                count(
+                    json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+                ),
+                600,
+            )
+            self.assertEqual(result["budget_type"], "tokenizer:fixture-words")
+
+
+if __name__ == "__main__":
+    unittest.main()
