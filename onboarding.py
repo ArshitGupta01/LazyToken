@@ -62,6 +62,16 @@ def regular_path(path):
             raise ValueError("Configuration paths must not contain symlinks or junctions.")
 
 
+def server_entries(data, client):
+    key = "mcp_servers" if client == "codex" else "mcpServers"
+    if not isinstance(data, dict) or not isinstance(data.get(key, {}), dict):
+        raise ValueError("Invalid client configuration.")
+    servers = data.get(key, {})
+    if "lazytoken" in servers and not isinstance(servers["lazytoken"], dict):
+        raise ValueError("Invalid LazyToken registration.")
+    return servers
+
+
 def preview(kn, project, clients=(), profile=None):
     root = Path(project)
     if not root.is_absolute() or not root.is_dir():
@@ -76,7 +86,7 @@ def preview(kn, project, clients=(), profile=None):
         text = before.decode("utf-8-sig")
         if client == "codex":
             parsed = tomllib.loads(text)
-            existing = parsed.get("mcp_servers", {}).get("lazytoken")
+            existing = server_entries(parsed, client).get("lazytoken")
             addition = (
                 "\n[mcp_servers.lazytoken]\ncommand = "
                 + json.dumps(server["command"])
@@ -93,9 +103,7 @@ def preview(kn, project, clients=(), profile=None):
                 after = before
         else:
             parsed = json.loads(text) if text.strip() else {}
-            if not isinstance(parsed, dict) or not isinstance(parsed.get("mcpServers", {}), dict):
-                raise ValueError("Invalid client configuration.")
-            existing = parsed.get("mcpServers", {}).get("lazytoken")
+            existing = server_entries(parsed, client).get("lazytoken")
             parsed.setdefault("mcpServers", {})["lazytoken"] = server
             after = json.dumps(parsed, ensure_ascii=False, indent=2).encode("utf-8")
         changes.append(
@@ -149,12 +157,17 @@ def apply(kn, plan):
             "Indexing failed or reported unreadable files; client configuration was not changed."
         )
     receipts = []
+    receipt = kn.data_root() / ("setup-" + str(time.time_ns()) + ".json")
     try:
         for change in plan["changes"]:
             if change["status"] != "add":
                 continue
             path = Path(change["path"])
+            regular_path(path)
             existed = path.exists()
+            current = path.read_bytes() if existed else b""
+            if current != change["before"]:
+                raise ValueError("Configuration changed during setup; rerun preview.")
             backup = path.with_name(path.name + ".lazytoken-" + str(time.time_ns()) + ".bak")
             # Backups are exclusive; retained for a later operator rollback.
             backup.parent.mkdir(parents=True, exist_ok=True)
@@ -170,6 +183,17 @@ def apply(kn, plan):
                 }
             )
             atomic_write(path, change["after"])
+        atomic_write(
+            receipt,
+            json.dumps(
+                {
+                    "format": "lazytoken-setup-v1",
+                    "owner": str(managed_root()) if managed_root() else None,
+                    "changes": receipts,
+                },
+                indent=2,
+            ).encode(),
+        )
     except Exception:
         for record in reversed(receipts):
             path = Path(record["path"])
@@ -179,18 +203,6 @@ def apply(kn, plan):
                 else:
                     path.unlink()
         raise
-    receipt = kn.data_root() / ("setup-" + str(time.time_ns()) + ".json")
-    atomic_write(
-        receipt,
-        json.dumps(
-            {
-                "format": "lazytoken-setup-v1",
-                "owner": str(managed_root()) if managed_root() else None,
-                "changes": receipts,
-            },
-            indent=2,
-        ).encode(),
-    )
     return {
         "configured": True,
         "index": indexed,
@@ -242,9 +254,7 @@ def diagnose(kn):
             try:
                 text = path.read_text(encoding="utf-8-sig")
                 data = tomllib.loads(text) if name == "codex" else json.loads(text)
-                result["registered"] = "lazytoken" in data.get(
-                    "mcp_servers" if name == "codex" else "mcpServers", {}
-                )
+                result["registered"] = "lazytoken" in server_entries(data, name)
                 result["configuration_valid"] = True
             except (ValueError, OSError, TypeError, AttributeError):
                 result["configuration_valid"] = False

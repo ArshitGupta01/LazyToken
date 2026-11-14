@@ -14,7 +14,7 @@ This records implemented behavior, not a production-readiness or token-savings c
 
 ## Verification
 
-Tests cover synthetic temporary databases, legacy detection/migration, checksum/traversal rejection, PATH ownership through a test store, client config preservation/rollback, and audit regressions. Final suite/build counts are recorded in the session report after execution. Existing user data/configuration are not test fixtures. CI definitions are prepared but hosted execution has not been demonstrated.
+Tests cover synthetic temporary databases, legacy detection/migration, checksum/traversal rejection, PATH ownership through a test store, client config preservation/rollback, and audit regressions. The v0.4.3 review fixes pass 100 tests (99 passed, one skipped); see `docs/REVIEW_FIXES.md` for the exact cases and packaged verification. Existing user data/configuration are not test fixtures. Hosted CI for these local changes has not been demonstrated.
 
 ## Remaining blockers
 

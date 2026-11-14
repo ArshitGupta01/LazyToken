@@ -635,7 +635,7 @@ def ranked_search(kn, args, conn):
     }
     terms = list(dict.fromkeys(terms + [alias for t in terms for alias in aliases.get(t, [])]))
     if not terms:
-        return {"query": query, "results": []}
+        return {"query": query, "project": project, "results": []}
     fts_hits = set()
     try:
         state = conn.execute(
@@ -735,7 +735,8 @@ def ranked_search(kn, args, conn):
             rows.append(entry)
     # Include scoped neighbors of directly matched assets, without crossing project boundaries.
     matched = {r["id"] for r in rows if r["type"] == "asset"}
-    for asset in list(matched):
+    graph_links = {}
+    for asset in sorted(matched):
         for e in conn.execute(
             "SELECT source_id,target_id,relation,scope,weight FROM asset_link_evidence WHERE (scope='*' OR scope=?) AND (source_id=? OR target_id=?)",
             (project, asset, asset),
@@ -743,34 +744,37 @@ def ranked_search(kn, args, conn):
             neighbor = e["target_id"] if e["source_id"] == asset else e["source_id"]
             if neighbor in matched:
                 continue
-            r = conn.execute(
-                "SELECT id,kind,name,summary,tags,source FROM assets WHERE id=? AND (scope='global' OR (scope='project' AND project_id=?))",
-                (neighbor, project),
+            previous = graph_links.get(neighbor)
+            if previous is None or e["weight"] > previous[1]["weight"]:
+                graph_links[neighbor] = (asset, e)
+    for neighbor, (asset, e) in graph_links.items():
+        r = conn.execute(
+            "SELECT id,kind,name,summary,tags,source FROM assets WHERE id=? AND (scope='global' OR (scope='project' AND project_id=?))",
+            (neighbor, project),
+        ).fetchone()
+        if r:
+            if conn.execute(
+                "SELECT 1 FROM memory_proposals WHERE asset_id=? AND status='superseded'",
+                (neighbor,),
+            ).fetchone():
+                continue
+            origin = conn.execute("SELECT name FROM assets WHERE id=?", (asset,)).fetchone()
+            entry = {
+                "type": "asset",
+                **dict(r),
+                "score": round(float(e["weight"]), 2),
+                "via": "graph",
+                "why": f"Connected to {origin['name']} by {e['relation']} (weight {float(e['weight']):.2f}; {'global' if e['scope']=='*' else 'project'}).",
+            }
+            memory = conn.execute(
+                "SELECT id FROM memory_proposals WHERE asset_id=?", (neighbor,)
             ).fetchone()
-            if r:
-                if conn.execute(
-                    "SELECT 1 FROM memory_proposals WHERE asset_id=? AND status='superseded'",
-                    (neighbor,),
-                ).fetchone():
-                    continue
-                origin = conn.execute("SELECT name FROM assets WHERE id=?", (asset,)).fetchone()
-                entry = {
-                    "type": "asset",
-                    **dict(r),
-                    "score": round(float(e["weight"]), 2),
-                    "via": "graph",
-                    "why": f"Connected to {origin['name']} by {e['relation']} (weight {float(e['weight']):.2f}; {'global' if e['scope']=='*' else 'project'}).",
-                }
-                memory = conn.execute(
-                    "SELECT id FROM memory_proposals WHERE asset_id=?", (neighbor,)
-                ).fetchone()
-                if memory:
-                    entry.update(health(conn, memory["id"]))
-                    entry["score"] *= 0.5 + 0.5 * entry["confidence"]
-                    if entry["freshness"] == "stale":
-                        entry["score"] *= 0.3
-                rows.append(entry)
-                matched.add(neighbor)
+            if memory:
+                entry.update(health(conn, memory["id"]))
+                entry["score"] *= 0.5 + 0.5 * entry["confidence"]
+                if entry["freshness"] == "stale":
+                    entry["score"] *= 0.3
+            rows.append(entry)
     rows.sort(key=lambda r: (-r["score"], str(r.get("name", "")).casefold(), r.get("path", "")))
     return {"query": query, "project": project, "results": rows[:limit]}
 

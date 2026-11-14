@@ -75,6 +75,113 @@ class SetupTests(unittest.TestCase):
     def test_real_local_handshake_uses_only_isolated_store(self):
         self.assertTrue(onboarding.connection_test(kn)["mcp_initialize"])
 
+    def test_edit_during_indexing_is_not_overwritten(self):
+        path = self.profile / ".codex/config.toml"
+        path.parent.mkdir()
+        path.write_text('model = "fixture"\n')
+        plan = onboarding.preview(kn, str(self.project), ["codex"], self.profile)
+        original_sync = kn.sync
+        edited = b'model = "updated-during-indexing"\n'
+
+        def sync_and_edit(*args, **kwargs):
+            result = original_sync(*args, **kwargs)
+            path.write_bytes(edited)
+            return result
+
+        with patch("kn.sync", side_effect=sync_and_edit):
+            with self.assertRaisesRegex(ValueError, "changed during setup"):
+                onboarding.apply(kn, plan)
+        self.assertEqual(path.read_bytes(), edited)
+        self.assertFalse(list(path.parent.glob("*.bak")))
+
+    def test_edit_to_later_client_preserves_edit_and_reverts_earlier_write(self):
+        plan = onboarding.preview(kn, str(self.project), ["codex", "antigravity"], self.profile)
+        first, second = [Path(change["path"]) for change in plan["changes"]]
+        original_write = onboarding.atomic_write
+        edited = b'{"newPreference": true}'
+
+        def write_and_edit(path, data):
+            original_write(path, data)
+            if Path(path) == first:
+                second.parent.mkdir(parents=True, exist_ok=True)
+                second.write_bytes(edited)
+
+        with patch("onboarding.atomic_write", side_effect=write_and_edit):
+            with self.assertRaisesRegex(ValueError, "changed during setup"):
+                onboarding.apply(kn, plan)
+        self.assertFalse(first.exists())
+        self.assertEqual(second.read_bytes(), edited)
+
+    def test_failed_receipt_restores_existing_bytes_and_original_file_absence(self):
+        first = self.profile / ".codex/config.toml"
+        first.parent.mkdir()
+        before = b'# original\nmodel = "fixture"\n'
+        first.write_bytes(before)
+        plan = onboarding.preview(kn, str(self.project), ["codex", "antigravity"], self.profile)
+        original_write = onboarding.atomic_write
+
+        def fail_receipt(path, data):
+            if Path(path).name.startswith("setup-"):
+                raise OSError("synthetic receipt failure")
+            original_write(path, data)
+
+        with patch("onboarding.atomic_write", side_effect=fail_receipt):
+            with self.assertRaisesRegex(OSError, "synthetic receipt failure"):
+                onboarding.apply(kn, plan)
+        self.assertEqual(first.read_bytes(), before)
+        self.assertFalse(Path(plan["changes"][1]["path"]).exists())
+        self.assertFalse(list(kn.data_root().glob("setup-*.json")))
+
+    def test_nested_client_configuration_shape_is_validated_in_preview_and_doctor(self):
+        cases = {
+            "codex": [
+                'mcp_servers = "lazytoken"',
+                "mcp_servers = []",
+                '[mcp_servers]\nlazytoken = "invalid"',
+            ],
+            "antigravity": [
+                '{"mcpServers":"lazytoken"}',
+                '{"mcpServers":[]}',
+                '{"mcpServers":null}',
+                '{"mcpServers":{"lazytoken":null}}',
+                '{"mcpServers":{"lazytoken":[]}}',
+            ],
+        }
+        for client, contents in cases.items():
+            path = onboarding.configuration_path(client, self.profile)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            for text in contents:
+                with self.subTest(client=client, contents=text):
+                    path.write_text(text)
+                    with self.assertRaises(ValueError):
+                        onboarding.preview(kn, str(self.project), [client], self.profile)
+                    with patch("onboarding.Path.home", return_value=self.profile):
+                        status = next(
+                            item
+                            for item in onboarding.diagnose(kn)["clients"]
+                            if item["client"] == client
+                        )
+                    self.assertFalse(status["registered"])
+                    self.assertFalse(status["configuration_valid"])
+                    self.assertEqual(path.read_text(), text)
+
+    def test_existing_remote_registration_is_preserved_and_reported(self):
+        path = onboarding.configuration_path("antigravity", self.profile)
+        path.parent.mkdir(parents=True)
+        before = b'{"mcpServers":{"lazytoken":{"url":"http://localhost:12345/mcp"}}}'
+        path.write_bytes(before)
+        plan = onboarding.preview(kn, str(self.project), ["antigravity"], self.profile)
+        self.assertEqual(plan["changes"][0]["status"], "existing_entry_preserved")
+        with patch("onboarding.Path.home", return_value=self.profile):
+            status = next(
+                item
+                for item in onboarding.diagnose(kn)["clients"]
+                if item["client"] == "antigravity"
+            )
+        self.assertTrue(status["registered"])
+        self.assertTrue(status["configuration_valid"])
+        self.assertEqual(path.read_bytes(), before)
+
     def test_repeated_client_selection_is_idempotent_and_can_roll_back(self):
         plan = onboarding.preview(
             kn, str(self.project), ["codex", "codex", "antigravity", "antigravity"], self.profile

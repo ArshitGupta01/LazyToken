@@ -36,3 +36,4 @@ Do not run real agent tasks, push, publish a release, or claim token savings wit
 
 - [x] Automatic selected-repository sync with debounce, bounded changed-file reads and evidence freshness.
 - [x] Manifest/import-derived framework graph and explicit all-project visualization without widening scoped retrieval.
+- [x] Fix six reproduced review defects: setup edit/receipt safety, empty search, verified rollback, strongest scoped graph evidence, and client configuration shape validation. See `docs/REVIEW_FIXES.md` for checks and limits.

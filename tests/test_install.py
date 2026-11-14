@@ -86,6 +86,48 @@ class InstallLifecycleTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual((target / "keep.txt").read_text(), "keep")
 
+    def test_rollback_rejects_damaged_previous_package_without_changing_selection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            source.mkdir()
+            executable = source / "LazyToken.exe"
+            executable.write_bytes(b"fixture-v1")
+            (source / "support.txt").write_bytes(b"fixture support")
+            target = root / "installed"
+            installed = self.run_install(
+                "-Action", "install", "-InstallRoot", target, "-Source", source
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            previous = (target / "current.txt").read_bytes()
+            executable.write_bytes(b"fixture-v2")
+            upgraded = self.run_install(
+                "-Action", "upgrade", "-InstallRoot", target, "-Source", source
+            )
+            self.assertEqual(upgraded.returncode, 0, upgraded.stderr)
+            current = (target / "current.txt").read_bytes()
+            package = target / "versions" / previous.decode().strip()
+            for filename, replacement in [
+                ("LazyToken.exe", b"corrupted"),
+                ("support.txt", None),
+                ("release-manifest.json", b"{}"),
+            ]:
+                with self.subTest(filename=filename):
+                    path = package / filename
+                    original = path.read_bytes()
+                    if replacement is None:
+                        path.unlink()
+                    else:
+                        path.write_bytes(replacement)
+                    refused = self.run_install("-Action", "rollback", "-InstallRoot", target)
+                    self.assertNotEqual(refused.returncode, 0)
+                    self.assertEqual((target / "current.txt").read_bytes(), current)
+                    self.assertEqual((target / "previous.txt").read_bytes(), previous)
+                    path.write_bytes(original)
+            rolled_back = self.run_install("-Action", "rollback", "-InstallRoot", target)
+            self.assertEqual(rolled_back.returncode, 0, rolled_back.stderr)
+            self.assertEqual((target / "current.txt").read_bytes(), previous)
+
 
 if __name__ == "__main__":
     unittest.main()

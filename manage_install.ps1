@@ -136,6 +136,7 @@ if ($Action -in @('install','upgrade')) {
     Assert-Installation
     $Old = Read-Version $Current; $Version = Read-Version $Previous
     if (-not $Version) { throw 'No previous version is recorded.' }
+    Verify-Package (Join-Path $Versions $Version)
     Set-Launcher $Version
     if ($Old) { [IO.File]::WriteAllText($Previous,$Old,[Text.Encoding]::ASCII) }
     Write-Host 'LazyToken rolled back to the previous installed version.'

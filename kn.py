@@ -20,7 +20,7 @@ import learning
 import data_ops
 from mcp_schema import TOOLS, mcp_tools
 
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 EXTENSIONS = {
     ".kt",
     ".kts",

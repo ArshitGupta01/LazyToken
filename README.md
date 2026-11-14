@@ -8,14 +8,14 @@ Indexing and retrieval run locally without model calls. **End-to-end token savin
 
 ## Installation status
 
-The current version is **0.4.2**, with a tested Windows x64 package candidate. It bundles Python, SQLite, the memory engine, Context Broker, MCP server and local dashboard assets. End users do not need separately installed Python or Node.js.
+The current version is **0.4.3**, with a Windows x64 package candidate. It bundles Python, SQLite, the memory engine, Context Broker, MCP server and local dashboard assets. End users do not need separately installed Python or Node.js. See [review fixes](docs/REVIEW_FIXES.md) for the focused safety and retrieval changes.
 
 **Public installation is not available yet.** The public latest-release endpoint returned HTTP 404 on November 15, 2026. Pushing source does not publish a release. See [RELEASING.md](RELEASING.md) for the remaining distribution steps.
 
 If you already have an independently verified local archive and matching bootstrap, replace the checksum placeholder and install with:
 
 ```powershell
-powershell -NoProfile -File .\bootstrap.ps1 -PackagePath .\lazytoken-v0.4.2-windows-x64.zip -ExpectedSha256 <trusted-64-character-SHA256>
+powershell -NoProfile -File .\bootstrap.ps1 -PackagePath .\lazytoken-v0.4.3-windows-x64.zip -ExpectedSha256 <trusted-64-character-SHA256>
 ```
 
 The bootstrap is named `install.ps1` in the source checkout. It verifies the package before running its installer, installs per user and registers the managed CLI on your user PATH. Open a new terminal afterward. Installation preserves knowledge data and does not select repositories or edit assistant settings.
@@ -100,7 +100,7 @@ Fresh data lives at **`%LOCALAPPDATA%\LazyToken\network.sqlite3`**. `KN_HOME` pr
 
 ## Verification and development
 
-Local v0.4.2 validation completed **92 tests: 91 passed, one skipped**, including a wrapper for three workspace race scenarios. The Windows candidate passed bundled-runtime, MCP, dashboard, background-sync and install/update/rollback/uninstall checks with Python and Node absent from its child PATH. This is not clean-machine or comprehensive browser/device certification.
+Local regression validation completed **100 tests: 99 passed, one skipped**, including a wrapper for three workspace race scenarios. Packaged verification and limits are recorded in the [review-fix report](docs/REVIEW_FIXES.md). This is not clean-machine or comprehensive browser/device certification.
 
 Benchmark records use manually supplied usage and outcomes; missing measurements remain unknown. Synthetic tests check calculations. **No real coding-agent benchmarks have been run and no measured token-savings claim is made.**
 

@@ -32,6 +32,61 @@ class LazyTokenFeaturesTests(unittest.TestCase):
     def run_action(self, operation, **args):
         return kn.feature_call(operation, args, self.db)
 
+    def test_empty_searches_keep_project_and_log_successfully(self):
+        for query in ("", "!", "a"):
+            with self.subTest(query=query):
+                result = self.run_action("search", project=self.project, query=query)
+                self.assertEqual(result, {"query": query, "project": self.project, "results": []})
+        rows = self.db.execute("SELECT project_id FROM retrievals").fetchall()
+        self.assertEqual([row[0] for row in rows], [self.project] * 3)
+
+    def test_graph_neighbor_uses_strongest_in_scope_edge_without_extra_hops(self):
+        ids = {}
+        for name, summary in [
+            ("Auth A", "authentication"),
+            ("Auth B", "authentication"),
+            ("Connection", "dependency"),
+            ("Second hop", "dependency"),
+        ]:
+            ids[name] = kn.add_asset(
+                {"kind": "library", "name": name, "summary": summary}, self.db
+            )["id"]
+        other = self.root.parent / "other"
+        other.mkdir()
+        kn.sync(other, self.db)
+
+        def link(source, target, weight, project=self.project):
+            return kn.link_assets(
+                {
+                    "source": source,
+                    "target": target,
+                    "relation": "uses",
+                    "weight": weight,
+                    "project": project,
+                    "evidence": "Synthetic graph fixture",
+                },
+                self.db,
+            )
+
+        link("Auth A", "Connection", 1, str(other.resolve()))
+        link("Connection", "Second hop", 1)
+        for a, b, origin in [(0.05, 0.9, "Auth B"), (0.95, 0.1, "Auth A")]:
+            with self.subTest(a=a, b=b):
+                link("Auth A", "Connection", a)
+                link("Auth B", "Connection", b)
+                result = self.run_action(
+                    "search", project=self.project, query="authentication", limit=100
+                )
+                neighbors = [
+                    item for item in result["results"] if item.get("id") == ids["Connection"]
+                ]
+                self.assertEqual(len(neighbors), 1)
+                self.assertEqual(neighbors[0]["score"], max(a, b))
+                self.assertIn("Connected to " + origin, neighbors[0]["why"])
+                self.assertFalse(
+                    any(item.get("id") == ids["Second hop"] for item in result["results"])
+                )
+
     def test_migration_is_idempotent_and_preserves_assets(self):
         kn.add_asset({"kind": "lesson", "name": "old", "summary": "existing"}, self.db)
         self.db.close()
