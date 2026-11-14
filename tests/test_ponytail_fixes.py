@@ -134,7 +134,7 @@ object.import('not-a-module');
 
     def test_framework_edges_update_and_workspace_does_not_change_scoped_search(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
+            root = Path(temp).resolve()
             project = root / "one"
             project.mkdir()
             manifest = project / "package.json"
