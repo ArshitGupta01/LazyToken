@@ -248,7 +248,7 @@ class InstallerSecurity(unittest.TestCase):
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
             version = (target / "current.txt").read_text()
-            self.assertIn(str(target / "bin"), pathfile.read_text())
+            self.assertIn(str((target / "bin").resolve()), pathfile.read_text())
             (source / "LazyToken.exe").write_bytes(b"tampered")
             denied = self.command(
                 "manage_install.ps1",

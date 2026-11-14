@@ -197,6 +197,15 @@ def resolve_project(value: str, conn: sqlite3.Connection) -> str:
     row = conn.execute("SELECT id FROM projects WHERE id=? OR root=?", (value, value)).fetchone()
     if row:
         return str(row[0])
+    try:
+        if Path(value).is_absolute():
+            canonical = str(Path(value).resolve())
+            row = conn.execute(
+                "SELECT id FROM projects WHERE id=? OR root=?", (canonical, canonical)
+            ).fetchone()
+            return str(row[0]) if row else ""
+    except (OSError, ValueError, RuntimeError):
+        return ""
     matches = [
         str(r[0])
         for r in conn.execute("SELECT id FROM projects")

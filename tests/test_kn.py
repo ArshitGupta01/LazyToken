@@ -49,6 +49,25 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.assertEqual(second["removed"], 1)
         self.assertEqual(kn.search("CaseStore", self.db)["results"][0]["name"], "CaseStore")
 
+    def test_project_path_aliases_resolve_to_the_indexed_scope(self):
+        kn.sync(self.root, self.db)
+        canonical = str(self.root.resolve())
+        variants = [str(self.root) + "/.", str(self.root).replace("\\", "/")]
+        if sys.platform == "win32":
+            import ctypes
+
+            buffer = ctypes.create_unicode_buffer(32768)
+            size = ctypes.windll.kernel32.GetShortPathNameW(str(self.root), buffer, len(buffer))
+            if 0 < size < len(buffer):
+                variants.append(buffer.value)
+        for value in variants:
+            with self.subTest(path=value):
+                self.assertEqual(kn.resolve_project(value, self.db), canonical)
+                result = kn.search("lookupAccount", self.db, value)
+                self.assertTrue(result["results"])
+                self.assertEqual(kn.context(value, self.db)["project"], self.root.name)
+        self.assertEqual(kn.resolve_project(str(self.root.parent / "not-indexed"), self.db), "")
+
     def test_project_filter_isolation(self):
         kn.sync(self.root, self.db)
         other = Path(self.tmp.name) / "other"
