@@ -91,12 +91,133 @@ def snapshot(kn, root):
     return values
 
 
+def _get_dir_mtimes(root):
+    dir_mtimes = {}
+    skip_dirs = {
+        ".git",
+        ".hg",
+        ".svn",
+        "__pycache__",
+        "node_modules",
+        ".venv",
+        "venv",
+        ".idea",
+        ".vscode",
+    }
+    try:
+        dir_mtimes[""] = root.stat().st_mtime_ns
+        for dirpath, dirnames, _ in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+            rel_dir = os.path.relpath(dirpath, root).replace("\\", "/")
+            if rel_dir == ".":
+                rel_dir = ""
+            try:
+                dir_mtimes[rel_dir] = Path(dirpath).stat().st_mtime_ns
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return dir_mtimes
+
+
+def incremental_snapshot(kn, root, state):
+    """Fast incremental directory reconciliation using directory mtimes and os.scandir."""
+    if not root.is_dir():
+        return None
+    dir_cache = state.setdefault("dir_mtime_cache", {})
+    file_cache = state.setdefault("file_cache", {})
+    skip_dirs = {
+        ".git",
+        ".hg",
+        ".svn",
+        "__pycache__",
+        "node_modules",
+        ".venv",
+        "venv",
+        ".idea",
+        ".vscode",
+    }
+
+    new_dir_mtimes = {}
+    new_file_cache = {}
+
+    def scan_dir(dir_path, rel_prefix=""):
+        try:
+            d_stat = dir_path.stat()
+            d_mtime = d_stat.st_mtime_ns
+            new_dir_mtimes[rel_prefix] = d_mtime
+        except OSError:
+            return
+
+        cached_mtime = dir_cache.get(rel_prefix)
+        # If this is a subdirectory whose mtime has not changed, reuse cached file entries without stating them
+        if rel_prefix and cached_mtime is not None and cached_mtime == d_mtime:
+            prefix_slash = f"{rel_prefix}/"
+            for rel_file, stat_tuple in file_cache.items():
+                if rel_file.startswith(prefix_slash) and "/" not in rel_file[len(prefix_slash) :]:
+                    new_file_cache[rel_file] = stat_tuple
+            # Still scan for potential subdirectories
+            try:
+                with os.scandir(dir_path) as entries:
+                    for entry in entries:
+                        if entry.is_dir(follow_symlinks=False):
+                            if entry.name not in skip_dirs and not entry.name.startswith("."):
+                                sub_rel = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
+                                scan_dir(Path(entry.path), sub_rel)
+            except OSError:
+                pass
+            return
+
+        # Scan directory entries with os.scandir
+        try:
+            with os.scandir(dir_path) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            if entry.name not in skip_dirs and not entry.name.startswith("."):
+                                sub_rel = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
+                                scan_dir(Path(entry.path), sub_rel)
+                        elif entry.is_file(follow_symlinks=False):
+                            rel_file = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
+                            st = Path(entry.path).stat()
+                            new_file_cache[rel_file] = (
+                                st.st_mtime_ns,
+                                st.st_ctime_ns,
+                                st.st_size,
+                                st.st_ino,
+                            )
+                    except OSError:
+                        rel_file = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
+                        new_file_cache[rel_file] = ("unreadable",)
+        except OSError:
+            pass
+
+    scan_dir(root, "")
+    state["dir_mtime_cache"] = new_dir_mtimes
+    state["file_cache"] = new_file_cache
+    return new_file_cache
+
+
 class ProjectWatcher:
-    def __init__(self, kn, connection, debounce=1.0, full_interval=300.0):
+    def __init__(
+        self,
+        kn,
+        connection,
+        debounce=1.0,
+        full_interval=300.0,
+        min_interval=0.5,
+        max_interval=15.0,
+        idle_backoff_steps=5,
+    ):
         self.kn = kn
         self.db = connection
         self.debounce = debounce
         self.full_interval = full_interval
+        self.min_interval = min_interval
+        self.max_interval = max_interval
+        self.effective_interval = min_interval
+        self.idle_backoff_steps = idle_backoff_steps
+        self.consecutive_idle = 0
         self.projects = {}
 
     def tick(self, now=None):
@@ -104,6 +225,10 @@ class ProjectWatcher:
         indexed = self.db.execute("SELECT id,root FROM projects ORDER BY root").fetchall()
         active = {row["id"] for row in indexed}
         self.projects = {key: value for key, value in self.projects.items() if key in active}
+
+        has_changes = False
+        has_pending = False
+
         for row in indexed:
             project = row["id"]
             root = Path(row["root"])
@@ -115,12 +240,27 @@ class ProjectWatcher:
                     "pending_since": None,
                     "last_change": now,
                     "last_full": None,
+                    "dir_mtime_cache": {},
+                    "file_cache": {},
                 },
             )
+            retry = 10 if state.get("error_count", 0) else self.full_interval
+            full = (
+                state["applied"] is None
+                or state["last_full"] is None
+                or now - state["last_full"] >= retry
+            )
             try:
-                current = snapshot(self.kn, root)
+                if full:
+                    current = snapshot(self.kn, root)
+                    if current is not None:
+                        state["file_cache"] = dict(current)
+                        state["dir_mtime_cache"] = _get_dir_mtimes(root)
+                else:
+                    current = incremental_snapshot(self.kn, root, state)
             except (OSError, subprocess.SubprocessError):
                 current = None
+
             if current is None:
                 if state.get("state") != "unavailable":
                     self.db.execute(
@@ -133,22 +273,23 @@ class ProjectWatcher:
                 state["observed"] = None
                 state["applied"] = None
                 continue
+
             if current != state["observed"]:
                 state["observed"] = current
                 state["last_change"] = now
                 if state["pending_since"] is None:
                     state["pending_since"] = now
-            retry = 10 if state.get("error_count", 0) else self.full_interval
-            full = (
-                state["applied"] is None
-                or state["last_full"] is None
-                or now - state["last_full"] >= retry
-            )
+                has_changes = True
+
+            if state["pending_since"] is not None:
+                has_pending = True
+
             changed = current != state["applied"]
             settled = now - state["last_change"] >= self.debounce
             overdue = state["pending_since"] is not None and now - state["pending_since"] >= 10
             if not full and not (changed and (settled or overdue)):
                 continue
+
             hints = (
                 None
                 if full
@@ -175,16 +316,41 @@ class ProjectWatcher:
                 state.pop("error", None)
                 if full:
                     state["last_full"] = now
+                has_changes = True
             except (OSError, sqlite3.Error, subprocess.SubprocessError):
                 self.db.rollback()
                 state["state"] = "retrying"
                 state["error"] = "Sync failed; retrying without discarding the previous index."
                 state["applied"] = None
+
+        # Adaptive interval calculation
+        if has_changes or has_pending:
+            self.consecutive_idle = 0
+            self.effective_interval = self.min_interval
+        else:
+            self.consecutive_idle += 1
+            scale = min(self.consecutive_idle, self.idle_backoff_steps)
+            step_size = (self.max_interval - self.min_interval) / max(1, self.idle_backoff_steps)
+            self.effective_interval = min(self.max_interval, self.min_interval + scale * step_size)
+            try:
+                self.db.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            except (sqlite3.OperationalError, sqlite3.DatabaseError):
+                pass
+
         return {
             project: {
                 key: value
                 for key, value in state.items()
-                if key not in ("observed", "applied", "pending_since", "last_change", "last_full")
+                if key
+                not in (
+                    "observed",
+                    "applied",
+                    "pending_since",
+                    "last_change",
+                    "last_full",
+                    "dir_mtime_cache",
+                    "file_cache",
+                )
             }
             for project, state in self.projects.items()
         }
@@ -203,14 +369,19 @@ def run(kn, interval=2.0, debounce=1.0):
     try:
         stop.unlink(missing_ok=True)
         connection = kn.connect()
-        engine = ProjectWatcher(kn, connection, debounce=debounce)
+        min_int = min(0.5, interval / 2) if interval > 0.5 else interval
+        max_int = max(15.0, interval * 4)
+        engine = ProjectWatcher(
+            kn, connection, debounce=debounce, min_interval=min_int, max_interval=max_int
+        )
         while True:
             if stop.exists():
                 break
+            poll_interval = engine.effective_interval
             report = {
                 "pid": os.getpid(),
                 "updated_at": int(time.time()),
-                "interval_seconds": interval,
+                "interval_seconds": round(poll_interval, 2),
             }
             try:
                 report["projects"] = engine.tick()
@@ -218,13 +389,17 @@ def run(kn, interval=2.0, debounce=1.0):
                 connection.rollback()
                 report["error"] = "Database temporarily unavailable; automatic sync will retry."
             atomic_write(directory / "watch-status.json", json.dumps(report).encode())
-            deadline = time.monotonic() + interval
+            deadline = time.monotonic() + poll_interval
             while time.monotonic() < deadline and not stop.exists():
                 time.sleep(min(0.25, max(0, deadline - time.monotonic())))
     except KeyboardInterrupt:
         pass
     finally:
         if connection:
+            try:
+                connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except (sqlite3.OperationalError, sqlite3.DatabaseError):
+                pass
             connection.close()
         atomic_write(
             directory / "watch-status.json",

@@ -22,6 +22,7 @@ import features
 import kn
 import retrieval_eval
 import token_budget
+import watcher
 from e2e.common import E2ETestCase, McpClient
 
 
@@ -1176,6 +1177,9 @@ class TestF14ActiveSessionDashboard(E2ETestCase):
             broker.task_context(
                 kn, {"project": str(repo), "task": "dash_view", "session_id": "sess-dash-14"}, conn
             )
+            broker.session_checkpoint(
+                kn, {"project": str(repo), "session_id": "sess-dash-14"}, conn
+            )
         finally:
             conn.close()
 
@@ -1410,7 +1414,10 @@ class TestF16MultiTurnSimulationRecall(E2ETestCase):
                 kn, {"project": str(repo), "task": "authenticate", "session_id": session_id}, conn
             )
             self.assertGreaterEqual(t4.get("suppressed_seen", 0), 1)
-            recap_keys = [item.get("key", "") for item in t4.get("recap", [])]
+            recap_keys = [
+                item.get("key", "") if isinstance(item, dict) else str(item)
+                for item in t4.get("recap", [])
+            ]
             self.assertTrue(
                 any("auth.py" in k for k in recap_keys),
                 f"Turn 1 item auth.py not recalled in recap: {recap_keys}",
@@ -1487,6 +1494,620 @@ class TestF16MultiTurnSimulationRecall(E2ETestCase):
             self.assertEqual(res3.get("suppressed_seen", 0), 0)
         finally:
             conn.close()
+
+
+# ============================================================================
+# Feature 17: Five-Mode Empirical Retrieval Evaluation
+# ============================================================================
+class TestF17FiveModeRetrievalAblations(E2ETestCase):
+    """F17: Five-mode retrieval ablation benchmarks (Grep, Lexical, Lexical+Graph, Memory, Full Pipeline)."""
+
+    def test_f17_mode1_plain_grep_baseline(self) -> None:
+        repo = self.create_repo(
+            {
+                "token_store.py": "class TokenStore:\n    def validate(self, token: str) -> bool:\n        return token == 'valid'\n",
+                "auth.py": "from token_store import TokenStore\ndef check_auth(t):\n    return TokenStore().validate(t)\n",
+            }
+        )
+        import benchmark.graph_ablation as ga
+
+        res = ga.plain_grep_search(repo, "validate", limit=5)
+        self.assertEqual(res["mode"], "grep_baseline")
+        self.assertGreater(res["matches"], 0)
+        self.assertTrue(any("token_store.py" in str(f) for f in res["files"]))
+        self.assertGreater(res["estimated_tokens"], 0)
+        # Verify plain grep works directly from disk without SQLite database file
+        self.assertFalse((self.temp_dir / "network.sqlite3").exists())
+
+    def test_f17_mode2_lexical_no_graph(self) -> None:
+        repo = self.create_repo(
+            {
+                "token_store.py": "class TokenStore:\n    def validate(self, token: str) -> bool:\n        return token == 'valid'\n",
+                "auth.py": "from token_store import TokenStore\ndef check_auth(t):\n    return TokenStore().validate(t)\n",
+            }
+        )
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            import benchmark.graph_ablation as ga
+
+            res = ga.lexical_search_no_graph(kn, str(repo), "TokenStore validate", conn, limit=5)
+            self.assertEqual(res["mode"], "lexical_no_graph")
+            self.assertIn("results", res)
+            self.assertGreater(len(res["results"]), 0)
+            names = [r.get("name") for r in res["results"]]
+            self.assertTrue(any("validate" in str(n) or "TokenStore" in str(n) for n in names))
+        finally:
+            conn.close()
+
+    def test_f17_mode3_lexical_with_graph(self) -> None:
+        repo = self.create_repo(
+            {
+                "token_store.py": "class TokenStore:\n    def validate(self, token: str) -> bool:\n        return True\n",
+                "auth_middleware.py": "from token_store import TokenStore\nclass AuthMiddleware:\n    def authenticate(self, t):\n        return TokenStore().validate(t)\n",
+            }
+        )
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            import benchmark.graph_ablation as ga
+
+            res = ga.lexical_search_with_graph(
+                kn, str(repo), "TokenStore validate", "TokenStore.validate", conn, limit=5
+            )
+            self.assertEqual(res["mode"], "lexical_with_graph")
+            self.assertIn("files", res)
+            self.assertTrue(any("auth_middleware.py" in str(f) for f in res["files"]))
+        finally:
+            conn.close()
+
+    def test_f17_mode4_verified_memory_no_graph(self) -> None:
+        repo = self.create_repo({"store.py": "class TokenStore: pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            project_id = str(repo.resolve())
+            kn.add_asset(
+                {
+                    "kind": "lesson",
+                    "name": "TokenStore Scope Contract",
+                    "summary": "TokenStore validate method requires scope string argument in token_store.py",
+                    "project_id": project_id,
+                },
+                conn,
+            )
+            import benchmark.graph_ablation as ga
+
+            res = ga.verified_memory_no_graph(
+                kn, project_id, "TokenStore validate scope", conn, limit=5
+            )
+            self.assertEqual(res["mode"], "verified_memory_no_graph")
+            self.assertGreater(len(res["results"]), 0)
+            names = [r.get("name") for r in res["results"]]
+            self.assertIn("TokenStore Scope Contract", names)
+        finally:
+            conn.close()
+
+    def test_f17_mode5_full_lazytoken_pipeline(self) -> None:
+        repo = self.create_repo(
+            {
+                "token_store.py": "class TokenStore:\n    def validate(self, token: str) -> bool: return True\n",
+                "auth.py": "from token_store import TokenStore\ndef check(t): return TokenStore().validate(t)\n",
+            }
+        )
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            import benchmark.graph_ablation as ga
+
+            res = ga.full_lazytoken_pipeline(
+                kn, str(repo), "TokenStore validate", "TokenStore.validate", conn, budget=600
+            )
+            self.assertEqual(res["mode"], "full_pipeline")
+            self.assertIn("files", res)
+            self.assertLessEqual(res.get("used_tokens", 0), 600)
+        finally:
+            conn.close()
+
+
+# ============================================================================
+# Feature 18: Cost-Aware Retrieval Policy & Utility Ranking
+# ============================================================================
+class TestF18CostAwareRetrievalPolicy(E2ETestCase):
+    """F18: Conservative task classification, utility ranking, progressive expansion, and why_this_context."""
+
+    def test_f18_conservative_task_classifier_skip(self) -> None:
+        repo = self.create_repo({"module.py": "x = 1\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            dec, reason = broker.classify_retrieval_need("Format this JSON document")
+            self.assertEqual(dec, "skip")
+
+            res = broker.task_context(
+                kn, {"project": str(repo), "task": "Format this json payload"}, conn
+            )
+            self.assertEqual(res["decision"], "skip")
+            self.assertEqual(res["results"], [])
+        finally:
+            conn.close()
+
+    def test_f18_conservative_task_classifier_abstain(self) -> None:
+        repo = self.create_repo({"math_ops.py": "def add(a, b): return a + b\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            res = broker.task_context(
+                kn, {"project": str(repo), "task": "UnrelatedDatabaseKubernetesQuery12345"}, conn
+            )
+            self.assertEqual(res["decision"], "abstain")
+            self.assertIn("No confident metadata match", res["reason"])
+            self.assertEqual(res["results"], [])
+        finally:
+            conn.close()
+
+    def test_f18_expected_utility_per_token_ranking(self) -> None:
+        util_compact = broker.utility_per_token(
+            relevance=10.0, freshness=1.0, verification=1.0, estimated_tokens=25
+        )
+        util_bloated = broker.utility_per_token(
+            relevance=10.0, freshness=1.0, verification=1.0, estimated_tokens=500
+        )
+        self.assertGreater(util_compact, util_bloated)
+
+        util_verified = broker.utility_per_token(
+            relevance=10.0, freshness=1.0, verification=1.2, estimated_tokens=25
+        )
+        self.assertGreater(util_verified, util_compact)
+
+    def test_f18_progressive_context_expansion(self) -> None:
+        repo = self.create_repo({"service.py": "def do_work(): pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            res_compact = broker.task_context(
+                kn, {"project": str(repo), "task": "do_work", "mode": "compact"}, conn
+            )
+            self.assertFalse(res_compact.get("progressive_expansion", False))
+
+            res_expand = broker.task_context(
+                kn, {"project": str(repo), "task": "do_work", "expand_context": True}, conn
+            )
+            self.assertTrue(res_expand.get("progressive_expansion", False))
+
+            res_deep = broker.task_context(
+                kn, {"project": str(repo), "task": "do_work", "mode": "deep"}, conn
+            )
+            self.assertTrue(res_deep.get("progressive_expansion", False))
+        finally:
+            conn.close()
+
+    def test_f18_why_this_context_explanations(self) -> None:
+        repo = self.create_repo({"core.py": "class CoreEngine: pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            res = broker.task_context(
+                kn, {"project": str(repo), "task": "CoreEngine", "why_this_context": True}, conn
+            )
+            self.assertGreater(len(res.get("results", [])), 0)
+            for item in res["results"]:
+                self.assertIn("why_this_context", item)
+                self.assertIn("why", item)
+                self.assertEqual(item["why_this_context"], item["why"])
+        finally:
+            conn.close()
+
+
+# ============================================================================
+# Feature 19: Model & Token Budget Fidelity
+# ============================================================================
+class TestF19TokenBudgetFidelity(E2ETestCase):
+    """F19: Model & token budget fidelity, schema overhead, chat framing, and approximation labeling."""
+
+    def test_f19_mcp_schema_overhead_distinction(self) -> None:
+        full_tax = token_budget.mcp_schema_overhead(compact=False)
+        compact_tax = token_budget.mcp_schema_overhead(compact=True)
+        self.assertEqual(full_tax, 2371)
+        self.assertEqual(compact_tax, 713)
+        self.assertGreater(full_tax, compact_tax)
+
+    def test_f19_chat_framing_overhead_accounting(self) -> None:
+        self.assertEqual(token_budget.chat_framing_overhead(turns=1), 25)
+        self.assertEqual(token_budget.chat_framing_overhead(turns=4), 100)
+        self.assertEqual(token_budget.chat_framing_overhead(turns=-5), 0)
+
+    def test_f19_approximation_labeling(self) -> None:
+        repo = self.create_repo({"index.py": "def test(): pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            counter = token_budget.counter({}, kn.estimate)
+            self.assertTrue(counter.is_approximate)
+            self.assertEqual(counter.fidelity, "approximate_chars_div_4")
+
+            res = broker.task_context(kn, {"project": str(repo), "task": "test"}, conn)
+            self.assertTrue(res.get("is_approximate", False))
+            self.assertIn("token_accounting", res)
+            self.assertTrue(res["token_accounting"]["is_approximate"])
+        finally:
+            conn.close()
+
+    def test_f19_token_accounting_structure(self) -> None:
+        acct = token_budget.token_accounting(
+            payload_tokens=200, compact_mcp=True, is_approx=True, turns=2
+        )
+        self.assertEqual(acct["payload_tokens"], 200)
+        self.assertEqual(acct["mcp_schema_overhead_tokens"], 713)
+        self.assertEqual(acct["chat_framing_overhead_tokens"], 50)
+        self.assertEqual(acct["total_context_footprint_tokens"], 963)
+        self.assertTrue(acct["is_approximate"])
+        self.assertEqual(acct["fidelity"], "approximate_chars_div_4")
+        self.assertIn("budget_scope", acct)
+        self.assertIn("estimation_note", acct)
+
+    def test_f19_budget_scope_and_uncertainty(self) -> None:
+        repo = self.create_repo({"util.py": "def helper(): pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            res = broker.task_context(kn, {"project": str(repo), "task": "helper"}, conn)
+            self.assertEqual(
+                res.get("budget_scope"),
+                "compact sorted JSON payload; excludes MCP envelope and provider chat framing",
+            )
+            self.assertEqual(
+                res.get("budget_type"),
+                "estimate: characters / 4; not a tokenizer",
+            )
+        finally:
+            conn.close()
+
+
+# ============================================================================
+# Feature 20: Persistent Task-Session State & Recovery
+# ============================================================================
+class TestF20PersistentTaskSessionState(E2ETestCase):
+    """F20: Persistent task-session state, epistemic layering, source invalidation, and idempotent recovery."""
+
+    def test_f20_task_session_schema_migration(self) -> None:
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            tables = {
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            self.assertIn("task_sessions", tables)
+            self.assertIn("session_decisions", tables)
+            self.assertIn("session_blockers", tables)
+            self.assertIn("session_test_outcomes", tables)
+            self.assertIn("session_breadcrumbs", tables)
+
+            mig = conn.execute("SELECT 1 FROM lazytoken_migrations WHERE version=6").fetchone()
+            self.assertIsNotNone(mig)
+        finally:
+            conn.close()
+
+    def test_f20_session_checkpoint_persistence(self) -> None:
+        repo = self.create_repo({"app.py": "def run(): pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        session_id = "sess-persisted-e2e"
+        try:
+            kn.sync(repo, conn)
+            broker.session_checkpoint(
+                kn,
+                {
+                    "project": str(repo),
+                    "session_id": session_id,
+                    "goal": "Refactor app for scalability",
+                    "decisions": [{"decision": "Decouple storage", "rationale": "High throughput"}],
+                    "blockers": [{"blocker": "Slow DB", "status": "open"}],
+                    "test_outcomes": [
+                        {"test_name": "test_app", "outcome": "passed", "exit_code": 0}
+                    ],
+                    "breadcrumbs": [{"crumb_type": "note", "payload": "Checked app entrypoint"}],
+                },
+                conn,
+            )
+        finally:
+            conn.close()
+
+        conn2 = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            cp = broker.session_checkpoint(
+                kn, {"project": str(repo), "session_id": session_id}, conn2
+            )
+            self.assertEqual(cp["goal"], "Refactor app for scalability")
+            self.assertEqual(len(cp["asserted_state"]["decisions"]), 1)
+            self.assertEqual(cp["asserted_state"]["decisions"][0]["decision"], "Decouple storage")
+            self.assertEqual(len(cp["asserted_state"]["blockers"]), 1)
+            self.assertEqual(cp["asserted_state"]["blockers"][0]["blocker"], "Slow DB")
+            self.assertEqual(len(cp["verified_state"]["test_outcomes"]), 1)
+            self.assertEqual(len(cp["recovery_breadcrumbs"]), 1)
+        finally:
+            conn2.close()
+
+    def test_f20_epistemic_layering_separation(self) -> None:
+        repo = self.create_repo({"worker.py": "class Worker: pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        session_id = "sess-epistemic-e2e"
+        try:
+            kn.sync(repo, conn)
+            broker.task_context(
+                kn, {"project": str(repo), "task": "Worker", "session_id": session_id}, conn
+            )
+            cp = broker.session_checkpoint(
+                kn,
+                {
+                    "project": str(repo),
+                    "session_id": session_id,
+                    "goal": "Worker refactor",
+                    "decisions": ["Keep backward compatibility"],
+                    "test_outcomes": [
+                        {"test_name": "test_worker", "outcome": "passed", "exit_code": 0}
+                    ],
+                },
+                conn,
+            )
+            self.assertIn("observed_state", cp)
+            self.assertIn("files", cp["observed_state"])
+            self.assertIn("symbols", cp["observed_state"])
+
+            self.assertIn("asserted_state", cp)
+            self.assertEqual(cp["asserted_state"]["goal"], "Worker refactor")
+            self.assertEqual(len(cp["asserted_state"]["decisions"]), 1)
+
+            self.assertIn("verified_state", cp)
+            self.assertEqual(len(cp["verified_state"]["test_outcomes"]), 1)
+        finally:
+            conn.close()
+
+    def test_f20_source_version_invalidation(self) -> None:
+        repo = self.create_repo({"module.py": "def calculate(): return 42\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        session_id = "sess-inval-e2e"
+        try:
+            kn.sync(repo, conn)
+            cp1 = broker.session_checkpoint(
+                kn, {"project": str(repo), "session_id": session_id}, conn
+            )
+            self.assertFalse(cp1["source_invalidation"]["invalidated"])
+
+            (repo / "module.py").write_text("def calculate(): return 100\n", encoding="utf-8")
+
+            cp2 = broker.session_checkpoint(
+                kn, {"project": str(repo), "session_id": session_id}, conn
+            )
+            self.assertTrue(cp2["source_invalidation"]["invalidated"])
+            self.assertIn("module.py", cp2["source_invalidation"]["changed_files"])
+        finally:
+            conn.close()
+
+    def test_f20_idempotent_session_recovery(self) -> None:
+        repo = self.create_repo({"service.py": "def serve(): pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        session_id = "sess-idempotent-e2e"
+        try:
+            kn.sync(repo, conn)
+            args = {
+                "project": str(repo),
+                "session_id": session_id,
+                "goal": "Idempotent recovery verification",
+                "decisions": ["Check before insert"],
+                "blockers": ["High disk I/O"],
+            }
+            cp1 = broker.session_checkpoint(kn, args, conn)
+            cp2 = broker.session_checkpoint(kn, args, conn)
+            cp3 = broker.session_checkpoint(kn, args, conn)
+
+            self.assertEqual(cp1["asserted_state"]["decisions"], cp2["asserted_state"]["decisions"])
+            self.assertEqual(cp2["asserted_state"]["decisions"], cp3["asserted_state"]["decisions"])
+
+            dec_count = conn.execute(
+                "SELECT count(*) FROM session_decisions WHERE session_id=?", (session_id,)
+            ).fetchone()[0]
+            self.assertEqual(dec_count, 1)
+        finally:
+            conn.close()
+
+
+# ============================================================================
+# Feature 21: Memory Quality Lifecycle Governance & Evidence Linking
+# ============================================================================
+class TestF21MemoryQualityLifecycle(E2ETestCase):
+    """F21: Memory quality lifecycle state machine, legitimate corrections, test linking, governance, and review guard."""
+
+    def test_f21_memory_lifecycle_state_machine(self) -> None:
+        repo = self.create_repo({"cache.py": "class Cache: pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            project_id = str(repo.resolve())
+            prop = features.propose(
+                kn,
+                {
+                    "project": project_id,
+                    "kind": "lesson",
+                    "name": "Cache Invalidation",
+                    "summary": "Evict expired keys periodically",
+                    "task": "Cache management",
+                    "evidence": "Memory growth observed",
+                    "paths": ["cache.py"],
+                },
+                conn,
+            )
+            prop_id = prop["id"]
+            self.assertEqual(prop.get("lifecycle_state"), "pending")
+
+            rev = features.review(
+                kn,
+                {"project": project_id, "id": prop_id, "action": "approve", "verified": True},
+                conn,
+            )
+            self.assertEqual(rev.get("lifecycle_state"), "verified")
+
+            (repo / "cache.py").write_text("class Cache: def evict(self): pass\n", encoding="utf-8")
+            kn.sync(repo, conn)
+            h = features.health(conn, prop_id)
+            self.assertEqual(h["lifecycle_state"], "stale")
+
+            rev_sup = features.review(
+                kn,
+                {"project": project_id, "id": prop_id, "action": "supersede"},
+                conn,
+            )
+            self.assertEqual(rev_sup.get("lifecycle_state"), "superseded")
+        finally:
+            conn.close()
+
+    def test_f21_legitimate_corrections_with_replaces_id(self) -> None:
+        repo = self.create_repo({"order.py": "def checkout(): pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            project_id = str(repo.resolve())
+            p1 = features.propose(
+                kn,
+                {
+                    "project": project_id,
+                    "kind": "lesson",
+                    "name": "Checkout Lock Policy",
+                    "summary": "Acquire database lock",
+                    "task": "Checkout",
+                    "evidence": "Race condition",
+                    "paths": ["order.py"],
+                },
+                conn,
+            )
+            p1_id = p1["id"]
+            features.review(
+                kn,
+                {"project": project_id, "id": p1_id, "action": "approve", "verified": True},
+                conn,
+            )
+
+            corr = features.propose(
+                kn,
+                {
+                    "project": project_id,
+                    "kind": "lesson",
+                    "name": "Checkout Lock Policy",
+                    "summary": "Use distributed Redis lock with auto-renew TTL",
+                    "task": "Checkout",
+                    "evidence": "Database lock was too slow",
+                    "paths": ["order.py"],
+                    "replaces_id": p1_id,
+                },
+                conn,
+            )
+            self.assertNotIn("error", corr)
+            corr_id = corr["id"]
+
+            features.review(
+                kn,
+                {"project": project_id, "id": corr_id, "action": "approve", "verified": True},
+                conn,
+            )
+            h_orig = features.health(conn, p1_id)
+            self.assertEqual(h_orig["lifecycle_state"], "superseded")
+        finally:
+            conn.close()
+
+    def test_f21_test_evidence_linking(self) -> None:
+        repo = self.create_repo({"auth.py": "def verify(): return True\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            project_id = str(repo.resolve())
+            prop = features.propose(
+                kn,
+                {
+                    "project": project_id,
+                    "kind": "lesson",
+                    "name": "Auth Verification Rule",
+                    "summary": "Verify returns boolean",
+                    "task": "Authentication",
+                    "evidence": "Test verification",
+                    "paths": ["auth.py"],
+                    "tests": [
+                        {
+                            "test_file": "test_auth.py",
+                            "test_command": "pytest test_auth.py",
+                            "exit_code": 0,
+                            "digest": "sha_auth_123",
+                            "output_snippet": "1 passed in 0.05s",
+                        }
+                    ],
+                },
+                conn,
+            )
+            rows = conn.execute(
+                "SELECT * FROM memory_test_evidence WHERE proposal_id=?", (prop["id"],)
+            ).fetchall()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["test_file"], "test_auth.py")
+            self.assertEqual(rows[0]["exit_code"], 0)
+        finally:
+            conn.close()
+
+    def test_f21_governance_export_retention_delete(self) -> None:
+        repo = self.create_repo({"service.py": "def run(): pass\n"})
+        conn = kn.connect(self.temp_dir / "network.sqlite3")
+        try:
+            kn.sync(repo, conn)
+            project_id = str(repo.resolve())
+            p = features.propose(
+                kn,
+                {
+                    "project": project_id,
+                    "kind": "lesson",
+                    "name": "Gov Lesson",
+                    "summary": "Gov",
+                    "task": "T",
+                    "evidence": "E",
+                    "paths": ["service.py"],
+                },
+                conn,
+            )
+            exp = features.export_memories(kn, {"project": project_id}, conn)
+            self.assertIn("Gov Lesson", exp["markdown"])
+
+            features.review(kn, {"project": project_id, "id": p["id"], "action": "reject"}, conn)
+            ret = features.retention_memories(kn, {"project": project_id}, conn)
+            self.assertEqual(ret["pruned_count"], 1)
+
+            p2 = features.propose(
+                kn,
+                {
+                    "project": project_id,
+                    "kind": "lesson",
+                    "name": "To Delete",
+                    "summary": "Del",
+                    "task": "T",
+                    "evidence": "E",
+                    "paths": ["service.py"],
+                },
+                conn,
+            )
+            del_res = features.delete_memory(kn, {"project": project_id, "id": p2["id"]}, conn)
+            self.assertTrue(del_res["deleted"])
+            self.assertTrue((repo / "service.py").exists(), "Source files must not be deleted")
+        finally:
+            conn.close()
+
+    def test_f21_human_review_policy_guard(self) -> None:
+        client = self.open_mcp_client()
+        init_res = client.initialize()
+        self.assertIn("serverInfo", init_res)
+
+        res = client.call_tool("lazytoken", {"action": "review", "id": 1, "action_type": "approve"})
+        err_msg = str(res)
+        self.assertTrue(
+            "dashboard" in err_msg.lower() or "cannot make review decisions" in err_msg.lower(),
+            f"Expected review restriction error, got: {res}",
+        )
 
 
 if __name__ == "__main__":

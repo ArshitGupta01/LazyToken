@@ -157,6 +157,83 @@ class WatcherTests(unittest.TestCase):
             ).fetchone()
         )
 
+    def test_watcher_adaptive_polling_backoff_on_idle(self):
+        """M6 / F20: Watcher scales effective polling interval up when repository is idle."""
+        watcher_engine = watcher.ProjectWatcher(
+            kn, self.db, debounce=0.5, min_interval=0.5, max_interval=5.0, idle_backoff_steps=3
+        )
+        self.assertEqual(watcher_engine.effective_interval, 0.5)
+        # Initial tick sets baseline (has_changes is True on initial sync)
+        watcher_engine.tick(now=0)
+        self.assertEqual(watcher_engine.effective_interval, 0.5)
+        # Successive idle ticks scale interval up
+        watcher_engine.tick(now=1)
+        self.assertGreater(watcher_engine.effective_interval, 0.5)
+        watcher_engine.tick(now=2)
+        watcher_engine.tick(now=3)
+        self.assertEqual(watcher_engine.effective_interval, 5.0)
+        self.assertGreaterEqual(watcher_engine.consecutive_idle, 3)
+
+    def test_watcher_fast_poll_recovery_on_file_change(self):
+        """M6 / F20: Watcher immediately recovers to min_interval upon detecting a file change."""
+        watcher_engine = watcher.ProjectWatcher(
+            kn, self.db, debounce=1.0, min_interval=0.5, max_interval=5.0, idle_backoff_steps=3
+        )
+        watcher_engine.tick(now=0)
+        watcher_engine.tick(now=1)
+        watcher_engine.tick(now=2)
+        watcher_engine.tick(now=3)
+        self.assertEqual(watcher_engine.effective_interval, 5.0)
+
+        # Mutate file
+        (self.root / "Auth.py").write_text("class MutatedAuth: pass")
+        watcher_engine.tick(now=4)
+        # Should instantly reset to min_interval
+        self.assertEqual(watcher_engine.effective_interval, 0.5)
+        self.assertEqual(watcher_engine.consecutive_idle, 0)
+
+    def test_incremental_directory_reconciliation(self):
+        """M6 / F20: Subdirectories whose mtimes have not changed are skipped in incremental scan."""
+        sub1 = self.root / "sub1"
+        sub1.mkdir()
+        (sub1 / "file1.py").write_text("class F1: pass")
+        sub2 = self.root / "sub2"
+        sub2.mkdir()
+        (sub2 / "file2.py").write_text("class F2: pass")
+
+        watcher_engine = watcher.ProjectWatcher(kn, self.db, debounce=0.5, full_interval=300)
+        watcher_engine.tick(now=0)  # full scan
+        state = watcher_engine.projects[self.project]
+        self.assertIn("sub1/file1.py", state["file_cache"])
+        self.assertIn("sub2/file2.py", state["file_cache"])
+
+        # Modify only file in sub1
+        (sub1 / "file1.py").write_text("class F1Updated: pass")
+        current = watcher.incremental_snapshot(kn, self.root, state)
+        self.assertIsNotNone(current)
+        self.assertIn("sub1/file1.py", current)
+        self.assertIn("sub2/file2.py", current)
+
+    def test_burst_write_coalescing_within_debounce(self):
+        """M6 / F20: Multiple rapid file edits within debounce window trigger single sync once settled."""
+        watcher_engine = watcher.ProjectWatcher(kn, self.db, debounce=1.0, full_interval=300)
+        watcher_engine.tick(now=0)
+
+        # Perform 5 rapid writes between t=0.1 and t=0.5
+        for i in range(5):
+            (self.root / "Auth.py").write_text(f"class AuthV{i}: pass")
+            watcher_engine.tick(now=0.1 * (i + 1))
+
+        # Still within debounce (< 1.0s after last change at 0.5s)
+        self.assertFalse(self.db.execute("SELECT 1 FROM symbols WHERE name='AuthV4'").fetchone())
+
+        # Tick at t=1.6 (> 1.0s after t=0.5)
+        with patch.object(kn, "sync", wraps=kn.sync) as mock_sync:
+            watcher_engine.tick(now=1.6)
+            self.assertEqual(mock_sync.call_count, 1)
+
+        self.assertTrue(self.db.execute("SELECT 1 FROM symbols WHERE name='AuthV4'").fetchone())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,9 +6,9 @@
 
 _Project-scoped SQLite graph network, bounded context broker, and zero-amnesia active session recall._
 
-[![Version](https://img.shields.io/badge/version-v0.4.5-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
-[![Unit Tests](https://img.shields.io/badge/unit%20tests-169%20verified-10b981.svg?style=for-the-badge&logo=pytest&logoColor=white)](#-verification--test-readiness)
-[![E2E Tests](https://img.shields.io/badge/e2e%20tests-184%2F184%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
+[![Version](https://img.shields.io/badge/version-v0.5.0-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
+[![Unit Tests](https://img.shields.io/badge/unit%20tests-256%20verified-10b981.svg?style=for-the-badge&logo=pytest&logoColor=white)](#-verification--test-readiness)
+[![E2E Tests](https://img.shields.io/badge/e2e%20tests-209%2F209%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
 [![Architecture](https://img.shields.io/badge/architecture-100%25%20local%20%7C%20offline-f59e0b.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
 [![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05%20%7C%202025--06--18-8b5cf6.svg?style=for-the-badge&logo=json&logoColor=white)](https://modelcontextprotocol.io)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20Native-0284c7.svg?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
@@ -284,16 +284,20 @@ Evaluated across 8 dynamic retrieval scenarios via `python benchmark/retrieval_a
 | **Forbidden Path Leakage**       |      **0%**      | Zero stale or deleted files returned after rename/removal events              |
 | **Mean Context Payload**         | **177.6 tokens** | Compact, bounded JSON payload delivery                                        |
 
-### 4. Graph Ablation Benchmark (Lexical vs Memory vs Graph vs Full Pipeline)
+### 4. 5-Mode Empirical Retrieval Ablation Benchmark
 
-Evaluated across 4 multi-component scenarios via `python benchmark/graph_ablation.py`:
+Empirically evaluated across 4 multi-component scenarios via `python benchmark/graph_ablation.py`:
 
-| Scenario   | Task Description                 |    Mode A (Lexical Alone)    | Mode B (Lexical + Memory) |  Mode C (AST Graph)   | Mode D (Full Pipeline) | Net Savings vs Raw Repo |
-| :--------- | :------------------------------- | :--------------------------: | :-----------------------: | :-------------------: | :--------------------: | :---------------------: |
-| **ABL-01** | Core TokenStore Refactor         |       Caller Missed ❌       |     Caller Missed ❌      | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-44.8%**        |
-| **ABL-02** | Disambiguating Duplicate Methods | False Matches (66% noise) ❌ |     False Matches ❌      | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-38.7%**        |
-| **ABL-03** | Nested Function Attribution      |    Outer Contaminated ❌     |   Outer Contaminated ❌   | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-55.4%**        |
-| **ABL-04** | Cross-Module Session Validation  |       Caller Missed ❌       |     Caller Missed ❌      | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-37.7%**        |
+| Mode | Precision@5 | Recall@5 | MRR@5 | NDCG@5 | Abstention | Tokens (mean) | Net Savings vs Raw |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **grep_baseline** (Plain disk regex/substring scan) | 0.3500 | 0.8333 | 0.8333 | 0.8005 | 1.0000 | 230 | **-84.5%** |
+| **lexical_no_graph** (SQLite FTS search alone) | 0.3000 | 0.7500 | 0.8750 | 0.7654 | 1.0000 | 361 | **-75.6%** |
+| **lexical_with_graph** (Lexical + AST call graph expansion) | 0.3500 | 0.8333 | 1.0000 | 0.8673 | 1.0000 | 924 | **-37.6%** |
+| **verified_memory_no_graph** (Verified lessons alone) | 0.2000 | 0.5417 | 0.8333 | 0.5793 | 1.0000 | 66 | **-95.5%** |
+| **full_pipeline** (Unified Lexical + Memory + AST Graph + Budget) | 0.3500 | 0.8333 | 1.0000 | 0.8673 | 1.0000 | 1090 | **-26.4%** |
+
+> [!NOTE]
+> **Key Takeaway**: Plain grep and lexical search miss indirect or multi-hop call sites (e.g. `ABL-01` 2-hop callers) and suffer disambiguation noise. AST call graph expansion achieves **100% MRR@5 and 0.867 NDCG@5** while providing bounded context within budget constraints.
 
 Full traces, hashes, and methodology are available in [docs/BENCHMARK_PILOT.md](docs/BENCHMARK_PILOT.md), [docs/RETRIEVAL_ASSESSMENT.md](docs/RETRIEVAL_ASSESSMENT.md), and [docs/GRAPH_ABLATION_ASSESSMENT.md](docs/GRAPH_ABLATION_ASSESSMENT.md).
 
@@ -345,10 +349,10 @@ lazytoken dashboard
 LazyToken is thoroughly tested across multiple acceptance tiers:
 
 ```powershell
-# 1. Run the core unit, security, and code intelligence suite (169 tests)
+# 1. Run the core unit, security, and code intelligence suite (256 tests)
 python -m unittest discover -s tests -p "test_*.py"
 
-# 2. Run the end-to-end opaque-box test runner (184 tests)
+# 2. Run the end-to-end opaque-box test runner (209 tests)
 python e2e/runner.py --all
 
 # 3. Check code formatting and style
@@ -356,8 +360,8 @@ python -m black --check .
 npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css tests/workspace.test.cjs
 ```
 
-- **Core Unit Suite**: **169 discovered tests** (167 passing, 2 platform/environment skips).
-- **End-to-End Suite**: **184 passing tests** across 4 tiers (80 feature coverage, 80 boundary, 16 cross-feature, 8 workload).
+- **Core Unit Suite**: **256 discovered tests** (254 passing, 2 platform/environment skips).
+- **End-to-End Suite**: **209 passing tests** across 4 tiers (105 feature coverage, 80 boundary, 16 cross-feature, 8 workload).
 - **Format Verification**: 100% compliant with `black` and `prettier`.
 
 ---

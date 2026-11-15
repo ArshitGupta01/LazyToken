@@ -620,14 +620,14 @@ class Milestone1HardeningTests(unittest.TestCase):
         kn.sync(self.root, self.db)
 
         session_id = "tight-suppression-session"
-        # Turn 1: populate session
+        # Turn 1: populate session (use generous budget so all 31 symbols are seen)
         ret1 = kn.call(
             "get_task_context",
             {
                 "project": self.project,
                 "task": "ControllerService handle_request",
                 "session_id": session_id,
-                "budget": 1200,
+                "budget": 3500,
             },
             self.db,
         )
@@ -707,6 +707,119 @@ class Milestone1HardeningTests(unittest.TestCase):
             active_files,
             f"foundational.py missing from current turn active_graph: {active_files}",
         )
+
+    def test_wal_pragmas_and_synchronous_normal(self):
+        """M6 / F21: Verify PRAGMA journal_mode=WAL, synchronous=NORMAL, and busy_timeout."""
+        db_file = self.root / "pragma_test.sqlite3"
+        conn = kn.connect(db_file)
+        try:
+            journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0].lower()
+            self.assertEqual(journal_mode, "wal")
+            sync_mode = conn.execute("PRAGMA synchronous").fetchone()[0]
+            # In SQLite, 1 corresponds to NORMAL (0=OFF, 1=NORMAL, 2=FULL, 3=EXTRA)
+            self.assertEqual(sync_mode, 1)
+            busy_timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+            self.assertGreaterEqual(busy_timeout, 5000)
+            foreign_keys = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+            self.assertEqual(foreign_keys, 1)
+        finally:
+            conn.close()
+
+    def test_concurrent_readers_during_active_write_transaction(self):
+        """M6 / F21: Readers proceed non-blocking during write transaction in WAL mode."""
+        import threading
+
+        db_file = self.root / "wal_read_write.sqlite3"
+        init_conn = kn.connect(db_file)
+        init_conn.close()
+
+        errors = []
+        writer_started = threading.Event()
+        writer_finish = threading.Event()
+
+        def writer_job():
+            try:
+                conn = kn.connect(db_file)
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                    for i in range(50):
+                        conn.execute(
+                            "INSERT INTO task_measurements VALUES(NULL, ?, 10, 5, 2, ?)",
+                            (f"job_{i}", int(time.time())),
+                        )
+                    writer_started.set()
+                    writer_finish.wait(timeout=5.0)
+                    conn.commit()
+                finally:
+                    conn.close()
+            except Exception as e:
+                errors.append(e)
+
+        def reader_job():
+            try:
+                writer_started.wait(timeout=5.0)
+                conn = kn.connect(db_file)
+                try:
+                    # Reader should be able to read without blocking
+                    row = conn.execute("SELECT count(*) FROM task_measurements").fetchone()
+                    self.assertIsNotNone(row)
+                finally:
+                    conn.close()
+            except Exception as e:
+                errors.append(e)
+
+        w_thread = threading.Thread(target=writer_job)
+        r_threads = [threading.Thread(target=reader_job) for _ in range(4)]
+
+        w_thread.start()
+        for t in r_threads:
+            t.start()
+        for t in r_threads:
+            t.join()
+        writer_finish.set()
+        w_thread.join()
+
+        self.assertEqual(errors, [])
+
+    def test_multi_writer_busy_timeout_contention(self):
+        """M6 / F21: Multiple concurrent writers succeed via busy_timeout backoff."""
+        import threading
+
+        db_file = self.root / "wal_multi_writer.sqlite3"
+        init_conn = kn.connect(db_file)
+        init_conn.close()
+
+        errors = []
+
+        def writer_worker(wid: int):
+            try:
+                conn = kn.connect(db_file)
+                try:
+                    for i in range(10):
+                        conn.execute(
+                            "INSERT INTO task_measurements VALUES(NULL, ?, 50, 20, 5, ?)",
+                            (f"w_{wid}_{i}", int(time.time())),
+                        )
+                        conn.commit()
+                        time.sleep(0.005)
+                finally:
+                    conn.close()
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=writer_worker, args=(i,)) for i in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(errors, [])
+        check_conn = kn.connect(db_file)
+        try:
+            count = check_conn.execute("SELECT count(*) FROM task_measurements").fetchone()[0]
+            self.assertEqual(count, 40)
+        finally:
+            check_conn.close()
 
 
 if __name__ == "__main__":

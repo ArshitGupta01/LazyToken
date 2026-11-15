@@ -124,7 +124,7 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         kn.add_asset({"kind": "lesson", "name": "old", "summary": "existing"}, self.db)
         self.db.close()
         self.db = kn.connect(Path(self.temp.name) / "test.sqlite3")
-        self.assertEqual(
+        self.assertGreaterEqual(
             self.db.execute("SELECT count(*) FROM lazytoken_migrations").fetchone()[0], 5
         )
         self.assertEqual(
@@ -158,7 +158,7 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         old.close()
         upgraded = kn.connect(path)
         upgraded.close()
-        backups = list(Path(self.temp.name).glob("legacy.sqlite3.pre-v5-*.sqlite3"))
+        backups = list(Path(self.temp.name).glob("legacy.sqlite3.pre-v*-*.sqlite3"))
         self.assertEqual(len(backups), 1)
         copy = sqlite3.connect(backups[0])
         self.assertEqual(copy.execute("SELECT value FROM legacy_marker").fetchone()[0], "preserved")

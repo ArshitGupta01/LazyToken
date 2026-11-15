@@ -54,8 +54,71 @@ def migrate(conn):
     CREATE TABLE IF NOT EXISTS index_errors(project_id TEXT NOT NULL,path TEXT NOT NULL,PRIMARY KEY(project_id,path));
     CREATE TABLE IF NOT EXISTS benchmark_records(task_id TEXT NOT NULL,pair_id TEXT NOT NULL,arm TEXT NOT NULL,record_json TEXT NOT NULL,recorded_at INTEGER NOT NULL,PRIMARY KEY(task_id,pair_id,arm));
     INSERT OR IGNORE INTO lazytoken_migrations VALUES(5,strftime('%s','now'));
+
+    CREATE TABLE IF NOT EXISTS task_sessions(
+        session_id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        goal TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        source_digest TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS session_decisions(
+        id INTEGER PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        decision TEXT NOT NULL,
+        rationale TEXT NOT NULL DEFAULT '',
+        recorded_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS session_blockers(
+        id INTEGER PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        blocker TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        recorded_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS session_test_outcomes(
+        id INTEGER PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        test_name TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        exit_code INTEGER NOT NULL,
+        duration_ms REAL NOT NULL DEFAULT 0.0,
+        recorded_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS session_breadcrumbs(
+        id INTEGER PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        crumb_type TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        recorded_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS memory_test_evidence(
+        id INTEGER PRIMARY KEY,
+        proposal_id INTEGER NOT NULL,
+        test_file TEXT NOT NULL,
+        test_command TEXT NOT NULL,
+        exit_code INTEGER NOT NULL,
+        digest TEXT NOT NULL,
+        output_snippet TEXT NOT NULL DEFAULT '',
+        recorded_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS session_decisions_idx ON session_decisions(session_id);
+    CREATE INDEX IF NOT EXISTS session_blockers_idx ON session_blockers(session_id);
+    CREATE INDEX IF NOT EXISTS session_test_outcomes_idx ON session_test_outcomes(session_id);
+    CREATE INDEX IF NOT EXISTS session_breadcrumbs_idx ON session_breadcrumbs(session_id);
+    CREATE INDEX IF NOT EXISTS memory_test_evidence_idx ON memory_test_evidence(proposal_id);
     """
     )
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(memory_proposals)")}
+    if "replaces_id" not in cols:
+        conn.execute("ALTER TABLE memory_proposals ADD COLUMN replaces_id INTEGER DEFAULT NULL")
+    if "lifecycle_state" not in cols:
+        conn.execute(
+            "ALTER TABLE memory_proposals ADD COLUMN lifecycle_state TEXT NOT NULL DEFAULT 'pending'"
+        )
+    conn.execute("INSERT OR IGNORE INTO lazytoken_migrations VALUES(6, strftime('%s','now'))")
     conn.commit()
 
 
@@ -313,34 +376,50 @@ def _propose(kn, args, conn):
     for field in ("problem", "attempts", "resolution"):
         if not isinstance(args.get(field, ""), str) or len(args.get(field, "")) > 3000:
             return {"error": field + " must be text of at most 3000 characters."}
-    duplicate = conn.execute(
-        "SELECT id FROM memory_proposals WHERE project_id=? AND kind=? AND lower(trim(name))=lower(trim(?)) AND status IN ('pending','approved') ORDER BY id LIMIT 1",
-        (project, kind, name),
-    ).fetchone()
-    if duplicate:
-        return {
-            "error": "A pending or approved memory with this name already exists in this project.",
-            "existing_id": duplicate["id"],
-        }
-    # Project-scoped near-duplicate detection never reads other projects' lessons.
-    words = lambda text: set(kn.split_words(text))
-    incoming = words(summary)
-    related = []
-    for candidate in conn.execute(
-        "SELECT id,name,summary FROM memory_proposals WHERE project_id=? AND kind=? AND status IN ('pending','approved') ORDER BY id DESC LIMIT 200",
-        (project, kind),
-    ):
-        existing = words(candidate["summary"])
-        similarity = len(incoming & existing) / max(1, len(incoming | existing))
-        if summary.strip().casefold() == candidate["summary"].strip().casefold():
+    replaces_id = args.get("replaces_id")
+    if replaces_id is not None:
+        try:
+            replaces_id = int(replaces_id)
+            repl_row = conn.execute(
+                "SELECT id FROM memory_proposals WHERE id=? AND project_id=?",
+                (replaces_id, project),
+            ).fetchone()
+            if not repl_row:
+                return {"error": f"replaces_id {replaces_id} does not exist in this project."}
+        except (ValueError, TypeError):
+            return {"error": "replaces_id must be an integer proposal ID."}
+
+    if replaces_id is None:
+        duplicate = conn.execute(
+            "SELECT id FROM memory_proposals WHERE project_id=? AND kind=? AND lower(trim(name))=lower(trim(?)) AND status IN ('pending','approved') ORDER BY id LIMIT 1",
+            (project, kind, name),
+        ).fetchone()
+        if duplicate:
             return {
-                "error": "A similar pending or approved memory already exists in this project.",
-                "existing_id": candidate["id"],
-                "similarity": round(similarity, 3),
+                "error": "A pending or approved memory with this name already exists in this project.",
+                "existing_id": duplicate["id"],
             }
-        a, b = words(name), words(candidate["name"])
-        if similarity >= 0.65 or len(a & b) / max(1, len(a | b)) >= 0.6:
-            related.append(candidate["id"])
+        # Project-scoped near-duplicate detection never reads other projects' lessons.
+        words = lambda text: set(kn.split_words(text))
+        incoming = words(summary)
+        related = []
+        for candidate in conn.execute(
+            "SELECT id,name,summary FROM memory_proposals WHERE project_id=? AND kind=? AND status IN ('pending','approved') ORDER BY id DESC LIMIT 200",
+            (project, kind),
+        ):
+            existing = words(candidate["summary"])
+            similarity = len(incoming & existing) / max(1, len(incoming | existing))
+            if summary.strip().casefold() == candidate["summary"].strip().casefold():
+                return {
+                    "error": "A similar pending or approved memory already exists in this project.",
+                    "existing_id": candidate["id"],
+                    "similarity": round(similarity, 3),
+                }
+            a, b = words(name), words(candidate["name"])
+            if similarity >= 0.65 or len(a & b) / max(1, len(a | b)) >= 0.6:
+                related.append(candidate["id"])
+    else:
+        related = []
     evidence_rows = []
     for path in paths:
         if not isinstance(path, str):
@@ -351,8 +430,9 @@ def _propose(kn, args, conn):
         if not row:
             return {"error": "Every evidence path must be an indexed file in the selected project."}
         evidence_rows.append((path, row["digest"]))
+    now = int(time.time())
     cur = conn.execute(
-        "INSERT INTO memory_proposals(project_id,kind,name,summary,task,evidence,commit_ref,created_at,problem,attempts,resolution) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO memory_proposals(project_id,kind,name,summary,task,evidence,commit_ref,created_at,problem,attempts,resolution,replaces_id,lifecycle_state) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             project,
             kind,
@@ -361,21 +441,42 @@ def _propose(kn, args, conn):
             task[:2000],
             evidence[:2000],
             str(args.get("commit_ref", ""))[:200],
-            int(time.time()),
+            now,
             args.get("problem", ""),
             args.get("attempts", ""),
             args.get("resolution", ""),
+            replaces_id,
+            "pending",
         ),
     )
+    new_pid = cur.lastrowid
     conn.executemany(
         "INSERT OR IGNORE INTO memory_evidence VALUES(?,?,?)",
-        [(cur.lastrowid, p, d) for p, d in evidence_rows],
+        [(new_pid, p, d) for p, d in evidence_rows],
     )
+    tests_input = args.get("tests", [])
+    if isinstance(tests_input, list):
+        for t in tests_input:
+            if isinstance(t, dict):
+                conn.execute(
+                    "INSERT INTO memory_test_evidence(proposal_id, test_file, test_command, exit_code, digest, output_snippet, recorded_at) VALUES(?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        new_pid,
+                        str(t.get("test_file", "")),
+                        str(t.get("test_command", "")),
+                        int(t.get("exit_code", 0)),
+                        str(t.get("digest", "")),
+                        str(t.get("output_snippet", ""))[:2000],
+                        now,
+                    ),
+                )
     conn.commit()
     return {
         "saved": True,
         "status": "pending",
-        "id": cur.lastrowid,
+        "lifecycle_state": "pending",
+        "id": new_pid,
+        "replaces_id": replaces_id,
         "related_candidates": related,
         "review_note": (
             "Related names may contain conflicting advice; human review is required."
@@ -390,6 +491,7 @@ def proposal_list(kn, args, conn):
     if not project:
         return {"error": "An indexed project is required."}
     status = args.get("status", "all")
+    lifecycle_filter = args.get("lifecycle_state")
     if status not in ("all", "pending", "approved", "rejected", "superseded"):
         return {"error": "Invalid status."}
     rows = conn.execute(
@@ -406,13 +508,15 @@ def proposal_list(kn, args, conn):
             )
         ]
         r.update(health(conn, r["id"]))
+        if lifecycle_filter and r.get("lifecycle_state") != lifecycle_filter:
+            continue
         result.append(r)
     return {"proposals": result}
 
 
 def health(conn, proposal_id):
     row = conn.execute(
-        "SELECT project_id,status,commit_ref,verification_state FROM memory_proposals WHERE id=?",
+        "SELECT project_id,status,commit_ref,verification_state,lifecycle_state FROM memory_proposals WHERE id=?",
         (proposal_id,),
     ).fetchone()
     if not row:
@@ -455,10 +559,31 @@ def health(conn, proposal_id):
         + (0.1 if row["commit_ref"] else 0)
         + 0.1
     )
+    r_dict = dict(row)
+    status = r_dict.get("status", "")
+    ls = r_dict.get("lifecycle_state", "")
+    lifecycle = (
+        "superseded"
+        if (status == "superseded" or ls == "superseded")
+        else (
+            "rejected"
+            if (status == "rejected" or ls == "rejected")
+            else (
+                "stale"
+                if changed
+                else (
+                    "verified"
+                    if (status == "approved" and r_dict.get("verification_state") == "verified")
+                    else ("reviewed" if status == "approved" else "pending")
+                )
+            )
+        )
+    )
     return {
         "freshness": state,
         "freshness_basis": "indexed hashes; approval also validates live files",
         "verification_state": row["verification_state"],
+        "lifecycle_state": lifecycle,
         "changed_paths": changed,
         "unavailable_paths": unavailable,
         "confidence": round(score, 2),
@@ -520,11 +645,16 @@ def _review(kn, args, conn):
         if row["status"] != "approved":
             return {"error": "Only approved memories can be superseded."}
         conn.execute(
-            "UPDATE memory_proposals SET status='superseded',reviewed_at=? WHERE id=?",
+            "UPDATE memory_proposals SET status='superseded',lifecycle_state='superseded',reviewed_at=? WHERE id=?",
             (int(time.time()), pid),
         )
         conn.commit()
-        return {"saved": True, "status": "superseded", "asset_id": row["asset_id"]}
+        return {
+            "saved": True,
+            "status": "superseded",
+            "lifecycle_state": "superseded",
+            "asset_id": row["asset_id"],
+        }
     if action == "revalidate":
         if row["status"] != "approved":
             return {"error": "Only approved memories can be revalidated."}
@@ -584,10 +714,15 @@ def _review(kn, args, conn):
             return {"error": "verified must be a boolean."}
         if verified and health(conn, pid)["freshness"] != "current":
             return {"error": "Verification requires current indexed file evidence."}
+    else:
+        verified = False
     status = "approved" if action == "approve" else "rejected"
+    lifecycle_state = (
+        ("verified" if verified else "reviewed") if action == "approve" else "rejected"
+    )
     changed = conn.execute(
-        "UPDATE memory_proposals SET status=?,reviewed_at=? WHERE id=? AND status='pending'",
-        (status, int(time.time()), pid),
+        "UPDATE memory_proposals SET status=?,lifecycle_state=?,reviewed_at=? WHERE id=? AND status='pending'",
+        (status, lifecycle_state, int(time.time()), pid),
     ).rowcount
     if not changed:
         conn.rollback()
@@ -615,8 +750,122 @@ def _review(kn, args, conn):
         "UPDATE memory_proposals SET asset_id=?,verification_state=? WHERE id=?",
         (aid, "verified" if action == "approve" and verified else "hypothesis", pid),
     )
+    row_dict = dict(row)
+    if action == "approve" and row_dict.get("replaces_id"):
+        conn.execute(
+            "UPDATE memory_proposals SET status='superseded',lifecycle_state='superseded',reviewed_at=? WHERE id=? AND project_id=?",
+            (int(time.time()), row_dict["replaces_id"], project),
+        )
     conn.commit()
-    return {"saved": True, "status": status, "asset_id": aid}
+    return {"saved": True, "status": status, "lifecycle_state": lifecycle_state, "asset_id": aid}
+
+
+def export_memories(kn, args, conn) -> dict:
+    """Exports proposals & assets as structured JSON and Markdown summary. Read-only."""
+    project = project_id(kn, conn, args.get("project"))
+    if not project:
+        return {"error": "An indexed project is required."}
+    proposals = conn.execute(
+        "SELECT * FROM memory_proposals WHERE project_id=? ORDER BY id", (project,)
+    ).fetchall()
+    props_list = [dict(r) for r in proposals]
+    for p in props_list:
+        p["evidence"] = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT path, digest FROM memory_evidence WHERE proposal_id=?", (p["id"],)
+            ).fetchall()
+        ]
+        p["test_evidence"] = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT test_file, test_command, exit_code, digest, output_snippet FROM memory_test_evidence WHERE proposal_id=?",
+                (p["id"],),
+            ).fetchall()
+        ]
+    md_lines = [f"# Memory Export for Project: {project}\n"]
+    for p in props_list:
+        state = p.get("lifecycle_state") or p.get("status", "pending")
+        md_lines.append(f"## [{state.upper()}] {p.get('name')}")
+        md_lines.append(f"- **Kind**: {p.get('kind')}")
+        md_lines.append(f"- **Summary**: {p.get('summary')}")
+        md_lines.append(f"- **Task**: {p.get('task')}")
+        if p.get("replaces_id"):
+            md_lines.append(f"- **Replaces ID**: {p.get('replaces_id')}")
+        md_lines.append("")
+    return {
+        "project": project,
+        "count": len(props_list),
+        "json": props_list,
+        "markdown": "\n".join(md_lines),
+    }
+
+
+def retention_memories(kn, args, conn) -> dict:
+    """Prunes rejected or superseded proposals; preserves verified, approved, and pending memories."""
+    project = project_id(kn, conn, args.get("project"))
+    if not project:
+        return {"error": "An indexed project is required."}
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        prune_rows = conn.execute(
+            "SELECT id FROM memory_proposals WHERE project_id=? AND (status IN ('rejected', 'superseded') OR lifecycle_state IN ('rejected', 'superseded'))",
+            (project,),
+        ).fetchall()
+        prune_ids = [r["id"] for r in prune_rows]
+        if prune_ids:
+            placeholders = ",".join("?" for _ in prune_ids)
+            conn.execute(
+                f"DELETE FROM memory_test_evidence WHERE proposal_id IN ({placeholders})", prune_ids
+            )
+            conn.execute(
+                f"DELETE FROM memory_evidence WHERE proposal_id IN ({placeholders})", prune_ids
+            )
+            conn.execute(f"DELETE FROM memory_proposals WHERE id IN ({placeholders})", prune_ids)
+        retained = conn.execute(
+            "SELECT count(*) FROM memory_proposals WHERE project_id=?", (project,)
+        ).fetchone()[0]
+        conn.commit()
+        return {
+            "project": project,
+            "pruned_count": len(prune_ids),
+            "retained_count": retained,
+            "preserved_approved": True,
+        }
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
+
+
+def delete_memory(kn, args, conn) -> dict:
+    """Deletes a single memory proposal by ID; never touches source files."""
+    project = project_id(kn, conn, args.get("project"))
+    if not project:
+        return {"error": "An indexed project is required."}
+    try:
+        pid = int(args.get("id", 0))
+    except (ValueError, TypeError):
+        return {"error": "Invalid proposal id."}
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        row = conn.execute(
+            "SELECT id, asset_id FROM memory_proposals WHERE id=? AND project_id=?", (pid, project)
+        ).fetchone()
+        if not row:
+            return {"error": "Proposal not found in this project."}
+        conn.execute("DELETE FROM memory_test_evidence WHERE proposal_id=?", (pid,))
+        conn.execute("DELETE FROM memory_evidence WHERE proposal_id=?", (pid,))
+        conn.execute("DELETE FROM memory_proposals WHERE id=?", (pid,))
+        if row["asset_id"]:
+            conn.execute("DELETE FROM asset_projects WHERE asset_id=?", (row["asset_id"],))
+            conn.execute("DELETE FROM assets WHERE id=?", (row["asset_id"],))
+        conn.commit()
+        return {"project": project, "deleted_id": pid, "deleted": True}
+    except Exception:
+        if conn.in_transaction:
+            conn.rollback()
+        raise
 
 
 def ranked_search(kn, args, conn):

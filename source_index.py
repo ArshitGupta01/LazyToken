@@ -101,6 +101,356 @@ def find_nested_lambdas(node):
         queue.extend(ast.iter_child_nodes(child))
 
 
+LANGUAGE_CAPABILITIES = {
+    "python": {
+        "language": "python",
+        "extensions": [".py"],
+        "tier": "ast",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": True,
+            "import_extraction": True,
+            "relative_imports": True,
+            "call_graph": True,
+            "super_resolution": True,
+            "attribute_inference": True,
+            "local_type_inference": True,
+        },
+        "confidence_model": "calibrated_ast",
+        "supported_confidence_levels": ["exact", "inferred", "provisional"],
+        "description": "Full Python standard library AST parsing with scope-aware call graph, inheritance resolution, and attribute inference.",
+    },
+    "javascript": {
+        "language": "javascript",
+        "extensions": [".js", ".jsx"],
+        "tier": "syntactic_regex",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": True,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": True,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "syntactic_regex",
+        "supported_confidence_levels": ["syntactic", "heuristic", "provisional"],
+        "description": "Syntactic regex with brace-depth scope tracking. Call graph reflects syntactic token co-occurrence, not semantic type resolution.",
+    },
+    "typescript": {
+        "language": "typescript",
+        "extensions": [".ts", ".tsx"],
+        "tier": "syntactic_regex",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": True,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": True,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "syntactic_regex",
+        "supported_confidence_levels": ["syntactic", "heuristic", "provisional"],
+        "description": "Syntactic regex supporting interfaces, types, enums, namespaces, and brace-depth scope tracking. Explicit syntactic confidence levels.",
+    },
+    "kotlin": {
+        "language": "kotlin",
+        "extensions": [".kt", ".kts"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Single-line regex matching for top-level declarations and imports; no call graph or inheritance resolution.",
+    },
+    "java": {
+        "language": "java",
+        "extensions": [".java"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Single-line regex matching for class/method declarations and package imports.",
+    },
+    "swift": {
+        "language": "swift",
+        "extensions": [".swift"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Single-line regex matching for Swift protocols, structs, classes, functions, and imports.",
+    },
+    "go": {
+        "language": "go",
+        "extensions": [".go"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Single-line regex matching for Go functions, structs, interfaces, and imports.",
+    },
+    "rust": {
+        "language": "rust",
+        "extensions": [".rs"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Single-line regex matching for Rust traits, structs, impls, fns, and use statements.",
+    },
+    "csharp": {
+        "language": "csharp",
+        "extensions": [".cs"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Single-line regex matching for C# namespaces, classes, interfaces, and using statements.",
+    },
+    "sql": {
+        "language": "sql",
+        "extensions": [".sql"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": False,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Line-level regex matching for table and view definitions.",
+    },
+    "gradle": {
+        "language": "gradle",
+        "extensions": [".gradle"],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": True,
+            "qualified_symbols": False,
+            "import_extraction": True,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": "Build script regex matching for plugins and dependencies.",
+    },
+    "document": {
+        "language": "document",
+        "extensions": [".md", ".html", ".css", ".scss", ".json", ".yml", ".yaml", ".toml"],
+        "tier": "text_only",
+        "features": {
+            "symbol_extraction": False,
+            "qualified_symbols": False,
+            "import_extraction": False,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "none",
+        "supported_confidence_levels": [],
+        "description": "Content indexed for full-text search and file digest tracking; no symbol or call graph extraction.",
+    },
+}
+
+
+def get_language_capabilities(target=None):
+    if not target:
+        return LANGUAGE_CAPABILITIES
+    target_clean = str(target).lower().strip()
+    if target_clean in LANGUAGE_CAPABILITIES:
+        return LANGUAGE_CAPABILITIES[target_clean]
+    ext = target_clean if target_clean.startswith(".") else f".{target_clean}"
+    for lang, spec in LANGUAGE_CAPABILITIES.items():
+        if ext in spec["extensions"]:
+            return spec
+    # Graceful fallback for unknown extension: line_pattern tier
+    return {
+        "language": target_clean.lstrip("."),
+        "extensions": [ext],
+        "tier": "line_pattern",
+        "features": {
+            "symbol_extraction": False,
+            "qualified_symbols": False,
+            "import_extraction": False,
+            "relative_imports": False,
+            "call_graph": False,
+            "super_resolution": False,
+            "attribute_inference": False,
+            "local_type_inference": False,
+        },
+        "confidence_model": "pattern_heuristic",
+        "supported_confidence_levels": ["provisional"],
+        "description": f"Fallback pattern matching for {ext} files.",
+    }
+
+
+def language_for_file(path):
+    p = str(path).lower()
+    suffix = "." + p.rsplit(".", 1)[-1] if "." in p else ""
+    for lang, spec in LANGUAGE_CAPABILITIES.items():
+        if suffix in spec["extensions"]:
+            return lang
+    return "document"
+
+
+def _extract_name(node):
+    """Recursively extract dotted name from Name, Attribute, or Subscript node."""
+    if node is None:
+        return None
+    if isinstance(node, ast.Name):
+        return node.id
+    elif isinstance(node, ast.Attribute):
+        parent = _extract_name(node.value)
+        return f"{parent}.{node.attr}" if parent else node.attr
+    elif isinstance(node, ast.Subscript):
+        return _extract_name(node.value)
+    return None
+
+
+def extract_type_from_annotation(node):
+    """Extract class/type name from an annotation node (Name, Attribute, Subscript, BinOp)."""
+    if node is None:
+        return None
+    if isinstance(node, ast.Name):
+        return node.id
+    elif isinstance(node, ast.Attribute):
+        return node.attr
+    elif isinstance(node, ast.Subscript):
+        val_name = getattr(node.value, "id", "") or getattr(node.value, "attr", "")
+        slice_node = getattr(node, "slice", None)
+        if isinstance(slice_node, (ast.Name, ast.Attribute)):
+            return extract_type_from_annotation(slice_node)
+        elif isinstance(slice_node, ast.Tuple):
+            for elem in slice_node.elts:
+                t = extract_type_from_annotation(elem)
+                if t and t not in ("None", "NoneType"):
+                    return t
+        elif slice_node is not None:
+            return extract_type_from_annotation(slice_node)
+    elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        left = extract_type_from_annotation(node.left)
+        if left and left not in ("None", "NoneType"):
+            return left
+        return extract_type_from_annotation(node.right)
+    return None
+
+
+def extract_type_from_expr(node):
+    """Extract instantiated class name from an assignment expression."""
+    if node is None:
+        return None
+    if isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Name):
+            return func.id
+        elif isinstance(func, ast.Attribute):
+            return func.attr
+    return None
+
+
+def walk_local_stmts(node):
+    """Walk statements in function body without descending into nested functions or classes."""
+    body = getattr(node, "body", [])
+    if isinstance(body, list):
+        for child in body:
+            yield child
+            if isinstance(child, (ast.If, ast.While, ast.For, ast.AsyncFor)):
+                yield from walk_local_stmts(child)
+                for orelse in getattr(child, "orelse", []):
+                    yield orelse
+                    if isinstance(
+                        orelse,
+                        (
+                            ast.If,
+                            ast.While,
+                            ast.For,
+                            ast.AsyncFor,
+                            ast.Try,
+                            ast.With,
+                            ast.AsyncWith,
+                        ),
+                    ):
+                        yield from walk_local_stmts(orelse)
+            elif isinstance(child, (ast.With, ast.AsyncWith)):
+                yield from walk_local_stmts(child)
+            elif isinstance(child, ast.Try):
+                yield from walk_local_stmts(child)
+                for h in child.handlers:
+                    yield from walk_local_stmts(h)
+                for orelse in child.orelse:
+                    yield from walk_local_stmts(orelse)
+                for f in child.finalbody:
+                    yield from walk_local_stmts(f)
+
+
 def python_calls(body):
     """Extract call relationships (caller_symbol -> callee_name) with shallow body walking and receiver resolution."""
     try:
@@ -121,44 +471,161 @@ def python_calls(body):
                 target = f"{mod_prefix}.{alias.name}" if mod_prefix else alias.name
                 imported_symbols[alias.asname or alias.name] = target
 
-    # Pass 1: Extract class attributes initialized in __init__ (e.g. self.store = TokenStore())
+    # Pass 1: Extract class hierarchy and class attributes
+    class_hierarchy = {}
     class_attrs = {}
+
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
-            class_attrs[node.name] = {}
+            bases = []
+            for b in node.bases:
+                b_name = _extract_name(b)
+                if b_name:
+                    bases.append(b_name)
+            methods = set()
+            properties = set()
+            attrs = {}
+
+            # Class-level annotations (AnnAssign) and assignments (Assign)
             for item in node.body:
-                if (
-                    isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-                    and item.name == "__init__"
-                ):
-                    for stmt in item.body:
+                if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                    t = extract_type_from_annotation(item.annotation) or extract_type_from_expr(
+                        item.value
+                    )
+                    if t:
+                        attrs[item.target.id] = t
+                elif isinstance(item, ast.Assign):
+                    t = extract_type_from_expr(item.value)
+                    if t:
+                        for target in item.targets:
+                            if isinstance(target, ast.Name):
+                                attrs[target.id] = t
+                elif isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    methods.add(item.name)
+                    # Check @property
+                    is_prop = False
+                    for dec in getattr(item, "decorator_list", []):
+                        d_name = _extract_name(dec)
+                        if d_name == "property":
+                            is_prop = True
+                            properties.add(item.name)
+                            break
+                    if is_prop:
+                        t = extract_type_from_annotation(item.returns)
+                        if not t:
+                            for stmt in walk_local_stmts(item):
+                                if isinstance(stmt, ast.Return):
+                                    t = extract_type_from_expr(
+                                        stmt.value
+                                    ) or extract_type_from_annotation(
+                                        getattr(stmt.value, "annotation", None)
+                                    )
+                                    if t:
+                                        break
+                        if t:
+                            attrs[item.name] = t
+
+                    # Inspect method body for self.<attr> assignments across all methods
+                    for stmt in walk_local_stmts(item):
                         if isinstance(stmt, ast.Assign):
-                            for target in stmt.targets:
-                                if (
-                                    isinstance(target, ast.Attribute)
-                                    and isinstance(target.value, ast.Name)
-                                    and target.value.id == "self"
-                                ):
-                                    if isinstance(stmt.value, ast.Call) and isinstance(
-                                        stmt.value.func, ast.Name
+                            t = extract_type_from_expr(stmt.value)
+                            if t:
+                                for target in stmt.targets:
+                                    if (
+                                        isinstance(target, ast.Attribute)
+                                        and isinstance(target.value, ast.Name)
+                                        and target.value.id == "self"
                                     ):
-                                        class_attrs[node.name][target.attr] = stmt.value.func.id
+                                        attrs[target.attr] = t
+                        elif isinstance(stmt, ast.AnnAssign):
+                            if (
+                                isinstance(stmt.target, ast.Attribute)
+                                and isinstance(stmt.target.value, ast.Name)
+                                and stmt.target.value.id == "self"
+                            ):
+                                t = extract_type_from_annotation(
+                                    stmt.annotation
+                                ) or extract_type_from_expr(stmt.value)
+                                if t:
+                                    attrs[stmt.target.attr] = t
+
+            class_hierarchy[node.name] = {
+                "bases": bases,
+                "methods": methods,
+                "properties": properties,
+                "full_name": node.name,
+            }
+            class_attrs[node.name] = attrs
+
+    def resolve_super_target(start_class, callee_name):
+        """Accurately resolve super().callee to parent class across local AST hierarchy and external bases."""
+        if start_class not in class_hierarchy:
+            return callee_name, "provisional", "unresolved_super"
+
+        bases = class_hierarchy[start_class]["bases"]
+        if not bases:
+            if callee_name in ("__init__", "__new__", "__repr__", "__str__", "__eq__", "__hash__"):
+                return f"object.{callee_name}", "exact", "super_resolution"
+            return callee_name, "provisional", "unresolved_super_base"
+
+        queue = list(bases)
+        visited = set()
+        external_candidates = []
+
+        while queue:
+            base = queue.pop(0)
+            short_base = base.split(".")[-1]
+            lookup_base = (
+                base
+                if base in class_hierarchy
+                else (short_base if short_base in class_hierarchy else None)
+            )
+
+            if lookup_base and lookup_base not in visited:
+                visited.add(lookup_base)
+                if callee_name in class_hierarchy[lookup_base]["methods"]:
+                    return f"{lookup_base}.{callee_name}", "exact", "super_resolution"
+                queue.extend(class_hierarchy[lookup_base]["bases"])
+            elif base not in visited and base != "object":
+                visited.add(base)
+                external_candidates.append(base)
+
+        if len(external_candidates) == 1:
+            ext = external_candidates[0]
+            resolved_ext = ext.split(".")[-1]
+            return f"{resolved_ext}.{callee_name}", "inferred", "super_resolution"
+        elif len(external_candidates) > 1:
+            first_ext = external_candidates[0].split(".")[-1]
+            return f"{first_ext}.{callee_name}", "provisional", "multiple_inheritance_ambiguous"
+
+        first_base = bases[0].split(".")[-1]
+        return f"{first_base}.{callee_name}", "provisional", "unresolved_super_method"
 
     def extract_local_types(func_node):
         local_types = {}
         for arg in getattr(getattr(func_node, "args", None), "args", []):
-            if arg.annotation and isinstance(arg.annotation, ast.Name):
-                local_types[arg.arg] = arg.annotation.id
-        body_stmts = getattr(func_node, "body", [])
-        if isinstance(body_stmts, list):
-            for stmt in body_stmts:
-                if isinstance(stmt, ast.Assign):
+            t = extract_type_from_annotation(arg.annotation)
+            if t:
+                local_types[arg.arg] = t
+        for stmt in walk_local_stmts(func_node):
+            if isinstance(stmt, ast.Assign):
+                t = extract_type_from_expr(stmt.value)
+                if t:
                     for target in stmt.targets:
                         if isinstance(target, ast.Name):
-                            if isinstance(stmt.value, ast.Call) and isinstance(
-                                stmt.value.func, ast.Name
-                            ):
-                                local_types[target.id] = stmt.value.func.id
+                            local_types[target.id] = t
+            elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                t = extract_type_from_annotation(stmt.annotation) or extract_type_from_expr(
+                    stmt.value
+                )
+                if t:
+                    local_types[stmt.target.id] = t
+            elif isinstance(stmt, (ast.With, ast.AsyncWith)):
+                for item in stmt.items:
+                    if item.optional_vars and isinstance(item.optional_vars, ast.Name):
+                        t = extract_type_from_expr(item.context_expr)
+                        if t:
+                            local_types[item.optional_vars.id] = t
         return local_types
 
     def record_calls(func_node, caller_names, class_name="", is_lambda=False):
@@ -203,6 +670,14 @@ def python_calls(body):
                     attr_name = val.attr
                     receiver = f"self.{attr_name}"
                     store_cls = class_attrs.get(class_name, {}).get(attr_name)
+                    if not store_cls and class_name in class_hierarchy:
+                        for b in class_hierarchy[class_name]["bases"]:
+                            short_b = b.split(".")[-1]
+                            store_cls = class_attrs.get(b, {}).get(attr_name) or class_attrs.get(
+                                short_b, {}
+                            ).get(attr_name)
+                            if store_cls:
+                                break
                     if store_cls:
                         resolved = f"{store_cls}.{callee_name}"
                         confidence = "exact"
@@ -217,11 +692,16 @@ def python_calls(body):
                     and val.func.id == "super"
                 ):
                     receiver = "super"
+                    start_cls = class_name
+                    if val.args and isinstance(val.args[0], ast.Name):
+                        start_cls = val.args[0].id
                     if class_name:
-                        resolved = f"{class_name}.{callee_name}"
-                        confidence = "exact"
-                        resolution_method = "explicit_class"
+                        resolved, confidence, resolution_method = resolve_super_target(
+                            start_cls, callee_name
+                        )
             elif isinstance(call_node.func, ast.Name):
+                if call_node.func.id == "super":
+                    continue
                 callee_name = call_node.func.id
                 receiver = ""
                 resolved = callee_name
@@ -292,6 +772,51 @@ JS_KEYWORDS = {
     "this",
 }
 
+JS_BUILTINS = {
+    "Math",
+    "JSON",
+    "Object",
+    "Array",
+    "Promise",
+    "String",
+    "Number",
+    "Boolean",
+    "RegExp",
+    "Date",
+    "Error",
+    "Map",
+    "Set",
+    "WeakMap",
+    "WeakSet",
+    "Symbol",
+    "Reflect",
+    "Proxy",
+    "Intl",
+    "Console",
+    "console",
+    "process",
+    "Buffer",
+}
+
+JS_GLOBAL_FUNCS = {
+    "fetch",
+    "setTimeout",
+    "clearTimeout",
+    "setInterval",
+    "clearInterval",
+    "setImmediate",
+    "clearImmediate",
+    "require",
+    "parseInt",
+    "parseFloat",
+    "encodeURI",
+    "decodeURI",
+    "encodeURIComponent",
+    "decodeURIComponent",
+    "isNaN",
+    "isFinite",
+}
+
 
 def javascript_symbols(body):
     """Extract symbols for JavaScript/TypeScript: functions, classes, methods, interfaces, types, enums, and namespaces."""
@@ -299,7 +824,7 @@ def javascript_symbols(body):
     class_stack = []
 
     re_class = re.compile(
-        r"^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([a-zA-Z0-9_$]+)"
+        r"^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([a-zA-Z0-9_$]+)(?:\s+extends\s+([a-zA-Z0-9_$]+))?"
     )
     re_decl = re.compile(
         r"^\s*(?:export\s+)?(?:default\s+)?(?:interface|type|enum|namespace)\s+([a-zA-Z0-9_$]+)"
@@ -339,7 +864,7 @@ def javascript_symbols(body):
         if m_arrow:
             symbols.append((m_arrow.group(1), n))
 
-        if class_stack:
+        if class_stack and class_stack[-1]["brace_depth"] == 1:
             current_cls = class_stack[-1]["name"]
             m_meth = re_method.search(clean)
             if m_meth and not m_cls and not m_fn:
@@ -358,29 +883,40 @@ def javascript_symbols(body):
     return symbols
 
 
+class JSClassFrame:
+    def __init__(self, name, base, depth):
+        self.name = name
+        self.base = base
+        self.depth = depth
+
+    def __getitem__(self, idx):
+        if idx == 0:
+            return self.name
+        if idx == 1:
+            return self.depth
+        raise IndexError(idx)
+
+    def get(self, key, default=None):
+        if key == "name":
+            return self.name
+        if key == "base":
+            return self.base
+        if key == "depth":
+            return self.depth
+        return default
+
+
 def javascript_calls(body):
-    """Extract call relationships (caller_symbol -> callee_name) for JavaScript and TypeScript."""
+    """Extract call relationships (caller_symbol -> callee_name) for JavaScript and TypeScript with calibrated confidence."""
     calls = []
     lines = body.splitlines()
 
     imported_symbols = set()
-    for line in lines:
-        m_named = re.findall(r"import\s+\{([^}]+)\}\s+from", line)
-        for group in m_named:
-            for item in group.split(","):
-                sym = item.strip().split(" as ")[-1].strip()
-                if sym:
-                    imported_symbols.add(sym)
-        m_default = re.search(r"import\s+([a-zA-Z0-9_$]+)\s+from", line)
-        if m_default:
-            imported_symbols.add(m_default.group(1))
-
-    class_stack = []
-    func_stack = []
-    brace_depth = 0
+    local_classes = {}
+    local_functions = set()
 
     re_class = re.compile(
-        r"^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([a-zA-Z0-9_$]+)"
+        r"^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([a-zA-Z0-9_$]+)(?:\s+extends\s+([a-zA-Z0-9_$]+))?"
     )
     re_func = re.compile(
         r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function(?:\s+([a-zA-Z0-9_$]+)|\s*\()"
@@ -393,6 +929,31 @@ def javascript_calls(body):
     )
     re_call = re.compile(r"(?:([a-zA-Z0-9_$]+(?:\.[a-zA-Z0-9_$]+)?)\.)?([a-zA-Z0-9_$]+)\s*\(")
 
+    for line in lines:
+        m_named = re.findall(r"import\s+\{([^}]+)\}\s+from", line)
+        for group in m_named:
+            for item in group.split(","):
+                sym = item.strip().split(" as ")[-1].strip()
+                if sym:
+                    imported_symbols.add(sym)
+        m_default = re.search(r"import\s+([a-zA-Z0-9_$]+)\s+from", line)
+        if m_default:
+            imported_symbols.add(m_default.group(1))
+
+        m_cls_pre = re_class.search(line)
+        if m_cls_pre:
+            local_classes[m_cls_pre.group(1)] = m_cls_pre.group(2)
+        m_fn_pre = re_func.search(line)
+        if m_fn_pre and m_fn_pre.group(1):
+            local_functions.add(m_fn_pre.group(1))
+        m_arr_pre = re_arrow.search(line)
+        if m_arr_pre and m_arr_pre.group(1):
+            local_functions.add(m_arr_pre.group(1))
+
+    class_stack = []
+    func_stack = []
+    brace_depth = 0
+
     for lineno, line in enumerate(lines, 1):
         clean_line = re.sub(r"//.*$", "", line)
         clean_line = re.sub(r"([\"'`])(?:\\.|(?!\1)[\s\S])*?\1", '""', clean_line)
@@ -403,12 +964,13 @@ def javascript_calls(body):
 
         m_cls = re_class.search(clean_line)
         pending_class = m_cls.group(1) if m_cls else None
+        pending_base = m_cls.group(2) if m_cls else None
 
         m_fn = re_func.search(clean_line)
         m_arr = re_arrow.search(clean_line)
         m_meth = None
 
-        if class_stack:
+        if class_stack and brace_depth == class_stack[-1].depth:
             curr_cls = class_stack[-1][0]
             m_meth_candidate = re_method.search(clean_line)
             if m_meth_candidate and not m_cls and not m_fn:
@@ -441,24 +1003,63 @@ def javascript_calls(body):
                 confidence = "provisional"
                 method = "untyped_receiver"
 
-                if recv in ("this", "super"):
-                    resolved = f"{curr_cls}.{callee}" if curr_cls else callee
-                    confidence = "exact"
-                    method = "explicit_class"
+                if recv == "super":
+                    base_cls = class_stack[-1].get("base") if class_stack else None
+                    if base_cls:
+                        resolved = f"{base_cls}.{callee}"
+                        confidence = "syntactic"
+                        method = "super_parent_class"
+                    else:
+                        resolved = callee
+                        confidence = "provisional"
+                        method = "unresolved_super"
+                elif recv == "this":
+                    if curr_cls:
+                        resolved = f"{curr_cls}.{callee}"
+                        confidence = "syntactic"
+                        method = "explicit_class"
+                    else:
+                        resolved = callee
+                        confidence = "provisional"
+                        method = "untyped_receiver"
                 elif recv in imported_symbols:
                     resolved = f"{recv}.{callee}"
-                    confidence = "exact"
+                    confidence = "syntactic"
                     method = "explicit_import"
-                elif recv and recv[0].isupper():
+                elif recv in JS_BUILTINS:
                     resolved = f"{recv}.{callee}"
-                    confidence = "exact"
-                    method = "explicit_class"
+                    confidence = "provisional"
+                    method = "builtin"
+                elif recv and recv[0].isupper():
+                    if recv in local_classes:
+                        resolved = f"{recv}.{callee}"
+                        confidence = "syntactic"
+                        method = "explicit_class"
+                    else:
+                        resolved = f"{recv}.{callee}"
+                        confidence = "heuristic"
+                        method = "pascal_case_heuristic"
                 elif not recv:
-                    resolved = callee
-                    confidence = "exact"
-                    method = "explicit_import" if callee in imported_symbols else "lexical_scope"
+                    if callee in imported_symbols:
+                        resolved = callee
+                        confidence = "syntactic"
+                        method = "explicit_import"
+                    elif callee in local_functions:
+                        resolved = callee
+                        confidence = "syntactic"
+                        method = "lexical_scope"
+                    elif callee in JS_GLOBAL_FUNCS:
+                        resolved = callee
+                        confidence = "provisional"
+                        method = "builtin_global"
+                    else:
+                        resolved = callee
+                        confidence = "provisional"
+                        method = "unresolved_global"
                 else:
                     resolved = f"{recv}.{callee}"
+                    confidence = "provisional"
+                    method = "untyped_receiver"
 
                 calls.append(
                     {
@@ -477,7 +1078,7 @@ def javascript_calls(body):
         close_b = clean_line.count("}")
 
         if pending_class and open_b > 0:
-            class_stack.append((pending_class, brace_depth + 1))
+            class_stack.append(JSClassFrame(pending_class, pending_base, brace_depth + 1))
         if pending_func and open_b > 0:
             func_stack.append((pending_func, brace_depth + 1))
 

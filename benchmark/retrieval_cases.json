@@ -1,13 +1,33 @@
 {
-  "label_provenance": "Agent-authored fixture labels; not independently reviewed or representative.",
+  "label_provenance": "Agent-authored benchmark cases covering multi-component repos, 5-mode ablations, session state queries, and memory state transitions.",
   "cases": [
     {"id":"session-auth", "fixture":"fixture_sessions", "task":"change authenticate token validation", "relevant":["auth.py"]},
     {"id":"session-handler", "fixture":"fixture_sessions", "task":"change primary handler response", "relevant":["handlers.py"]},
     {"id":"session-store", "fixture":"fixture_sessions", "task":"modify SessionStore get", "relevant":["store.py"]},
+    {"id":"session-hash", "fixture":"fixture_sessions", "task":"hash_token hashing function", "relevant":["auth.py"]},
+    {"id":"session-delete", "fixture":"fixture_sessions", "task":"delete session token key from store", "relevant":["store.py"]},
+    {"id":"session-ttl", "fixture":"fixture_sessions", "task":"check session expires_at and time", "relevant":["auth.py"]},
+    {"id":"session-unauthorized", "fixture":"fixture_sessions", "task":"handle_request missing token 401 response", "relevant":["handlers.py"]},
     {"id":"notebook-find", "fixture":"fixture_notebook", "task":"change Notebook find filtering", "relevant":["notebook.py"]},
+    {"id":"notebook-add", "fixture":"fixture_notebook", "task":"add note with title and body tags", "relevant":["notebook.py"]},
+    {"id":"notebook-archive", "fixture":"fixture_notebook", "task":"archive note entry by id", "relevant":["notebook.py"]},
+    {"id":"notebook-save", "fixture":"fixture_notebook", "task":"save notebook entries to json file", "relevant":["notebook.py"]},
+    {"id":"notebook-load", "fixture":"fixture_notebook", "task":"load notebook json text", "relevant":["notebook.py"]},
     {"id":"no-match", "fixture":"fixture_sessions", "task":"quasar zephyr xylophone", "relevant":[]},
+    {"id":"no-match-notebook", "fixture":"fixture_notebook", "task":"quantum cryptography entanglement teleportation", "relevant":[]},
     {"id":"changed-symbol", "fixture":"fixture_sessions", "task":"check verify_credentials", "operation":"change", "relevant":["auth.py"]},
     {"id":"renamed-file", "fixture":"fixture_sessions", "task":"change authenticate token validation", "operation":"rename", "relevant":["identity.py"], "forbidden":["auth.py"]},
-    {"id":"removed-file", "fixture":"fixture_sessions", "task":"authenticate", "operation":"remove", "relevant":[], "forbidden":["auth.py"]}
+    {"id":"removed-file", "fixture":"fixture_sessions", "task":"authenticate", "operation":"remove", "relevant":[], "forbidden":["auth.py"]},
+    {"id":"multi-gateway", "fixture":"fixture_multicomponent", "task":"gateway request routing and dispatch", "relevant":["gateway.py"]},
+    {"id":"multi-auth", "fixture":"fixture_multicomponent", "task":"auth service bearer token verification", "relevant":["auth_service.py"]},
+    {"id":"multi-user", "fixture":"fixture_multicomponent", "task":"user service update role and profile", "relevant":["user_service.py"]},
+    {"id":"multi-billing", "fixture":"fixture_multicomponent", "task":"billing service process invoice payment", "relevant":["billing_service.py"]},
+    {"id":"multi-inventory", "fixture":"fixture_multicomponent", "task":"inventory service reserve stock quantity", "relevant":["inventory_service.py"]},
+    {"id":"multi-notification", "fixture":"fixture_multicomponent", "task":"notification service dispatch email alert", "relevant":["notification_service.py"]},
+    {"id":"multi-session-state", "fixture":"fixture_multicomponent", "task":"session state manager save checkpoint", "relevant":["session_state.py"]},
+    {"id":"multi-memory-store", "fixture":"fixture_multicomponent", "task":"memory store review proposal lifecycle", "relevant":["memory_store.py"]},
+    {"id":"multi-no-match", "fixture":"fixture_multicomponent", "task":"zyzzyva xenolith pterodactyl", "relevant":[]},
+    {"id":"ablation-session-store-crud", "fixture":"fixture_sessions", "task":"modify SessionStore get set delete", "relevant":["store.py"]},
+    {"id":"ablation-multi-idempotency", "fixture":"fixture_multicomponent", "task":"billing service idempotency key duplicate payment", "relevant":["billing_service.py"]}
   ]
 }

@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import posixpath
+import sqlite3
 import sys
 import time
 import features
@@ -211,6 +212,25 @@ _PYTHON_STDLIB = getattr(
 )
 
 
+class ContextCrumb(dict):
+    """Context item dictionary supporting both 'why' and 'why_this_context' seamlessly."""
+
+    def __getitem__(self, key):
+        if key == "why_this_context" and not super().__contains__(key):
+            return super().get("why", "Metadata match.")
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        if key == "why_this_context" and not super().__contains__(key):
+            return super().get("why", default)
+        return super().get(key, default)
+
+    def __contains__(self, key):
+        return super().__contains__(key) or (
+            key == "why_this_context" and super().__contains__("why")
+        )
+
+
 def _resolve_import_target(source: str, target: str, active_files: set[str]) -> str | None:
     norm_source = source.replace("\\", "/")
     target = target.strip().replace("\\", "/")
@@ -384,6 +404,70 @@ def _key(item):
     return ":".join(str(item.get(k, "")) for k in ("type", "path", "name", "line"))
 
 
+def classify_retrieval_need(
+    task: str,
+    context_is_complete: bool = False,
+    skip_retrieval: bool = False,
+) -> tuple[str, str]:
+    if skip_retrieval:
+        return ("skip", "Caller explicitly requested no retrieval.")
+    if not isinstance(task, str) or not task.strip():
+        return ("abstain", "Task description is empty.")
+    if context_is_complete:
+        return ("skip", "Caller supplied complete context for a text-only task.")
+
+    t = task.strip().lower()
+    greeting_phrases = ("hello", "hi", "hey", "good morning", "good evening", "howdy", "greetings")
+    words = [w.strip("!?,.") for w in t.split()]
+    is_greeting = any(t.startswith(g) for g in greeting_phrases) or any(
+        w in ("hello", "hi", "hey", "howdy", "greetings") for w in words
+    )
+    if (
+        len(words) <= 3
+        and is_greeting
+        and not any(k in t for k in ("code", "file", "func", "class", "bug", "test", "repo"))
+    ):
+        return ("skip", "Task is conversational greeting; retrieval skipped.")
+
+    formatting_patterns = (
+        "format json",
+        "prettify json",
+        "format this json",
+        "format markdown",
+        "fix indentation",
+        "convert snake_case to camelcase",
+        "convert camelcase to snake_case",
+        "write a regex",
+        "regex for email",
+        "calculate factorial",
+        "fibonacci function",
+        "reverse a string",
+        "rewrite this text",
+        "format this text",
+        "summarize this text",
+        "summarise this text",
+    )
+    if any(p in t for p in formatting_patterns) and not any(
+        k in t for k in ("in repo", "in file", "in project", "across", "caller", "import")
+    ):
+        return (
+            "skip",
+            f"Task is self-contained utility/formatting ({task.strip()[:40]}); retrieval skipped.",
+        )
+
+    return ("retrieve", "Task requires repository context retrieval.")
+
+
+def utility_per_token(
+    relevance: float,
+    freshness: float = 1.0,
+    verification: float = 1.0,
+    estimated_tokens: int = 1,
+) -> float:
+    tokens = max(1, int(estimated_tokens))
+    return round((float(relevance) * float(freshness) * float(verification)) / tokens, 6)
+
+
 def task_context(kn, args, conn):
     project = features.project_id(kn, conn, args.get("project"))
     if not project:
@@ -406,14 +490,11 @@ def task_context(kn, args, conn):
         return {
             "error": "skip_retrieval, include_seen, rehydrate and context_is_complete must be booleans."
         }
-    explicit_text_task = (
-        task.lstrip()
-        .casefold()
-        .startswith(
-            ("rewrite this text", "format this text", "summarize this text", "summarise this text")
-        )
+    clf_decision, clf_reason = classify_retrieval_need(
+        task, context_is_complete=complete, skip_retrieval=skip
     )
-    skip = skip or (complete and explicit_text_task)
+    if clf_decision == "skip":
+        skip = True
     expand = args.get("expand_assets", False)
     if not isinstance(expand, bool):
         return {"error": "expand_assets must be boolean."}
@@ -426,9 +507,14 @@ def task_context(kn, args, conn):
     if isinstance(budget, bool) or not isinstance(budget, int) or not 100 <= budget <= 16000:
         return {"error": "budget must be an integer from 100 to 16000 estimated tokens."}
     try:
-        count, budget_type, fallback = token_budget.counter(args, kn.estimate)
+        counter_result = token_budget.counter(args, kn.estimate)
+        count, budget_type, fallback = counter_result
     except ValueError as exc:
         return {"error": str(exc)}
+    is_approx = getattr(
+        counter_result, "is_approximate", not str(budget_type).startswith("tokenizer:")
+    )
+    compact_mcp = (mode == "compact") or bool(args.get("compact_mcp", False))
 
     def used(response):
         # Count the final compact payload, including the usage counters themselves.
@@ -439,9 +525,23 @@ def task_context(kn, args, conn):
             estimated = kn.estimate(encoded)
             measured = count(encoded)
             if estimated <= response["estimated_tokens"] and measured <= response["used_tokens"]:
+                if "token_accounting" in response:
+                    response["token_accounting"]["payload_tokens"] = response["used_tokens"]
+                    response["token_accounting"]["total_context_footprint_tokens"] = (
+                        response["used_tokens"]
+                        + response["token_accounting"]["mcp_schema_overhead_tokens"]
+                        + response["token_accounting"]["chat_framing_overhead_tokens"]
+                    )
                 return response["used_tokens"]
             response["estimated_tokens"] = max(response["estimated_tokens"], estimated)
             response["used_tokens"] = max(response["used_tokens"], measured)
+            if "token_accounting" in response:
+                response["token_accounting"]["payload_tokens"] = response["used_tokens"]
+                response["token_accounting"]["total_context_footprint_tokens"] = (
+                    response["used_tokens"]
+                    + response["token_accounting"]["mcp_schema_overhead_tokens"]
+                    + response["token_accounting"]["chat_framing_overhead_tokens"]
+                )
         raise ValueError("Unable to stabilize payload accounting.")
 
     def finish(response, shown=(), touched=()):
@@ -474,16 +574,10 @@ def task_context(kn, args, conn):
         "mode": mode,
         "budget": budget,
         "budget_type": budget_type,
+        "is_approximate": is_approx,
+        "progressive_expansion": bool(args.get("expand_context", False)) or (mode == "deep"),
         "decision": "skip" if skip else "retrieve",
-        "reason": (
-            (
-                "Caller supplied complete context for a text-only task."
-                if complete and explicit_text_task
-                else "Caller explicitly requested no retrieval."
-            )
-            if skip
-            else "Ranked project metadata."
-        ),
+        "reason": (clf_reason if skip else "Ranked project metadata."),
         "results": [],
         "truncated": False,
         "suppressed_seen": 0,
@@ -495,9 +589,23 @@ def task_context(kn, args, conn):
     response["budget_scope"] = (
         "compact sorted JSON payload; excludes MCP envelope and provider chat framing"
     )
+    response["token_accounting"] = token_budget.token_accounting(
+        payload_tokens=0,
+        compact_mcp=compact_mcp,
+        model=args.get("model"),
+        is_approx=is_approx,
+    )
     if skip:
         if used(response) > budget:
-            return {"error": "Budget is too small for response metadata."}
+            response.pop("budget_scope", None)
+            if used(response) > budget:
+                response.pop("token_accounting", None)
+                if used(response) > budget:
+                    response.pop("progressive_expansion", None)
+                    if used(response) > budget:
+                        response.pop("is_approximate", None)
+                        if used(response) > budget:
+                            return {"error": "Budget is too small for response metadata."}
         return finish(response)
     ranked = _search(kn, project, task, conn)
     if "error" in ranked:
@@ -518,11 +626,17 @@ def task_context(kn, args, conn):
     ):
         response["decision"] = "abstain"
         response["reason"] = "No confident metadata match; inspect the project or refine the task."
-        return (
-            finish(response)
-            if used(response) <= budget
-            else {"error": "Budget is too small for response metadata."}
-        )
+        if used(response) > budget:
+            response.pop("budget_scope", None)
+            if used(response) > budget:
+                response.pop("token_accounting", None)
+                if used(response) > budget:
+                    response.pop("progressive_expansion", None)
+                    if used(response) > budget:
+                        response.pop("is_approximate", None)
+                        if used(response) > budget:
+                            return {"error": "Budget is too small for response metadata."}
+        return finish(response)
     shown = []
     covered_paths = set()
     touched_suppressed = []
@@ -566,22 +680,24 @@ def task_context(kn, args, conn):
     for raw in results:
         if raw["type"] == "file" and raw.get("path") in covered_paths:
             continue
-        crumb = {
-            k: raw[k]
-            for k in (
-                "type",
-                "name",
-                "path",
-                "line",
-                "id",
-                "kind",
-                "freshness",
-                "verification_state",
-                "confidence",
-                "via",
-            )
-            if k in raw
-        }
+        crumb = ContextCrumb(
+            {
+                k: raw[k]
+                for k in (
+                    "type",
+                    "name",
+                    "path",
+                    "line",
+                    "id",
+                    "kind",
+                    "freshness",
+                    "verification_state",
+                    "confidence",
+                    "via",
+                )
+                if k in raw
+            }
+        )
         if raw["type"] == "asset":
             paths = evidence_by_asset.get(raw["id"], [])[:3]
             if paths:
@@ -602,6 +718,8 @@ def task_context(kn, args, conn):
             crumb["why"] += " Evidence unavailable or unverified; verify before reuse."
         elif raw.get("freshness") == "current":
             crumb["why"] += " Current as indexed; verify source."
+        if mode != "compact" or args.get("why_this_context"):
+            crumb["why_this_context"] = crumb["why"]
         if expanded:
             response["results"].append(crumb)
             too_large = used(response) > budget
@@ -620,11 +738,16 @@ def task_context(kn, args, conn):
             crumb["summary"] = raw["summary"]
             response["results"].append(crumb)
             if used(response) > budget:
+                response.pop("budget_scope", None)
+                if used(response) > budget:
+                    response.pop("token_accounting", None)
+            if used(response) > budget:
                 crumb.pop("summary")
                 response["truncated"] = True
             response["results"].pop()
         key = _key(crumb) + (":expanded" if expanded else "")
-        fingerprint_data = {"crumb": crumb}
+        crumb_hash = {k: v for k, v in crumb.items() if k != "why_this_context"}
+        fingerprint_data = {"crumb": crumb_hash}
         if raw.get("path"):
             fingerprint_data["file_digest"] = digests_by_path.get(raw["path"])
         if raw["type"] == "asset":
@@ -674,6 +797,10 @@ def task_context(kn, args, conn):
                     continue
         response["results"].append(crumb)
         if used(response) > budget:
+            response.pop("budget_scope", None)
+            if used(response) > budget:
+                response.pop("token_accounting", None)
+        if used(response) > budget:
             response["results"].pop()
             response["truncated"] = True
             continue
@@ -721,6 +848,8 @@ def task_context(kn, args, conn):
                 response.pop("graph_topology", None)
                 if used(response) > budget:
                     response.pop("budget_scope", None)
+                    response.pop("token_accounting", None)
+                    response.pop("progressive_expansion", None)
                     response["recap"] = [item["key"] for item in suppressed_items][:3]
                     response["active_context_summary"] = [item["key"] for item in suppressed_items][
                         :3
@@ -735,6 +864,8 @@ def task_context(kn, args, conn):
                                     for item in suppressed_items
                                 ][:1]
                                 if used(response) > budget:
+                                    response.pop("is_approximate", None)
+                                if used(response) > budget:
                                     response.pop("recap", None)
                                     if used(response) > budget:
                                         return {
@@ -743,7 +874,13 @@ def task_context(kn, args, conn):
         if "recap" not in response:
             return {"error": "Budget is too small for session recap metadata."}
         if used(response) > budget:
-            return {"error": "Budget is too small for response metadata."}
+            response.pop("budget_scope", None)
+            response.pop("token_accounting", None)
+            response.pop("progressive_expansion", None)
+            if used(response) > budget:
+                response.pop("is_approximate", None)
+            if used(response) > budget:
+                return {"error": "Budget is too small for response metadata."}
     if response["results"]:
         result_files = {c.get("path") for c in response["results"] if c.get("path")}
         combined_files = result_files | session_files
@@ -780,6 +917,12 @@ def task_context(kn, args, conn):
 
     if used(response) > budget:
         response.pop("budget_scope", None)
+    if used(response) > budget:
+        response.pop("token_accounting", None)
+    if used(response) > budget:
+        response.pop("progressive_expansion", None)
+    if used(response) > budget:
+        response.pop("is_approximate", None)
     if used(response) > budget:
         return {"error": "Budget is too small for response metadata."}
     return finish(response, shown, touched_suppressed)
@@ -909,6 +1052,165 @@ def session_checkpoint(kn, args, conn):
     session = args.get("session_id")
     if not project or not isinstance(session, str) or not session.strip() or len(session) > 120:
         return {"error": "An indexed project and session_id are required."}
+    now = int(time.time())
+
+    # Ensure task_sessions record exists
+    sess_row = conn.execute("SELECT * FROM task_sessions WHERE session_id=?", (session,)).fetchone()
+
+    file_rows = conn.execute(
+        "SELECT path, digest FROM files WHERE project_id=? ORDER BY path", (project,)
+    ).fetchall()
+    current_source_digest = hashlib.sha256(
+        "".join(f"{r['path']}:{r['digest']};" for r in file_rows).encode("utf-8")
+    ).hexdigest()
+
+    goal = str(
+        args.get("goal") or (dict(sess_row).get("goal", "") if sess_row else "") or ""
+    ).strip()
+
+    stored_source_digest = (
+        dict(sess_row).get("source_digest") or current_source_digest
+        if sess_row
+        else current_source_digest
+    )
+    try:
+        if sess_row is None:
+            conn.execute(
+                "INSERT INTO task_sessions(session_id, project_id, goal, status, source_digest, created_at, updated_at) VALUES(?, ?, ?, 'active', ?, ?, ?)",
+                (session, project, goal, current_source_digest, now, now),
+            )
+            stored_source_digest = current_source_digest
+        else:
+            sess_dict = dict(sess_row)
+            stored_source_digest = sess_dict.get("source_digest") or current_source_digest
+            if goal and goal != sess_dict.get("goal", ""):
+                conn.execute(
+                    "UPDATE task_sessions SET goal=?, updated_at=? WHERE session_id=?",
+                    (goal, now, session),
+                )
+
+        # Persist new decisions idempotently
+        decisions_input = args.get("decisions", [])
+        if isinstance(decisions_input, list):
+            for d in decisions_input:
+                if isinstance(d, str):
+                    d_text, d_rat = d.strip(), ""
+                elif isinstance(d, dict):
+                    d_text = str(d.get("decision", "")).strip()
+                    d_rat = str(d.get("rationale", "")).strip()
+                else:
+                    continue
+                if d_text:
+                    exists = conn.execute(
+                        "SELECT 1 FROM session_decisions WHERE session_id=? AND decision=?",
+                        (session, d_text),
+                    ).fetchone()
+                    if not exists:
+                        conn.execute(
+                            "INSERT INTO session_decisions(session_id, decision, rationale, recorded_at) VALUES(?, ?, ?, ?)",
+                            (session, d_text, d_rat, now),
+                        )
+
+        # Persist new blockers idempotently
+        blockers_input = args.get("blockers", [])
+        if isinstance(blockers_input, list):
+            for b in blockers_input:
+                if isinstance(b, str):
+                    b_text, b_stat = b.strip(), "open"
+                elif isinstance(b, dict):
+                    b_text = str(b.get("blocker", "")).strip()
+                    b_stat = str(b.get("status", "open")).strip()
+                else:
+                    continue
+                if b_text:
+                    exists = conn.execute(
+                        "SELECT 1 FROM session_blockers WHERE session_id=? AND blocker=?",
+                        (session, b_text),
+                    ).fetchone()
+                    if not exists:
+                        conn.execute(
+                            "INSERT INTO session_blockers(session_id, blocker, status, recorded_at) VALUES(?, ?, ?, ?)",
+                            (session, b_text, b_stat, now),
+                        )
+
+        # Persist new test outcomes idempotently
+        test_outcomes_input = args.get("test_outcomes", [])
+        if isinstance(test_outcomes_input, list):
+            for t in test_outcomes_input:
+                if isinstance(t, dict):
+                    t_name = str(t.get("test_name", "")).strip()
+                    t_outcome = str(t.get("outcome", "")).strip()
+                    t_exit = int(t.get("exit_code", 0))
+                    t_dur = float(t.get("duration_ms", 0.0))
+                    if t_name:
+                        exists = conn.execute(
+                            "SELECT 1 FROM session_test_outcomes WHERE session_id=? AND test_name=? AND outcome=?",
+                            (session, t_name, t_outcome),
+                        ).fetchone()
+                        if not exists:
+                            conn.execute(
+                                "INSERT INTO session_test_outcomes(session_id, test_name, outcome, exit_code, duration_ms, recorded_at) VALUES(?, ?, ?, ?, ?, ?)",
+                                (session, t_name, t_outcome, t_exit, t_dur, now),
+                            )
+
+        # Persist breadcrumbs idempotently
+        breadcrumbs_input = args.get("breadcrumbs", [])
+        if isinstance(breadcrumbs_input, list):
+            for c in breadcrumbs_input:
+                if isinstance(c, str):
+                    c_type, c_payload = "note", c.strip()
+                elif isinstance(c, dict):
+                    c_type = str(c.get("crumb_type", "note")).strip()
+                    c_payload = json.dumps(c.get("payload", c))
+                else:
+                    continue
+                if c_payload:
+                    exists = conn.execute(
+                        "SELECT 1 FROM session_breadcrumbs WHERE session_id=? AND payload=?",
+                        (session, c_payload),
+                    ).fetchone()
+                    if not exists:
+                        conn.execute(
+                            "INSERT INTO session_breadcrumbs(session_id, crumb_type, payload, recorded_at) VALUES(?, ?, ?, ?)",
+                            (session, c_type, c_payload, now),
+                        )
+        conn.commit()
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        pass
+
+    # Detect source invalidation
+    changed_files = []
+    deleted_files = []
+    root_row = conn.execute("SELECT root FROM projects WHERE id=?", (project,)).fetchone()
+    if root_row and root_row["root"]:
+        root_path = Path(root_row["root"])
+        for r in file_rows:
+            fpath = root_path / r["path"]
+            if not fpath.exists():
+                deleted_files.append(r["path"])
+            else:
+                try:
+                    disk_digest = hashlib.sha256(fpath.read_bytes()).hexdigest()
+                    if disk_digest != r["digest"]:
+                        changed_files.append(r["path"])
+                except OSError:
+                    changed_files.append(r["path"])
+
+    invalidated = bool(
+        changed_files or deleted_files or (stored_source_digest != current_source_digest)
+    )
+    source_invalidation = {
+        "invalidated": invalidated,
+        "changed_files": changed_files,
+        "deleted_files": deleted_files,
+        "reason": (
+            f"Source modified ({len(changed_files)} changed, {len(deleted_files)} deleted)."
+            if invalidated
+            else "Source code matches session checkpoint digest."
+        ),
+    }
+
+    # Query context session items
     rows = conn.execute(
         "SELECT total.count, recent.item_key FROM "
         "(SELECT count(*) AS count FROM context_session_items WHERE project_id=? AND session_id=?) AS total "
@@ -917,15 +1219,97 @@ def session_checkpoint(kn, args, conn):
         "ORDER BY recent.updated_at DESC, recent.item_key",
         (project, session, project, session),
     ).fetchall()
-    count = rows[0]["count"]
+    count = rows[0]["count"] if rows else 0
     recent_keys = [r["item_key"] for r in rows if r["item_key"] is not None]
     graph_info = build_session_graph(kn, conn, project, recent_keys)
+
+    # Observed state
+    observed_files = list(
+        {k.split(":")[1] for k in recent_keys if ":" in k}
+        | {
+            f if isinstance(f, str) else str(f.get("path", f))
+            for f in graph_info["active_graph"].get("files", [])
+        }
+    )
+    observed_symbols = [
+        s.get("name", str(s)) if isinstance(s, dict) else str(s)
+        for s in graph_info["active_graph"].get("symbols", [])
+    ]
+    observed_state = {
+        "files": observed_files,
+        "symbols": observed_symbols,
+        "active_graph": graph_info["active_graph"],
+        "graph_topology": graph_info["graph_topology"],
+    }
+
+    # Asserted state
+    saved_decisions = [
+        {"decision": r["decision"], "rationale": r["rationale"], "recorded_at": r["recorded_at"]}
+        for r in conn.execute(
+            "SELECT decision, rationale, recorded_at FROM session_decisions WHERE session_id=? ORDER BY id",
+            (session,),
+        ).fetchall()
+    ]
+    saved_blockers = [
+        {"blocker": r["blocker"], "status": r["status"], "recorded_at": r["recorded_at"]}
+        for r in conn.execute(
+            "SELECT blocker, status, recorded_at FROM session_blockers WHERE session_id=? ORDER BY id",
+            (session,),
+        ).fetchall()
+    ]
+    asserted_state = {
+        "goal": goal,
+        "decisions": saved_decisions,
+        "blockers": saved_blockers,
+    }
+
+    # Verified state
+    saved_tests = [
+        {
+            "test_name": r["test_name"],
+            "outcome": r["outcome"],
+            "exit_code": r["exit_code"],
+            "duration_ms": r["duration_ms"],
+            "recorded_at": r["recorded_at"],
+        }
+        for r in conn.execute(
+            "SELECT test_name, outcome, exit_code, duration_ms, recorded_at FROM session_test_outcomes WHERE session_id=? ORDER BY id",
+            (session,),
+        ).fetchall()
+    ]
+    verified_lessons = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT id, name, summary, lifecycle_state FROM memory_proposals WHERE project_id=? AND (lifecycle_state='verified' OR (status='approved' AND verification_state='verified'))",
+            (project,),
+        ).fetchall()
+    ]
+    verified_state = {
+        "test_outcomes": saved_tests,
+        "verified_lessons": verified_lessons,
+    }
+
+    recovery_breadcrumbs = [
+        {"crumb_type": r["crumb_type"], "payload": r["payload"], "recorded_at": r["recorded_at"]}
+        for r in conn.execute(
+            "SELECT crumb_type, payload, recorded_at FROM session_breadcrumbs WHERE session_id=? ORDER BY id",
+            (session,),
+        ).fetchall()
+    ]
+
     return {
         "project": project,
         "session_id": session,
+        "goal": goal,
         "supplied_items": count,
         "recent_keys": recent_keys,
+        "observed_state": observed_state,
+        "asserted_state": asserted_state,
+        "verified_state": verified_state,
+        "source_invalidation": source_invalidation,
+        "recovery_breadcrumbs": recovery_breadcrumbs,
+        "active_graph": graph_info["active_graph"],
+        "graph_topology": graph_info["graph_topology"],
         "truncated": count > 30,
-        **graph_info,
         "note": "Reuse this project and session_id after compaction. Stored fingerprints suppress unchanged breadcrumbs; source contents are not stored.",
     }

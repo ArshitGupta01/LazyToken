@@ -20,8 +20,13 @@ import learning
 import data_ops
 import token_budget
 from mcp_schema import TOOLS, WORKFLOW_INSTRUCTIONS, mcp_tools
+from source_index import (
+    LANGUAGE_CAPABILITIES,
+    get_language_capabilities,
+    language_for_file,
+)
 
-VERSION = "0.4.4"
+VERSION = "0.5.0"
 EXTENSIONS = {
     ".kt",
     ".kts",
@@ -120,42 +125,7 @@ def db_path() -> Path:
     return root / "network.sqlite3"
 
 
-def connect(path: Path | None = None) -> sqlite3.Connection:
-    target = path or db_path()
-    existed = Path(target).is_file() and Path(target).stat().st_size > 0
-    conn = sqlite3.connect(target)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA foreign_keys = ON")
-    if existed:
-        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        version = (
-            conn.execute("SELECT coalesce(max(version),0) FROM lazytoken_migrations").fetchone()[0]
-            if "lazytoken_migrations" in tables
-            else 0
-        )
-        if version > 5:
-            conn.close()
-            raise RuntimeError(
-                "Database was created by a newer LazyToken version; upgrade the application before opening it."
-            )
-        if tables and version < 5:
-            # SQLite's backup API includes committed WAL data and leaves the original intact.
-            stamp = f"{time.time_ns()}"
-            backup_path = Path(target).with_name(Path(target).name + f".pre-v5-{stamp}.sqlite3")
-            descriptor = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            os.close(descriptor)
-            try:
-                backup = sqlite3.connect(backup_path)
-                try:
-                    conn.backup(backup)
-                finally:
-                    backup.close()
-            except Exception:
-                backup_path.unlink(missing_ok=True)
-                conn.close()
-                raise
-    conn.execute("PRAGMA journal_mode=WAL")
+def _init_schema_and_migrations(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
       CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, root TEXT NOT NULL, updated_at INTEGER NOT NULL DEFAULT 0);
@@ -222,6 +192,49 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     )
     conn.commit()
     features.migrate(conn)
+
+
+def connect(path: Path | None = None) -> sqlite3.Connection:
+    target = path or db_path()
+    existed = Path(target).is_file() and Path(target).stat().st_size > 0
+    conn = sqlite3.connect(target, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    tables = set()
+    version = 0
+    if existed:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        version = (
+            conn.execute("SELECT coalesce(max(version),0) FROM lazytoken_migrations").fetchone()[0]
+            if "lazytoken_migrations" in tables
+            else 0
+        )
+        if version > 6:
+            conn.close()
+            raise RuntimeError(
+                "Database was created by a newer LazyToken version; upgrade the application before opening it."
+            )
+        if tables and version < 6:
+            # SQLite's backup API includes committed WAL data and leaves the original intact.
+            stamp = f"{time.time_ns()}"
+            backup_path = Path(target).with_name(Path(target).name + f".pre-v6-{stamp}.sqlite3")
+            descriptor = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(descriptor)
+            try:
+                backup = sqlite3.connect(backup_path)
+                try:
+                    conn.backup(backup)
+                finally:
+                    backup.close()
+            except Exception:
+                backup_path.unlink(missing_ok=True)
+                conn.close()
+                raise
+    if (not existed) or ("projects" not in tables) or (version < 6):
+        _init_schema_and_migrations(conn)
     return conn
 
 
@@ -414,20 +427,42 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
         return {"error": "Repository is unavailable; the previous index was preserved."}
     root = root.resolve()
     project = str(root)
-    conn.execute(
-        "INSERT INTO projects(id,root,updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET root=excluded.root",
-        (project, project, int(time.time())),
-    )
+
+    # 1. Non-locking reads to get baseline state
     index_state = conn.execute(
         "SELECT extractor_version FROM index_state WHERE project_id=?", (project,)
     ).fetchone()
     reextract = not index_state or index_state[0] < 4
+
+    existing_files = {
+        r[0]: r[1]
+        for r in conn.execute(
+            "SELECT path, digest FROM files WHERE project_id=?", (project,)
+        ).fetchall()
+    }
+    existing_skipped = {
+        r[0]: (r[1], r[2])
+        for r in conn.execute(
+            "SELECT path, reason, bytes FROM index_skipped_files WHERE project_id=?", (project,)
+        ).fetchall()
+    }
+
     present: set[str] = set()
     added = changed = removed = 0
     errors = []
-    skipped = []
     changed_paths: list[str] = []
     removed_paths: list[str] = []
+
+    # In-memory staging of database mutations
+    files_to_write = []
+    skipped_to_write = []
+    skipped_to_delete = []
+    symbols_to_write = []
+    calls_to_write = []
+    imports_to_write = []
+    paths_to_clean = []
+
+    # 2. File discovery, reading, hashing, and AST parsing completely in memory
     for rel in list_files(root):
         norm_rel = rel.replace("\\", "/").strip().lower()
         if any(
@@ -440,71 +475,50 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
             )
         ):
             present.discard(rel)
-            conn.execute(
-                "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)",
-                (project, rel, "sensitive_credential_path", 0),
-            )
+            skipped_to_write.append((project, rel, "sensitive_credential_path", 0))
             continue
         path = root / rel
         present.add(rel)
         try:
             if changed_hint is not None and rel not in changed_hint and not reextract:
-                if conn.execute(
-                    "SELECT 1 FROM files WHERE project_id=? AND path=?", (project, rel)
-                ).fetchone():
+                if rel in existing_files:
                     continue
             with path.open("rb") as source:
                 raw = source.read(1_000_001)
             if len(raw) > 1_000_000 or b"\x00" in raw:
                 present.discard(rel)
                 reason = "oversized" if len(raw) > 1_000_000 else "binary"
-                conn.execute(
-                    "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)",
-                    (project, rel, reason, len(raw)),
-                )
+                skipped_to_write.append((project, rel, reason, len(raw)))
                 continue
-            conn.execute(
-                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", (project, rel)
-            )
+            if rel in existing_skipped:
+                skipped_to_delete.append((project, rel))
             digest = hashlib.sha256(raw).hexdigest()
             present.add(rel)
-            old = conn.execute(
-                "SELECT digest FROM files WHERE project_id=? AND path=?", (project, rel)
-            ).fetchone()
-            if old and old[0] == digest and not reextract:
+            old_digest = existing_files.get(rel)
+            if old_digest and old_digest == digest and not reextract:
                 continue
-            if old:
+            if old_digest:
                 changed += 1
             else:
                 added += 1
             body = raw.decode("utf-8", errors="replace")
-            conn.execute(
-                "INSERT OR REPLACE INTO files VALUES(?,?,?,?)", (project, rel, digest, len(raw))
-            )
+            files_to_write.append((project, rel, digest, len(raw)))
             changed_paths.append(rel)
-            conn.execute("DELETE FROM symbols WHERE project_id=? AND path=?", (project, rel))
-            conn.execute("DELETE FROM imports WHERE project_id=? AND source=?", (project, rel))
-            conn.execute(
-                "DELETE FROM symbol_calls WHERE project_id=? AND caller_path=?", (project, rel)
-            )
+            paths_to_clean.append((project, rel))
+
             if path.suffix.lower() == ".py":
                 from source_index import python_calls, python_imports, python_symbols
 
                 py_syms = python_symbols(body)
                 if py_syms:
-                    conn.executemany(
-                        "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
-                        [(project, rel, name, lineno) for name, lineno in py_syms],
+                    symbols_to_write.extend(
+                        [(project, rel, name, lineno) for name, lineno in py_syms]
                     )
                 else:
                     for n, line in enumerate(body.splitlines(), 1):
                         m = SYMBOLS.match(line)
                         if m:
-                            conn.execute(
-                                "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
-                                (project, rel, m.group(1), n),
-                            )
-                call_rows = []
+                            symbols_to_write.append((project, rel, m.group(1), n))
                 for c in python_calls(body):
                     caller_sym = c["caller_symbol"]
                     caller_line = c.get("caller_line", 0)
@@ -512,7 +526,7 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                     callee_resolved = c.get("resolved_callee", c["callee_name"])
                     callee_id = f"{project}::{callee_resolved}"
                     method = c.get("resolution_method", "unresolved")
-                    call_rows.append(
+                    calls_to_write.append(
                         (
                             project,
                             rel,
@@ -527,14 +541,7 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                             c["line"],
                         )
                     )
-                conn.executemany(
-                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    call_rows,
-                )
-                conn.executemany(
-                    "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
-                    [(project, rel, target) for target in python_imports(body)],
-                )
+                imports_to_write.extend([(project, rel, target) for target in python_imports(body)])
             elif path.suffix.lower() in {".js", ".jsx", ".ts", ".tsx"}:
                 from source_index import (
                     javascript_calls,
@@ -544,19 +551,14 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
 
                 js_syms = javascript_symbols(body)
                 if js_syms:
-                    conn.executemany(
-                        "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
-                        [(project, rel, name, lineno) for name, lineno in js_syms],
+                    symbols_to_write.extend(
+                        [(project, rel, name, lineno) for name, lineno in js_syms]
                     )
                 else:
                     for n, line in enumerate(body.splitlines(), 1):
                         m = SYMBOLS.match(line)
                         if m:
-                            conn.execute(
-                                "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
-                                (project, rel, m.group(1), n),
-                            )
-                js_call_rows = []
+                            symbols_to_write.append((project, rel, m.group(1), n))
                 for c in javascript_calls(body):
                     caller_sym = c["caller_symbol"]
                     caller_line = c.get("caller_line", 0)
@@ -564,7 +566,7 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                     callee_resolved = c.get("resolved_callee", c["callee_name"])
                     callee_id = f"{project}::{callee_resolved}"
                     method = c.get("resolution_method", "unresolved")
-                    js_call_rows.append(
+                    calls_to_write.append(
                         (
                             project,
                             rel,
@@ -579,64 +581,92 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                             c["line"],
                         )
                     )
-                conn.executemany(
-                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    js_call_rows,
-                )
-                conn.executemany(
-                    "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
-                    [(project, rel, target) for target in javascript_imports(body)],
+                imports_to_write.extend(
+                    [(project, rel, target) for target in javascript_imports(body)]
                 )
             else:
                 for n, line in enumerate(body.splitlines(), 1):
                     m = SYMBOLS.match(line)
                     if m:
-                        conn.execute(
-                            "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
-                            (project, rel, m.group(1), n),
-                        )
+                        symbols_to_write.append((project, rel, m.group(1), n))
                     imp = IMPORTS.match(line)
                     if imp:
-                        conn.execute(
-                            "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
-                            (project, rel, imp.group(1)),
-                        )
+                        imports_to_write.append((project, rel, imp.group(1)))
         except OSError:
             errors.append(rel)
-            conn.execute(
-                "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)",
-                (project, rel, "unreadable", 0),
-            )
+            skipped_to_write.append((project, rel, "unreadable", 0))
             continue
-    for row in conn.execute("SELECT path FROM files WHERE project_id=?", (project,)).fetchall():
-        if row[0] not in present:
-            conn.execute("DELETE FROM files WHERE project_id=? AND path=?", (project, row[0]))
-            conn.execute("DELETE FROM symbols WHERE project_id=? AND path=?", (project, row[0]))
-            conn.execute("DELETE FROM imports WHERE project_id=? AND source=?", (project, row[0]))
-            conn.execute(
-                "DELETE FROM symbol_calls WHERE project_id=? AND caller_path=?", (project, row[0])
-            )
-            conn.execute(
-                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", (project, row[0])
-            )
-            removed_paths.append(row[0])
-            removed += 1
-    for row in conn.execute(
-        "SELECT path FROM index_skipped_files WHERE project_id=?", (project,)
-    ).fetchall():
-        if not (root / row[0]).exists():
-            conn.execute(
-                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", (project, row[0])
-            )
-    conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (int(time.time()), project))
-    conn.execute("DELETE FROM index_errors WHERE project_id=?", (project,))
-    conn.executemany("INSERT INTO index_errors VALUES(?,?)", [(project, path) for path in errors])
-    conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,4)", (project,))
-    features.refresh_fts(conn, project, changed_paths, removed_paths)
-    import frameworks
 
-    frameworks.update(conn, project)
-    conn.commit()
+    # Identify removed files
+    files_to_remove = []
+    for old_path in existing_files:
+        if old_path not in present:
+            files_to_remove.append((project, old_path))
+            paths_to_clean.append((project, old_path))
+            removed_paths.append(old_path)
+            removed += 1
+
+    # Check index_skipped_files that no longer exist on disk
+    skipped_prune = []
+    for old_path in existing_skipped:
+        if not (root / old_path).exists():
+            skipped_prune.append((project, old_path))
+
+    # 3. Short atomic write transaction
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute(
+            "INSERT INTO projects(id,root,updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET root=excluded.root",
+            (project, project, int(time.time())),
+        )
+        if skipped_to_delete:
+            conn.executemany(
+                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", skipped_to_delete
+            )
+        if skipped_to_write:
+            conn.executemany(
+                "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)", skipped_to_write
+            )
+        if paths_to_clean:
+            conn.executemany("DELETE FROM symbols WHERE project_id=? AND path=?", paths_to_clean)
+            conn.executemany("DELETE FROM imports WHERE project_id=? AND source=?", paths_to_clean)
+            conn.executemany(
+                "DELETE FROM symbol_calls WHERE project_id=? AND caller_path=?", paths_to_clean
+            )
+        if files_to_remove:
+            conn.executemany("DELETE FROM files WHERE project_id=? AND path=?", files_to_remove)
+            conn.executemany(
+                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", files_to_remove
+            )
+        if files_to_write:
+            conn.executemany("INSERT OR REPLACE INTO files VALUES(?,?,?,?)", files_to_write)
+        if symbols_to_write:
+            conn.executemany("INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)", symbols_to_write)
+        if calls_to_write:
+            conn.executemany(
+                "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?,?,?,?,?,?,?)", calls_to_write
+            )
+        if imports_to_write:
+            conn.executemany("INSERT OR IGNORE INTO imports VALUES(?,?,?)", imports_to_write)
+        if skipped_prune:
+            conn.executemany(
+                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", skipped_prune
+            )
+        conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (int(time.time()), project))
+        conn.execute("DELETE FROM index_errors WHERE project_id=?", (project,))
+        conn.executemany(
+            "INSERT INTO index_errors VALUES(?,?)", [(project, path) for path in errors]
+        )
+        conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,4)", (project,))
+        features.refresh_fts(conn, project, changed_paths, removed_paths)
+        import frameworks
+
+        frameworks.update(conn, project)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
     all_skipped = [
         {"path": r[0], "reason": r[1], "bytes": r[2]}
         for r in conn.execute(
@@ -644,6 +674,15 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
             (project,),
         ).fetchall()
     ]
+
+    # 4. Telemetry: Language breakdown
+    language_breakdown = {}
+    for p in present:
+        lang = language_for_file(p)
+        tier = LANGUAGE_CAPABILITIES.get(lang, {}).get("tier", "text_only")
+        entry = language_breakdown.setdefault(lang, {"files": 0, "tier": tier})
+        entry["files"] += 1
+
     return {
         "added": added,
         "changed": changed,
@@ -654,6 +693,7 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
         "skipped_count": len(all_skipped),
         "error_count": len(errors),
         "error_paths": errors,
+        "language_breakdown": language_breakdown,
     }
 
 
@@ -810,11 +850,14 @@ def search(
     )
     rows = rows[:limit]
     out = json.dumps({"query": query, "results": rows}, ensure_ascii=False, separators=(",", ":"))
-    conn.execute(
-        "INSERT INTO retrievals VALUES(?,?,?,?,?)",
-        (int(time.time()), project, len(query), len(out), estimate(out)),
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            "INSERT INTO retrievals VALUES(?,?,?,?,?)",
+            (int(time.time()), project, len(query), len(out), estimate(out)),
+        )
+        conn.commit()
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        pass
     return {"query": query, "results": rows, "estimated_tokens": estimate(out)}
 
 
@@ -851,11 +894,14 @@ def context(project: str, conn: sqlite3.Connection, limit: int = 30) -> dict[str
     }
     result["estimated_tokens"] = estimate(json.dumps(result, separators=(",", ":")))
     encoded = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
-    conn.execute(
-        "INSERT INTO retrievals VALUES(?,?,?,?,?)",
-        (int(time.time()), row["id"], 0, len(encoded), result["estimated_tokens"]),
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            "INSERT INTO retrievals VALUES(?,?,?,?,?)",
+            (int(time.time()), row["id"], 0, len(encoded), result["estimated_tokens"]),
+        )
+        conn.commit()
+    except (sqlite3.OperationalError, sqlite3.DatabaseError):
+        pass
     return result
 
 
@@ -1155,13 +1201,38 @@ def feature_call(action: str, args: dict[str, Any], conn: sqlite3.Connection) ->
         return features.proposal_list(sys.modules[__name__], args, conn)
     if action == "review":
         return features.review(sys.modules[__name__], args, conn)
+    if action == "export_memories":
+        return features.export_memories(sys.modules[__name__], args, conn)
+    if action == "retention_memories":
+        return features.retention_memories(sys.modules[__name__], args, conn)
+    if action == "delete_memory":
+        return features.delete_memory(sys.modules[__name__], args, conn)
     if action == "dependencies":
         return features.dependencies(sys.modules[__name__], args, conn)
     if action == "impact":
         return features.impact_analysis(sys.modules[__name__], args, conn)
     if action == "discover":
         return features.discover(conn)
+    if action == "capabilities":
+        target = args.get("target") or args.get("language") or args.get("extension")
+        return get_language_capabilities(target)
     return {"error": "Unknown LazyToken action."}
+
+
+def checkpoint_wal(conn: sqlite3.Connection | None = None, mode: str = "PASSIVE") -> dict:
+    close = False
+    if conn is None:
+        conn = connect()
+        close = True
+    try:
+        cur = conn.execute(f"PRAGMA wal_checkpoint({mode})")
+        res = cur.fetchone()
+        return {"busy": res[0], "log": res[1], "checkpointed": res[2]}
+    except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
+        return {"error": str(e)}
+    finally:
+        if close:
+            conn.close()
 
 
 def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
@@ -1172,6 +1243,8 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
         "get_task_context": "task_context",
         "clear_context_session": "clear_session",
         "inspect_source_range": "inspect_source",
+        "capabilities": "capabilities",
+        "get_language_capabilities": "capabilities",
         "inspect_impact": "impact",
         "impact": "impact",
         "checkpoint": "checkpoint",
@@ -1428,9 +1501,17 @@ def main() -> None:
             "review",
             "dependencies",
             "discover",
+            "capabilities",
         ],
     )
     lt.add_argument("--json", default="{}", help="JSON object, or @path to a UTF-8 JSON file")
+    caps_cmd = sub.add_parser(
+        "capabilities", help="Inspect language capability tiers and supported features"
+    )
+    caps_cmd.add_argument(
+        "target", nargs="?", default=None, help="Optional language name or file extension"
+    )
+    caps_cmd.add_argument("--format", choices=("json", "text", "table"), default="json")
     backup = sub.add_parser("backup", help="Copy the current database to a new file")
     backup.add_argument("destination")
     restore = sub.add_parser("restore", help="Restore a backup to a new, empty directory")
@@ -1551,6 +1632,36 @@ def main() -> None:
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
             print(json.dumps({"error": str(exc)}))
             raise SystemExit(1)
+    if a.cmd == "capabilities":
+        res = get_language_capabilities(a.target)
+        if a.format == "json":
+            print(json.dumps(res, indent=2))
+        elif a.format == "table":
+            if isinstance(res, dict) and "language" in res:
+                items = [res]
+            else:
+                items = list(res.values())
+            print(
+                f"{'Language':<15} | {'Tier':<18} | {'Extensions':<25} | {'Call Graph':<10} | {'Super Res'}"
+            )
+            print("-" * 80)
+            for item in items:
+                exts = ", ".join(item.get("extensions", []))
+                cg = "Yes" if item.get("features", {}).get("call_graph") else "No"
+                sr = "Yes" if item.get("features", {}).get("super_resolution") else "No"
+                print(
+                    f"{item.get('language', ''):<15} | {item.get('tier', ''):<18} | {exts:<25} | {cg:<10} | {sr}"
+                )
+        else:
+            if isinstance(res, dict) and "language" in res:
+                print(f"Language: {res.get('language')} (Tier: {res.get('tier')})")
+                print(f"Description: {res.get('description')}")
+            else:
+                for lang, spec in res.items():
+                    print(
+                        f"{lang}: {spec.get('tier')} tier ({', '.join(spec.get('extensions', []))})"
+                    )
+        return
     if a.cmd == "doctor":
         import diagnostics
 

@@ -481,6 +481,354 @@ def complex_controller(default_opt=get_default_val()):
         self.assertIn("provenance", match)
         self.assertEqual(match["provenance"]["source_file"], "client.py")
 
+    def test_super_call_resolves_to_parent_class(self):
+        """M6 / F18: Verify AST super().method() resolves to parent class, not child."""
+        code = """class BaseService:
+    def execute(self, payload):
+        return True
+
+class CustomService(BaseService):
+    def execute(self, payload):
+        return super().execute(payload)
+"""
+        calls = source_index.python_calls(code)
+        custom_calls = [
+            c
+            for c in calls
+            if c["caller_symbol"] == "CustomService.execute" and c["callee_name"] == "execute"
+        ]
+        self.assertEqual(len(custom_calls), 1)
+        c = custom_calls[0]
+        self.assertEqual(c["receiver"], "super")
+        self.assertEqual(c["resolved_callee"], "BaseService.execute")
+        self.assertEqual(c["confidence"], "exact")
+        self.assertEqual(c["resolution_method"], "super_resolution")
+
+    def test_super_call_multi_level_inheritance(self):
+        """M6 / F18: Multi-level inheritance resolution Grandparent -> Parent -> Child."""
+        code = """class Grandparent:
+    def init_state(self): pass
+
+class Parent(Grandparent):
+    def init_state(self):
+        super().init_state()
+
+class Child(Parent):
+    def init_state(self):
+        super().init_state()
+"""
+        calls = source_index.python_calls(code)
+        parent_call = [
+            c
+            for c in calls
+            if c["caller_symbol"] == "Parent.init_state" and c["callee_name"] == "init_state"
+        ][0]
+        child_call = [
+            c
+            for c in calls
+            if c["caller_symbol"] == "Child.init_state" and c["callee_name"] == "init_state"
+        ][0]
+        self.assertEqual(parent_call["resolved_callee"], "Grandparent.init_state")
+        self.assertEqual(child_call["resolved_callee"], "Parent.init_state")
+
+    def test_super_call_inherited_method_unoverridden_in_parent(self):
+        """M6 / F18: Inherited method not overridden in immediate parent resolves to ancestor."""
+        code = """class Grandparent:
+    def cleanup(self): pass
+
+class Parent(Grandparent):
+    pass
+
+class Child(Parent):
+    def cleanup(self):
+        super().cleanup()
+"""
+        calls = source_index.python_calls(code)
+        child_call = [
+            c
+            for c in calls
+            if c["caller_symbol"] == "Child.cleanup" and c["callee_name"] == "cleanup"
+        ][0]
+        self.assertEqual(child_call["resolved_callee"], "Grandparent.cleanup")
+        self.assertEqual(child_call["confidence"], "exact")
+        self.assertEqual(child_call["resolution_method"], "super_resolution")
+
+    def test_super_with_explicit_class_argument(self):
+        """M6 / F18: Python 2/3 compatibility syntax super(Child, self).method()."""
+        code = """class Base:
+    def run(self): pass
+
+class Child(Base):
+    def run(self):
+        super(Child, self).run()
+"""
+        calls = source_index.python_calls(code)
+        child_call = [
+            c for c in calls if c["caller_symbol"] == "Child.run" and c["callee_name"] == "run"
+        ][0]
+        self.assertEqual(child_call["resolved_callee"], "Base.run")
+        self.assertEqual(child_call["confidence"], "exact")
+        self.assertEqual(child_call["resolution_method"], "super_resolution")
+
+    def test_super_unresolvable_base_graceful_fallback(self):
+        """M6 / F18: Unresolvable/external bases degrade gracefully without false self-attribution."""
+        code_ext = """from external_module import ExternalBase
+
+class LocalService(ExternalBase):
+    def process(self):
+        super().process()
+"""
+        calls = source_index.python_calls(code_ext)
+        call = [
+            c
+            for c in calls
+            if c["caller_symbol"] == "LocalService.process" and c["callee_name"] == "process"
+        ][0]
+        self.assertEqual(call["resolved_callee"], "ExternalBase.process")
+        self.assertEqual(call["confidence"], "inferred")
+        self.assertEqual(call["resolution_method"], "super_resolution")
+
+        code_dyn = """class Unknown(dynamic_func()):
+    def process(self):
+        super().process()
+"""
+        calls_dyn = source_index.python_calls(code_dyn)
+        call_dyn = [
+            c
+            for c in calls_dyn
+            if c["caller_symbol"] == "Unknown.process" and c["callee_name"] == "process"
+        ][0]
+        self.assertNotEqual(call_dyn["resolved_callee"], "Unknown.process")
+        self.assertEqual(call_dyn["confidence"], "provisional")
+
+    def test_super_impact_analysis_inbound_attribution(self):
+        """M6 / F18: In synchronized repo, impact analysis on BaseService.process finds DerivedService."""
+        repo = self.root / "repo_super_impact"
+        repo.mkdir()
+        (repo / "services.py").write_text(
+            "class BaseService:\n"
+            "    def process(self, x):\n"
+            "        return x\n\n"
+            "class DerivedService(BaseService):\n"
+            "    def process(self, x):\n"
+            "        return super().process(x)\n",
+            encoding="utf-8",
+        )
+        kn.sync(repo, self.db)
+        project = repo.name
+
+        # Impact analysis on BaseService.process
+        res = features.impact_analysis(
+            kn, {"project": project, "target": "BaseService.process"}, self.db
+        )
+        self.assertNotIn("error", res)
+        self.assertEqual(res["inbound_call_count"], 1)
+        caller = res["inbound_callers"][0]
+        self.assertEqual(caller["caller_symbol"], "DerivedService.process")
+        self.assertEqual(caller["resolution_method"], "super_resolution")
+
+        # DerivedService.process must NOT list itself as caller
+        res_derived = features.impact_analysis(
+            kn, {"project": project, "target": "DerivedService.process"}, self.db
+        )
+        self.assertNotIn("error", res_derived)
+        derived_callers = [c["caller_symbol"] for c in res_derived["inbound_callers"]]
+        self.assertNotIn("DerivedService.process", derived_callers)
+
+    def test_attribute_inference_in_helper_methods(self):
+        """M6: Class attributes assigned in helper methods like setup() resolve method calls."""
+        code = """class AppWorker:
+    def __init__(self):
+        self.name = "worker"
+
+    def setup(self):
+        self.store = TokenStore()
+
+    def execute(self):
+        self.store.save()
+"""
+        calls = source_index.python_calls(code)
+        exec_call = [
+            c
+            for c in calls
+            if c["caller_symbol"] == "AppWorker.execute" and c["callee_name"] == "save"
+        ][0]
+        self.assertEqual(exec_call["receiver"], "self.store")
+        self.assertEqual(exec_call["resolved_callee"], "TokenStore.save")
+        self.assertEqual(exec_call["confidence"], "exact")
+        self.assertEqual(exec_call["resolution_method"], "inferred_type")
+
+    def test_attribute_inference_from_class_level_annotations(self):
+        """M6: Class-level AnnAssign annotations inform receiver types."""
+        code = """class ServiceHandler:
+    database: DatabaseClient
+    cache: MemoryCache = None
+
+    def handle_request(self):
+        self.database.execute_query()
+        self.cache.get_item()
+"""
+        calls = source_index.python_calls(code)
+        h_calls = {
+            c["callee_name"]: c
+            for c in calls
+            if c["caller_symbol"] == "ServiceHandler.handle_request"
+        }
+        self.assertEqual(
+            h_calls["execute_query"]["resolved_callee"], "DatabaseClient.execute_query"
+        )
+        self.assertEqual(h_calls["execute_query"]["confidence"], "exact")
+        self.assertEqual(h_calls["execute_query"]["resolution_method"], "inferred_type")
+        self.assertEqual(h_calls["get_item"]["resolved_callee"], "MemoryCache.get_item")
+        self.assertEqual(h_calls["get_item"]["confidence"], "exact")
+        self.assertEqual(h_calls["get_item"]["resolution_method"], "inferred_type")
+
+    def test_local_type_inference_from_parameter_annotations(self):
+        """M6: Parameter type annotations in standalone and member functions resolve calls."""
+        code = """def process_order(gateway: PaymentGateway, validator: OrderValidator):
+    gateway.charge()
+    validator.validate()
+"""
+        calls = source_index.python_calls(code)
+        c_map = {c["callee_name"]: c for c in calls if c["caller_symbol"] == "process_order"}
+        self.assertEqual(c_map["charge"]["resolved_callee"], "PaymentGateway.charge")
+        self.assertEqual(c_map["charge"]["confidence"], "exact")
+        self.assertEqual(c_map["charge"]["resolution_method"], "inferred_type")
+        self.assertEqual(c_map["validate"]["resolved_callee"], "OrderValidator.validate")
+        self.assertEqual(c_map["validate"]["confidence"], "exact")
+
+    def test_local_variable_type_annotation_in_body(self):
+        """M6: Type-annotated local variables inside function body resolve calls."""
+        code = """def dispatch_task():
+    client: APIClient = get_client()
+    client.post_payload()
+"""
+        calls = source_index.python_calls(code)
+        post_call = [
+            c
+            for c in calls
+            if c["caller_symbol"] == "dispatch_task" and c["callee_name"] == "post_payload"
+        ][0]
+        self.assertEqual(post_call["resolved_callee"], "APIClient.post_payload")
+        self.assertEqual(post_call["confidence"], "exact")
+        self.assertEqual(post_call["resolution_method"], "inferred_type")
+
+    def test_javascript_calls_calibrated_confidence(self):
+        """M6: JS/TS call extraction distinguishes syntactic, heuristic, and provisional confidence."""
+        code = """import { sendAlert } from "./notifier";
+
+export class UserController extends BaseController {
+    async handle(id) {
+        this.validate(id);
+        super.handle(id);
+        sendAlert(id);
+        const obj = getDynamic();
+        obj.customMethod();
+    }
+    validate(id) {}
+}
+"""
+        calls = source_index.javascript_calls(code)
+        c_map = {
+            c["callee_name"]: c for c in calls if c["caller_symbol"] == "UserController.handle"
+        }
+        self.assertEqual(c_map["validate"]["resolved_callee"], "UserController.validate")
+        self.assertEqual(c_map["validate"]["confidence"], "syntactic")
+        self.assertEqual(c_map["validate"]["resolution_method"], "explicit_class")
+
+        self.assertEqual(c_map["handle"]["resolved_callee"], "BaseController.handle")
+        self.assertEqual(c_map["handle"]["confidence"], "syntactic")
+        self.assertEqual(c_map["handle"]["resolution_method"], "super_parent_class")
+
+        self.assertEqual(c_map["sendAlert"]["resolved_callee"], "sendAlert")
+        self.assertEqual(c_map["sendAlert"]["confidence"], "syntactic")
+        self.assertEqual(c_map["sendAlert"]["resolution_method"], "explicit_import")
+
+        self.assertEqual(c_map["customMethod"]["confidence"], "provisional")
+        self.assertEqual(c_map["customMethod"]["resolution_method"], "untyped_receiver")
+
+    def test_javascript_builtin_globals_not_marked_exact_class(self):
+        """M6: Built-in globals like Math, JSON, console are marked provisional/builtin, not exact."""
+        code = """function compute() {
+    Math.max(1, 2);
+    JSON.parse("{}");
+    console.log("ok");
+}
+"""
+        calls = source_index.javascript_calls(code)
+        for c in calls:
+            self.assertNotEqual(c["confidence"], "exact")
+            self.assertEqual(c["confidence"], "provisional")
+            self.assertEqual(c["resolution_method"], "builtin")
+
+    def test_language_capabilities_structure(self):
+        """M6 / F19: Inspect canonical LANGUAGE_CAPABILITIES dictionary."""
+        caps = kn.get_language_capabilities()
+        self.assertIn("python", caps)
+        self.assertEqual(caps["python"]["tier"], "ast")
+        self.assertTrue(caps["python"]["features"]["super_resolution"])
+        self.assertIn("typescript", caps)
+        self.assertEqual(caps["typescript"]["tier"], "syntactic_regex")
+        self.assertFalse(caps["typescript"]["features"]["super_resolution"])
+        self.assertIn("kotlin", caps)
+        self.assertEqual(caps["kotlin"]["tier"], "line_pattern")
+        self.assertFalse(caps["kotlin"]["features"]["call_graph"])
+        self.assertIn("document", caps)
+        self.assertEqual(caps["document"]["tier"], "text_only")
+
+    def test_language_capabilities_by_extension_lookup(self):
+        """M6 / F19: Extension lookup via get_language_capabilities and language_for_file."""
+        self.assertEqual(kn.get_language_capabilities(".py")["language"], "python")
+        self.assertEqual(kn.get_language_capabilities("ts")["language"], "typescript")
+        self.assertEqual(kn.get_language_capabilities(".go")["language"], "go")
+        self.assertEqual(kn.get_language_capabilities(".md")["tier"], "text_only")
+        self.assertEqual(kn.get_language_capabilities(".unknown")["tier"], "line_pattern")
+        self.assertEqual(kn.language_for_file("app/main.py"), "python")
+        self.assertEqual(kn.language_for_file("src/index.ts"), "typescript")
+        self.assertEqual(kn.language_for_file("README.md"), "document")
+
+    def test_sync_project_language_breakdown_telemetry(self):
+        """M6 / F19: kn.sync() includes language_breakdown telemetry."""
+        repo = self.root / "repo_lang_breakdown"
+        repo.mkdir()
+        (repo / "main.py").write_text("def run(): pass\n", encoding="utf-8")
+        (repo / "helper.py").write_text("def help(): pass\n", encoding="utf-8")
+        (repo / "app.ts").write_text("export class App {}\n", encoding="utf-8")
+        (repo / "notes.md").write_text("# Notes\n", encoding="utf-8")
+        res = kn.sync(repo, self.db)
+        self.assertIn("language_breakdown", res)
+        b = res["language_breakdown"]
+        self.assertEqual(b["python"]["files"], 2)
+        self.assertEqual(b["python"]["tier"], "ast")
+        self.assertEqual(b["typescript"]["files"], 1)
+        self.assertEqual(b["typescript"]["tier"], "syntactic_regex")
+        self.assertEqual(b["document"]["files"], 1)
+        self.assertEqual(b["document"]["tier"], "text_only")
+
+    def test_cli_capabilities_command(self):
+        """M6 / F19: python kn.py capabilities CLI command supports json, table, text."""
+        import subprocess
+        import sys
+
+        res_json = subprocess.run(
+            [sys.executable, str(Path(kn.__file__)), "capabilities", "--format", "json"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        data = json.loads(res_json.stdout)
+        self.assertIn("python", data)
+        self.assertEqual(data["python"]["tier"], "ast")
+
+        res_table = subprocess.run(
+            [sys.executable, str(Path(kn.__file__)), "capabilities", "python", "--format", "table"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertIn("python", res_table.stdout)
+        self.assertIn("ast", res_table.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

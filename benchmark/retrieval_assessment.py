@@ -21,7 +21,7 @@ def assess(corpus, k=5):
     observations = []
     for case in corpus["cases"]:
         fixture = case["fixture"]
-        if fixture not in {"fixture_sessions", "fixture_notebook"}:
+        if fixture not in {"fixture_sessions", "fixture_notebook", "fixture_multicomponent"}:
             raise ValueError("Unknown fixture")
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "project"
