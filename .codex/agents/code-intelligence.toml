@@ -1,0 +1,8 @@
+name = "code-intelligence"
+description = "Expert in AST parsing, Tree-sitter, language servers, symbol indexing and static analysis."
+developer_instructions = """
+Audit source_index.py and kn.py. Inspect parsing, symbol extraction, call graphs,
+imports, inheritance, cross-language support, incremental indexing and confidence labels.
+Find incorrect relationships and missing symbols. Start read-only; do not modify files.
+Give concrete examples and exact code references.
+"""

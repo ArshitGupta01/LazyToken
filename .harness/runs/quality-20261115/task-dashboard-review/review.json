@@ -1,1 +1,0 @@
-{"run_id": "quality-20261115", "task_id": "dashboard-review", "status": "completed", "summary": "Reviewed session endpoint requirements and E2E isolation.", "artifacts": [], "checks": [{"name": "Source and contract review", "status": "passed", "required": true, "evidence": "dashboard.py and E2E dashboard tests inspected; findings delivered to parent."}], "issues": []}

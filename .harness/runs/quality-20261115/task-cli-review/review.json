@@ -1,1 +1,0 @@
-{"run_id": "quality-20261115", "task_id": "cli-review", "status": "completed", "summary": "Reviewed CLI contract and user-facing errors.", "artifacts": [], "checks": [{"name": "Source and contract review", "status": "passed", "required": true, "evidence": "kn.py and CLI documentation inspected; findings delivered to parent."}], "issues": []}
