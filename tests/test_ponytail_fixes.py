@@ -94,7 +94,10 @@ object.import('not-a-module');
                 ):
                     kn.rpc_server(db)
                 self.assertEqual(db.execute("SELECT count(*) FROM projects").fetchone()[0], 0)
-                self.assertEqual(len(output.getvalue().splitlines()), 1)
+                replies = [json.loads(line) for line in output.getvalue().splitlines()]
+                self.assertEqual(replies[0]["id"], 1)
+                self.assertEqual(replies[1]["id"], None)
+                self.assertEqual(replies[1]["error"]["code"], -32700)
             finally:
                 db.close()
 

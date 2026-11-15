@@ -25,6 +25,283 @@ class AuditRegressions(unittest.TestCase):
         self.db.close()
         self.temp.cleanup()
 
+    def test_reuse_guidance_is_sent_at_initialization_in_both_catalog_modes(self):
+        requests = [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {"protocolVersion": "2024-11-05"},
+            },
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": "get_task_context",
+                    "arguments": {"project": self.project, "task": "auth", "budget": 600},
+                },
+            },
+        ]
+        for compact in (False, True):
+            with self.subTest(compact=compact):
+                output = io.StringIO()
+                with (
+                    patch("sys.stdin", io.StringIO("\n".join(json.dumps(row) for row in requests))),
+                    patch("sys.stdout", output),
+                ):
+                    kn.rpc_server(self.db, compact=compact)
+                replies = [json.loads(row) for row in output.getvalue().splitlines()]
+                self.assertEqual(len(replies), 3)
+                instructions = replies[0]["result"]["instructions"]
+                self.assertIn("get_task_context", instructions)
+                self.assertIn("session_id", instructions)
+                self.assertIn("human review", instructions)
+                self.assertIn("untrusted evidence", instructions)
+                self.assertLess(len(instructions), 1000)
+                tools = replies[1]["result"]["tools"]
+                self.assertTrue(any(tool["name"] == "get_task_context" for tool in tools))
+                self.assertNotIn("instructions", replies[1]["result"])
+                result = json.loads(replies[2]["result"]["content"][0]["text"])
+                self.assertNotIn("error", result)
+                self.assertNotIn("instructions", result)
+                self.assertNotIn(instructions, json.dumps(replies[1:]))
+
+    def test_mcp_negotiates_versions_and_never_executes_notifications(self):
+        requests = [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {"protocolVersion": "2025-06-18"},
+            },
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "initialize",
+                "params": {"protocolVersion": "2099-01-01"},
+            },
+            {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {"name": "sync_project", "arguments": {}},
+            },
+            {"jsonrpc": "2.0", "id": None, "method": "ping"},
+            {"jsonrpc": "2.0", "id": 3, "method": "ping"},
+        ]
+        output = io.StringIO()
+        with (
+            patch("sys.stdin", io.StringIO("\n".join(json.dumps(row) for row in requests))),
+            patch("sys.stdout", output),
+            patch("kn.call") as call,
+        ):
+            kn.rpc_server(self.db)
+        replies = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(replies[0]["result"]["protocolVersion"], "2025-06-18")
+        self.assertEqual(replies[1]["result"]["protocolVersion"], "2025-06-18")
+        self.assertEqual(replies[2]["error"]["code"], -32600)
+        self.assertEqual(replies[3]["id"], 3)
+        call.assert_not_called()
+
+    def test_graph_reuse_flow_keeps_trust_labels_deduplication_and_review_boundary(self):
+        proposal = self.proposal(
+            name="Auth reuse", summary="Reuse the existing Auth class for authentication."
+        )
+        approved = kn.feature_call(
+            "review",
+            {"project": self.project, "id": proposal["id"], "action": "approve", "verified": True},
+            self.db,
+        )
+        self.assertTrue(approved["saved"])
+        hypothesis = self.proposal(
+            name="Auth hypothesis", summary="Authentication retry remains an unverified hypothesis."
+        )
+        unverified = kn.feature_call(
+            "review",
+            {
+                "project": self.project,
+                "id": hypothesis["id"],
+                "action": "approve",
+                "verified": False,
+            },
+            self.db,
+        )
+        args = {
+            "project": self.project,
+            "task": "Auth reuse authentication",
+            "budget": 1200,
+            "session_id": "reuse-flow",
+        }
+        first = kn.call("get_task_context", args, self.db)
+        memory = next(item for item in first["results"] if item.get("id") == approved["asset_id"])
+        self.assertEqual(memory["verification_state"], "verified")
+        self.assertEqual(memory["freshness"], "current")
+        self.assertIn("Current as indexed", memory["why"])
+        self.assertEqual(memory["evidence_paths"], ["Auth.py"])
+        hypothesis_crumb = next(
+            item for item in first["results"] if item.get("id") == unverified["asset_id"]
+        )
+        self.assertEqual(hypothesis_crumb["verification_state"], "hypothesis")
+        self.assertNotIn("summary", memory)
+        self.assertTrue(any(item.get("path") == "Auth.py" for item in first["results"]))
+        inspected = kn.call(
+            "inspect_source_range",
+            {"project": self.project, "path": "Auth.py", "start_line": 1, "end_line": 1},
+            self.db,
+        )
+        self.assertIn("class Auth", inspected["lines"][0]["text"])
+        repeated = kn.call("get_task_context", args, self.db)
+        self.assertEqual(repeated["results"], [])
+        self.assertGreater(repeated["suppressed_seen"], 0)
+        (self.root / "Auth.py").write_text("class Auth:\n    def retry(self): pass\n")
+        kn.sync(self.root, self.db)
+        changed = kn.call("get_task_context", args, self.db)
+        stale = next(item for item in changed["results"] if item.get("id") == approved["asset_id"])
+        self.assertEqual(stale["freshness"], "stale")
+        self.assertEqual(stale["evidence_paths"], ["Auth.py"])
+        self.assertIn("revalidate", stale["why"])
+        before = self.db.execute("SELECT count(*) FROM assets").fetchone()[0]
+        checkpoint = kn.call(
+            "lazytoken",
+            {
+                "action": "complete_task",
+                "payload": {
+                    "project": self.project,
+                    "task": "Add retry behavior",
+                    "outcome": "success",
+                    "resolution": "Use Auth.retry to centralize retry behavior.",
+                    "evidence": "Synthetic updated implementation",
+                    "paths": ["Auth.py"],
+                },
+            },
+            self.db,
+        )
+        self.assertEqual(checkpoint["status"], "pending")
+        self.assertTrue(checkpoint["review_required"])
+        self.assertEqual(self.db.execute("SELECT count(*) FROM assets").fetchone()[0], before)
+
+    def test_unavailable_memory_is_deprioritized_and_clearly_marked(self):
+        (self.root / "Offline.py").write_text("class Offline: pass", encoding="utf-8")
+        kn.sync(self.root, self.db)
+        current = self.proposal(name="Auth current", summary="Authentication primary solution")
+        offline = self.proposal(
+            name="Auth unavailable",
+            summary="Authentication secondary approach",
+            paths=["Offline.py"],
+        )
+        for proposal in (current, offline):
+            self.assertTrue(
+                kn.feature_call(
+                    "review",
+                    {
+                        "project": self.project,
+                        "id": proposal["id"],
+                        "action": "approve",
+                        "verified": True,
+                    },
+                    self.db,
+                )["saved"]
+            )
+        self.db.execute("INSERT INTO index_errors VALUES(?,?)", (self.project, "Offline.py"))
+        self.db.commit()
+        ranked = features.ranked_search(
+            kn, {"project": self.project, "query": "auth", "limit": 100}, self.db
+        )
+        scores = {r["name"]: r["score"] for r in ranked["results"] if r["type"] == "asset"}
+        self.assertGreater(scores["Auth current"], scores["Auth unavailable"])
+        result = kn.call(
+            "get_task_context", {"project": self.project, "task": "auth", "budget": 1200}, self.db
+        )
+        memory = next(r for r in result["results"] if r.get("name") == "Auth unavailable")
+        self.assertEqual(memory["freshness"], "unverified")
+        self.assertIn("verify before reuse", memory["why"])
+
+    def test_direct_stale_memory_is_not_hidden_by_confidence_penalty(self):
+        proposal = self.proposal(name="AmberGiraffe", summary="AmberGiraffe lesson")
+        approved = kn.feature_call(
+            "review",
+            {"project": self.project, "id": proposal["id"], "action": "approve", "verified": True},
+            self.db,
+        )
+        (self.root / "Auth.py").write_text("class Changed: pass", encoding="utf-8")
+        kn.sync(self.root, self.db)
+        result = kn.call(
+            "get_task_context",
+            {"project": self.project, "task": "AmberGiraffe", "budget": 600},
+            self.db,
+        )
+        memory = next(r for r in result["results"] if r.get("id") == approved["asset_id"])
+        self.assertEqual(memory["freshness"], "stale")
+        self.assertIn("revalidate", memory["why"])
+        self.db.execute(
+            "UPDATE assets SET tags=? WHERE id=?", ("amberweakmatch", approved["asset_id"])
+        )
+        self.db.commit()
+        weak = kn.call(
+            "get_task_context",
+            {"project": self.project, "task": "amberweakmatch", "budget": 600},
+            self.db,
+        )
+        self.assertEqual(weak["decision"], "abstain")
+
+    def test_oversized_expanded_memory_falls_back_and_can_expand_later(self):
+        proposal = self.proposal(name="Auth reusable lesson", summary="auth " + "detail " * 150)
+        approved = kn.feature_call(
+            "review",
+            {"project": self.project, "id": proposal["id"], "action": "approve", "verified": True},
+            self.db,
+        )
+        args = {
+            "project": self.project,
+            "task": "auth reusable lesson",
+            "budget": 350,
+            "session_id": "progressive-memory",
+            "expand_assets": True,
+        }
+        small = kn.call("get_task_context", args, self.db)
+        memory = next(item for item in small["results"] if item.get("id") == approved["asset_id"])
+        self.assertNotIn("summary", memory)
+        self.assertTrue(small["truncated"])
+        self.assertLessEqual(small["used_tokens"], 350)
+        large = kn.call("get_task_context", {**args, "budget": 1200}, self.db)
+        expanded = next(item for item in large["results"] if item.get("id") == approved["asset_id"])
+        self.assertTrue(expanded["summary"].startswith("auth detail"))
+
+    def test_expanded_memory_suppresses_compact_repeat_but_changed_evidence_returns(self):
+        proposal = self.proposal(
+            name="Auth reuse", summary="Reuse authentication " + "detail " * 150
+        )
+        approved = kn.feature_call(
+            "review",
+            {"project": self.project, "id": proposal["id"], "action": "approve", "verified": True},
+            self.db,
+        )
+        args = {
+            "project": self.project,
+            "task": "auth reuse",
+            "budget": 1200,
+            "session_id": "expanded-first",
+        }
+        first = kn.call("get_task_context", {**args, "expand_assets": True}, self.db)
+        memory = next(r for r in first["results"] if r.get("id") == approved["asset_id"])
+        self.assertIn("summary", memory)
+        repeated = kn.call("get_task_context", args, self.db)
+        self.assertFalse(any(r.get("id") == approved["asset_id"] for r in repeated["results"]))
+        self.assertGreater(repeated["suppressed_seen"], 0)
+        fallback = kn.call(
+            "get_task_context", {**args, "budget": 350, "expand_assets": True}, self.db
+        )
+        self.assertTrue(fallback["truncated"])
+        self.assertFalse(any(r.get("id") == approved["asset_id"] for r in fallback["results"]))
+        override = kn.call("get_task_context", {**args, "include_seen": True}, self.db)
+        self.assertTrue(any(r.get("id") == approved["asset_id"] for r in override["results"]))
+        (self.root / "Auth.py").write_text("class Changed: pass", encoding="utf-8")
+        kn.sync(self.root, self.db)
+        changed = kn.call("get_task_context", args, self.db)
+        memory = next(r for r in changed["results"] if r.get("id") == approved["asset_id"])
+        self.assertEqual(memory["freshness"], "stale")
+
     def proposal(self, **extra):
         return kn.feature_call(
             "propose",

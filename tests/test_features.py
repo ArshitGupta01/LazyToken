@@ -40,6 +40,39 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         rows = self.db.execute("SELECT project_id FROM retrievals").fetchall()
         self.assertEqual([row[0] for row in rows], [self.project] * 3)
 
+    def test_natural_language_query_keeps_late_meaningful_terms(self):
+        result = self.run_action(
+            "search",
+            project=self.project,
+            query="where is the code in the project and how does the service handle authentication",
+        )
+        self.assertTrue(any(item.get("name") == "AuthClient" for item in result["results"]))
+
+    def test_search_prioritizes_project_code_but_keeps_tests_and_vendor_searchable(self):
+        (self.root / "vendor").mkdir()
+        (self.root / "vendor" / "auth.py").write_text("class AuthClient: pass\n")
+        (self.root / "tests").mkdir()
+        (self.root / "tests" / "test_auth.py").write_text("class AuthClient: pass\n")
+        kn.sync(self.root, self.db)
+        result = self.run_action("search", project=self.project, query="AuthClient", limit=100)
+        matches = [r["path"] for r in result["results"] if r.get("name") == "AuthClient"]
+        self.assertEqual(matches[0], "AuthClient.kt")
+        self.assertIn("vendor/auth.py", matches)
+        self.assertIn("tests/test_auth.py", matches)
+        explicit = self.run_action(
+            "search", project=self.project, query="vendor AuthClient", limit=100
+        )
+        self.assertTrue(any(r.get("path") == "vendor/auth.py" for r in explicit["results"]))
+
+    def test_approval_question_finds_review_and_proposal_symbols(self):
+        (self.root / "memory.py").write_text("def review(): pass\ndef propose(): pass\n")
+        kn.sync(self.root, self.db)
+        result = self.run_action(
+            "search", project=self.project, query="Where is a memory proposal approved?"
+        )
+        names = {r.get("name") for r in result["results"] if r.get("path") == "memory.py"}
+        self.assertTrue({"review", "propose"} <= names)
+
     def test_graph_neighbor_uses_strongest_in_scope_edge_without_extra_hops(self):
         ids = {}
         for name, summary in [

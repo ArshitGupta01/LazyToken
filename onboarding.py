@@ -268,20 +268,41 @@ def diagnose(kn):
 
 def connection_test(kn):
     server = entry(kn)
-    request = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
-    result = subprocess.run(
-        [server["command"], *server["args"]],
-        input=json.dumps(request) + "\n",
-        capture_output=True,
-        text=True,
-        timeout=20,
-        env={**os.environ, **server["env"]},
-        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
-    )
-    reply = json.loads(result.stdout)
+    requests = [
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2024-11-05"},
+        },
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+    ]
+    try:
+        result = subprocess.run(
+            [server["command"], *server["args"]],
+            input="".join(json.dumps(request) + "\n" for request in requests),
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env={**os.environ, **server["env"], "LAZYTOKEN_DISABLE_AUTOWATCH": "1"},
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        replies = [json.loads(line) for line in result.stdout.splitlines()]
+        initialize = next((r for r in replies if r.get("id") == 1), {})
+        listing = next((r for r in replies if r.get("id") == 2), {})
+        names = [tool.get("name") for tool in listing.get("result", {}).get("tools", [])]
+        ok = result.returncode == 0 and "result" in initialize and "get_task_context" in names
+    except (OSError, subprocess.TimeoutExpired, ValueError, TypeError, AttributeError) as exc:
+        return {
+            "mcp_initialize": False,
+            "error": type(exc).__name__,
+            "note": "Check the launcher and run doctor for repair guidance.",
+        }
     return {
-        "mcp_initialize": result.returncode == 0 and "result" in reply,
-        "note": "Local server handshake only; does not prove a client has loaded it.",
+        "mcp_initialize": ok,
+        "tools_available": len(names),
+        "note": "Local handshake and tool discovery only; restart your client and check its tool list.",
     }
 
 

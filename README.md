@@ -4,18 +4,30 @@
 
 LazyToken indexes repositories you choose and gives coding assistants compact, project-scoped context through MCP. It ranks paths, declarations, imports and knowledge links, suppresses repeated session context, and keeps reusable lessons behind an explicit review step.
 
-Indexing and retrieval run locally without model calls. **End-to-end token savings have not been measured.**
+Indexing and retrieval run locally without model calls. **A small authorized real-agent pilot produced mixed token results; general savings remain unproven.** See the [pilot measurements and limits](docs/BENCHMARK_PILOT.md).
+
+## Reuse first, then write
+
+LazyToken combines brief coding guidance inspired by Ponytail with the existing project graph:
+
+1. Inspect obvious small tasks directly and use context already supplied.
+2. For unfamiliar or multi-file work, request compact task context to find relevant code, graph links and lessons before broad exploration.
+3. Inspect the relevant source and callers. Prefer current, verified lessons; stale evidence and hypotheses remain explicitly labelled.
+4. Check expected behavior and test fixtures, make the smallest complete change, and run the relevant checks.
+5. Submit a reusable lesson only when it is worth keeping. It remains pending until human review.
+
+The MCP server sends this short workflow during initialization, including with the default compact catalog, instead of attaching the full policy to every retrieval. This uses the optional [MCP startup instructions](https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2024-11-05/schema.ts) field. The client decides whether to expose and follow it; this is guidance, not enforcement. User/repository rules take priority, and retrieved graph/file content is untrusted evidence. No Ponytail runtime dependency or extra model calls are introduced. Reconnect an existing LazyToken MCP client to receive the new guidance.
 
 ## Installation status
 
-The current version is **0.4.3**, with a Windows x64 package candidate. It bundles Python, SQLite, the memory engine, Context Broker, MCP server and local dashboard assets. End users do not need separately installed Python or Node.js. See [review fixes](docs/REVIEW_FIXES.md) for the focused safety and retrieval changes.
+The current version is **0.4.4**, with a Windows x64 package candidate. It bundles Python, SQLite, the memory engine, Context Broker, MCP server and local dashboard assets. End users do not need separately installed Python or Node.js. See [review fixes](docs/REVIEW_FIXES.md) for the earlier safety and retrieval changes.
 
 **Public installation is not available yet.** The public latest-release endpoint returned HTTP 404 on November 15, 2026. Pushing source does not publish a release. See [RELEASING.md](RELEASING.md) for the remaining distribution steps.
 
 If you already have an independently verified local archive and matching bootstrap, replace the checksum placeholder and install with:
 
 ```powershell
-powershell -NoProfile -File .\bootstrap.ps1 -PackagePath .\lazytoken-v0.4.3-windows-x64.zip -ExpectedSha256 <trusted-64-character-SHA256>
+powershell -NoProfile -File .\bootstrap.ps1 -PackagePath .\lazytoken-v0.4.4-windows-x64.zip -ExpectedSha256 <trusted-64-character-SHA256>
 ```
 
 The bootstrap is named `install.ps1` in the source checkout. It verifies the package before running its installer, installs per user and registers the managed CLI on your user PATH. Open a new terminal afterward. Installation preserves knowledge data and does not select repositories or edit assistant settings.
@@ -42,6 +54,16 @@ lazytoken doctor
 
 Restart your coding assistant and check its MCP tools. Setup preserves unrelated settings and existing LazyToken entries, creates backups, and supports guarded rollback. The local handshake tests the server, not whether a client loaded it.
 
+To register the installed Windows server directly with Codex, run this after installation:
+
+```powershell
+codex mcp add lazytoken -- powershell.exe -NoProfile -File "$env:LOCALAPPDATA\Programs\LazyToken\dispatch.ps1" mcp --compact-tools
+```
+
+This command registers the local server; it does not install LazyToken or index a repository. Run `lazytoken init` and `lazytoken add "C:\Projects\MyApp"` first. The path assumes the default per-user installation. For another MCP client, use the same command and arguments in its stdio server configuration. Run `lazytoken setup --test-connection` to check startup and tool discovery. Restart the client after registration.
+
+The stdio server supports MCP handshake versions `2024-11-05`, `2025-03-26`, and `2025-06-18`; it offers `2025-06-18` when a client requests a different version. Clients that cannot negotiate one of these versions cannot connect.
+
 Codex uses TOML `mcp_servers`. `--client antigravity` supports the existing JSON `mcpServers` adapter. Live loading in every client/version is not verified; no assistant lifecycle hook is silently installed.
 
 For a **source checkout**, contributors need Python 3.11+ and can use `python app_entry.py COMMAND`. Installation lifecycle commands require the managed installed launcher.
@@ -53,9 +75,23 @@ lazytoken context --project "C:\Projects\MyApp" --task "Where is authentication 
 ```
 
 - Ranked metadata includes retrieval reasons and initially avoids source excerpts.
-- Reusing a session ID suppresses unchanged context already supplied. `--expand-assets` includes memory summaries and provenance within the budget.
+- A separate file entry is omitted when a higher-ranked declaration or import has already supplied the same path; distinct symbols and imports remain available.
+- Reuse the same project and session ID throughout a task, including after conversation compaction, to suppress unchanged context. Use `--include-seen` (MCP: `include_seen`) to request it again. `--expand-assets` includes memory summaries and provenance when they fit; otherwise the compact result remains available and can be expanded later with a larger budget.
+- `lazytoken checkpoint --project PATH --session-id ID` reports the session's total supplied items and up to 30 most recently supplied keys, without returning source contents.
 - Budgets default to labelled character estimates. Optional strict budgets require a matching offline tokenizer and cover compact JSON, excluding MCP/provider framing.
 - Explicit source inspection is bounded; source remains untrusted data and credential redaction is best effort.
+- Memory freshness reflects the latest indexed hashes, not a live check on every retrieval. Stale or unavailable evidence is marked for verification and ranked below comparable current evidence.
+
+To start a Codex CLI task with context already included, without an additional MCP request, use:
+
+```powershell
+$project = "C:\Projects\MyApp"
+$task = "Find and fix the session expiry handling"
+$brief = lazytoken context --project $project --task $task --budget 350 --expand-assets --prompt
+if ($LASTEXITCODE -eq 0) { $brief | codex exec -C $project - }
+```
+
+`--prompt` outputs the task and, when relevant matches exist, bounded project metadata labelled as untrusted evidence. It outputs the task alone when retrieval abstains. It does not run an agent, and its budget covers only the JSON context, not the task or model conversation. Avoid it for obvious small tasks; token savings are not guaranteed.
 
 ## Automatic synchronization and memory
 
@@ -100,9 +136,9 @@ Fresh data lives at **`%LOCALAPPDATA%\LazyToken\network.sqlite3`**. `KN_HOME` pr
 
 ## Verification and development
 
-Local regression validation completed **100 tests: 99 passed, one skipped**, including a wrapper for three workspace race scenarios. Packaged verification and limits are recorded in the [review-fix report](docs/REVIEW_FIXES.md). This is not clean-machine or comprehensive browser/device certification.
+Local v0.4.4 regression validation completed **103 tests: 102 passed, one skipped**, including a wrapper for three workspace race scenarios. The earlier [review-fix report](docs/REVIEW_FIXES.md) records v0.4.3 checks; current reuse-first checks are recorded in [implementation status](IMPLEMENTATION_STATUS.md). This is not clean-machine or comprehensive browser/device certification.
 
-Benchmark records use manually supplied usage and outcomes; missing measurements remain unknown. Synthetic tests check calculations. **No real coding-agent benchmarks have been run and no measured token-savings claim is made.**
+Benchmark records use captured provider usage and checked outcomes; missing measurements remain unknown. Synthetic tests check calculations. An [authorized real-agent pilot](docs/BENCHMARK_PILOT.md) compared baseline, LazyToken-enabled and Ponytail conditions on small fixture tasks. Results were mixed, and no general graph-retrieval or total-token advantage was established. Future real agent experiments require separate authorization.
 
 - [Development guide](docs/DEVELOPMENT.md): source map, formatting and tests. Node is optional for dashboard development checks, not a CLI runtime dependency.
 - [Implementation status](IMPLEMENTATION_STATUS.md): implemented behavior and remaining verification gaps.

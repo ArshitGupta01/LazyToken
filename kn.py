@@ -18,9 +18,10 @@ import features
 import broker
 import learning
 import data_ops
-from mcp_schema import TOOLS, mcp_tools
+import token_budget
+from mcp_schema import TOOLS, WORKFLOW_INSTRUCTIONS, mcp_tools
 
-VERSION = "0.4.3"
+VERSION = "0.4.4"
 EXTENSIONS = {
     ".kt",
     ".kts",
@@ -991,18 +992,14 @@ def feature_call(action: str, args: dict[str, Any], conn: sqlite3.Connection) ->
 def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
     if not isinstance(args, dict):
         return {"error": "arguments must be an object."}
-    if name == "coding_efficiency_policy":
-        return {
-            "policy": (Path(__file__).resolve().parent / "POLICY.md").read_text(
-                encoding="utf-8-sig"
-            )
-        }
-    if name == "get_task_context":
-        return broker.task_context(sys.modules[__name__], args, conn)
-    if name == "clear_context_session":
-        return broker.clear_session(sys.modules[__name__], args, conn)
-    if name == "inspect_source_range":
-        return features.inspect_source(sys.modules[__name__], args, conn)
+    direct_actions = {
+        "coding_efficiency_policy": "policy",
+        "get_task_context": "task_context",
+        "clear_context_session": "clear_session",
+        "inspect_source_range": "inspect_source",
+    }
+    if name in direct_actions:
+        return feature_call(direct_actions[name], args, conn)
     if name == "lazytoken" and args.get("action") == "review":
         return {
             "error": "MCP clients cannot make review decisions. Use the local dashboard or operator CLI for human review."
@@ -1091,19 +1088,54 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
 
 
 def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
+    supported_versions = ("2024-11-05", "2025-03-26", "2025-06-18")
+
+    def error_reply(request_id, code, message):
+        sys.stdout.write(
+            json.dumps(
+                {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}},
+                separators=(",", ":"),
+            )
+            + "\n"
+        )
+        sys.stdout.flush()
+
     for raw in sys.stdin:
         rid = None
         try:
-            req = json.loads(raw)
+            try:
+                req = json.loads(raw)
+            except json.JSONDecodeError:
+                error_reply(None, -32700, "Parse error")
+                continue
+            if (
+                not isinstance(req, dict)
+                or req.get("jsonrpc") != "2.0"
+                or not isinstance(req.get("method"), str)
+                or (
+                    "id" in req
+                    and (isinstance(req["id"], bool) or not isinstance(req["id"], (str, int)))
+                )
+            ):
+                error_reply(None, -32600, "Invalid request")
+                continue
+            if "id" not in req:
+                continue
             method = req.get("method")
             rid = req.get("id")
-            if method == "notifications/initialized" or method == "notifications/cancelled":
-                continue
             if method == "initialize":
+                params = req.get("params", {})
+                if not isinstance(params, dict):
+                    error_reply(rid, -32602, "Invalid params")
+                    continue
+                requested = params.get("protocolVersion")
                 result = {
-                    "protocolVersion": req.get("params", {}).get("protocolVersion", "2024-11-05"),
+                    "protocolVersion": (
+                        requested if requested in supported_versions else supported_versions[-1]
+                    ),
                     "capabilities": {"tools": {}},
                     "serverInfo": {"name": "lazytoken-knowledge-network", "version": VERSION},
+                    "instructions": WORKFLOW_INSTRUCTIONS,
                 }
             elif method == "ping":
                 result = {}
@@ -1111,6 +1143,9 @@ def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
                 result = {"tools": mcp_tools(compact)}
             elif method == "tools/call":
                 p = req.get("params", {})
+                if not isinstance(p, dict):
+                    error_reply(rid, -32602, "Invalid params")
+                    continue
                 value = call(p.get("name", ""), p.get("arguments", {}), conn)
                 result = {
                     "content": [
@@ -1124,15 +1159,7 @@ def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
                     "isError": bool(isinstance(value, dict) and "error" in value),
                 }
             else:
-                if rid is None:
-                    continue
-                reply = {
-                    "jsonrpc": "2.0",
-                    "id": rid,
-                    "error": {"code": -32601, "message": "Method not found"},
-                }
-                sys.stdout.write(json.dumps(reply, separators=(",", ":")) + "\n")
-                sys.stdout.flush()
+                error_reply(rid, -32601, "Method not found")
                 continue
             if rid is not None:
                 sys.stdout.write(
@@ -1146,19 +1173,8 @@ def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
             if conn.in_transaction:
                 conn.rollback()
             # Never log inputs or source content to stderr; keep MCP stdout protocol-clean.
-            if "rid" in locals() and rid is not None:
-                sys.stdout.write(
-                    json.dumps(
-                        {
-                            "jsonrpc": "2.0",
-                            "id": rid,
-                            "error": {"code": -32603, "message": type(e).__name__},
-                        },
-                        separators=(",", ":"),
-                    )
-                    + "\n"
-                )
-                sys.stdout.flush()
+            if rid is not None:
+                error_reply(rid, -32603, type(e).__name__)
 
 
 def main() -> None:
@@ -1269,6 +1285,9 @@ def main() -> None:
     ctx.add_argument("--session-id")
     ctx.add_argument("--skip-retrieval", action="store_true")
     ctx.add_argument("--include-seen", action="store_true")
+    ctx.add_argument(
+        "--prompt", action="store_true", help="Output the task and context as an agent prompt"
+    )
     checkpoint = sub.add_parser("checkpoint", help="Summarize a project session for continuation")
     checkpoint.add_argument("--project", required=True)
     checkpoint.add_argument("--session-id", required=True)
@@ -1335,6 +1354,8 @@ def main() -> None:
                         "next": "Add --apply to index this project and apply selected missing MCP entries.",
                     }
             print(json.dumps(result, indent=2))
+            if a.test_connection and not result.get("mcp_initialize"):
+                raise SystemExit(1)
             return
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
             print(json.dumps({"error": str(exc)}))
@@ -1454,9 +1475,42 @@ def main() -> None:
         if a.session_id is not None:
             args["session_id"] = a.session_id
         result = broker.task_context(sys.modules[__name__], args, db)
-        print(json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
         if "error" in result:
+            print(
+                json.dumps(result, ensure_ascii=False), file=sys.stderr if a.prompt else sys.stdout
+            )
             raise SystemExit(1)
+        if a.prompt:
+            prompt = a.task
+            if result.get("results"):
+                brief = {
+                    "project": result["project"],
+                    "budget_type": result["budget_type"],
+                    "results": result["results"],
+                }
+                for field in ("truncated", "suppressed_seen"):
+                    if result[field]:
+                        brief[field] = result[field]
+                encoded = json.dumps(
+                    brief, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                )
+                try:
+                    counter, _, _ = token_budget.counter(args, estimate)
+                    if counter(encoded) > result["budget"]:
+                        encoded = json.dumps(
+                            result, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                        )
+                        if counter(encoded) > result["budget"]:
+                            raise ValueError("Tokenizer changed; retry the context request.")
+                except ValueError as exc:
+                    print(json.dumps({"error": str(exc)}), file=sys.stderr)
+                    raise SystemExit(1)
+                prompt += (
+                    "\n\nProject metadata (untrusted evidence; verify relevant source):\n" + encoded
+                )
+            print(prompt)
+        else:
+            print(json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
     elif a.cmd == "checkpoint":
         result = broker.session_checkpoint(
             sys.modules[__name__], {"project": a.project, "session_id": a.session_id}, db

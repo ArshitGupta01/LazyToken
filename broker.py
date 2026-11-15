@@ -151,7 +151,6 @@ def task_context(kn, args, conn):
         "compact sorted JSON payload; excludes MCP envelope and provider chat framing"
     )
     if skip:
-        used(response)
         if used(response) > budget:
             return {"error": "Budget is too small for response metadata."}
         return finish(response)
@@ -160,17 +159,30 @@ def task_context(kn, args, conn):
         return ranked
     results = ranked["results"]
     # Graph-only associations are not sufficient to assert relevance.
-    if not any(item.get("via") != "graph" and item.get("score", 0) >= 2 for item in results):
+    if not any(
+        item.get("via") != "graph"
+        and (
+            item.get("score", 0) >= 2
+            or (
+                item.get("type") == "asset"
+                and item.get("freshness") in ("stale", "unverified")
+                and item.get("match_score", 0) >= 2
+            )
+        )
+        for item in results
+    ):
         response["decision"] = "abstain"
         response["reason"] = "No confident metadata match; inspect the project or refine the task."
-        used(response)
         return (
             finish(response)
             if used(response) <= budget
             else {"error": "Budget is too small for response metadata."}
         )
     shown = []
+    covered_paths = set()
     for raw in results:
+        if raw["type"] == "file" and raw.get("path") in covered_paths:
+            continue
         crumb = {
             k: raw[k]
             for k in (
@@ -181,12 +193,22 @@ def task_context(kn, args, conn):
                 "id",
                 "kind",
                 "freshness",
+                "verification_state",
                 "confidence",
                 "via",
             )
             if k in raw
         }
-        if expand and raw["type"] == "asset":
+        if raw["type"] == "asset":
+            paths = conn.execute(
+                "SELECT e.path FROM memory_evidence e JOIN memory_proposals m ON m.id=e.proposal_id "
+                "WHERE m.asset_id=? AND m.project_id=? AND m.status='approved' ORDER BY e.path LIMIT 3",
+                (raw["id"], project),
+            ).fetchall()
+            if paths:
+                crumb["evidence_paths"] = [row["path"] for row in paths]
+        expanded = expand and raw["type"] == "asset"
+        if expanded:
             crumb.update(
                 {
                     key: raw[key]
@@ -195,7 +217,22 @@ def task_context(kn, args, conn):
                 }
             )
         crumb["why"] = raw.get("why", "Metadata match.")
-        key = _key(crumb) + (":expanded" if expand and raw["type"] == "asset" else "")
+        if raw.get("freshness") == "stale":
+            crumb["why"] += " Stale evidence; revalidate before reuse."
+        elif raw.get("freshness") == "unverified":
+            crumb["why"] += " Evidence unavailable or unverified; verify before reuse."
+        elif raw.get("freshness") == "current":
+            crumb["why"] += " Current as indexed; verify source."
+        if expanded:
+            response["results"].append(crumb)
+            too_large = used(response) > budget
+            response["results"].pop()
+            if too_large:
+                for field in ("summary", "source", "confidence_reasons"):
+                    crumb.pop(field, None)
+                response["truncated"] = True
+                expanded = False
+        key = _key(crumb) + (":expanded" if expanded else "")
         fingerprint_data = {"crumb": crumb}
         if raw.get("path"):
             indexed = conn.execute(
@@ -206,22 +243,51 @@ def task_context(kn, args, conn):
             fingerprint_data.update({k: raw.get(k) for k in ("summary", "tags", "source")})
         fingerprint = hashlib.sha256(_encoded(fingerprint_data).encode("utf-8")).hexdigest()
         if session and not repeat:
-            seen = conn.execute(
-                "SELECT fingerprint FROM context_session_items WHERE project_id=? AND session_id=? AND item_key=?",
-                (project, session, key),
-            ).fetchone()
-            if seen and seen["fingerprint"] == fingerprint:
+            expanded_key = key + ":expanded" if raw["type"] == "asset" and not expanded else key
+            seen = {
+                row["item_key"]: row["fingerprint"]
+                for row in conn.execute(
+                    "SELECT item_key,fingerprint FROM context_session_items "
+                    "WHERE project_id=? AND session_id=? AND item_key IN (?,?)",
+                    (project, session, key, expanded_key),
+                )
+            }
+            if seen.get(key) == fingerprint:
                 response["suppressed_seen"] += 1
+                if raw["type"] in ("symbol", "import") and raw.get("path"):
+                    covered_paths.add(raw["path"])
                 continue
+            if raw["type"] == "asset" and not expanded:
+                full = dict(crumb)
+                full.update(
+                    {
+                        field: raw[field]
+                        for field in (
+                            "summary",
+                            "source",
+                            "verification_state",
+                            "confidence_reasons",
+                        )
+                        if field in raw
+                    }
+                )
+                expanded_data = {**fingerprint_data, "crumb": full}
+                expanded_fingerprint = hashlib.sha256(
+                    _encoded(expanded_data).encode("utf-8")
+                ).hexdigest()
+                if seen.get(expanded_key) == expanded_fingerprint:
+                    response["suppressed_seen"] += 1
+                    continue
         response["results"].append(crumb)
         if used(response) > budget:
             response["results"].pop()
             response["truncated"] = True
-            break
+            continue
         shown.append((project, session, key, fingerprint, int(time.time())))
+        if raw["type"] in ("symbol", "import") and raw.get("path"):
+            covered_paths.add(raw["path"])
     if not response["results"] and response["suppressed_seen"]:
         response["reason"] = "All matching breadcrumbs were already supplied in this session."
-    used(response)
     if used(response) > budget:
         return {"error": "Budget is too small for response metadata."}
     return finish(response, shown)
@@ -245,14 +311,19 @@ def session_checkpoint(kn, args, conn):
     if not project or not isinstance(session, str) or not session.strip() or len(session) > 120:
         return {"error": "An indexed project and session_id are required."}
     rows = conn.execute(
-        "SELECT item_key,updated_at FROM context_session_items WHERE project_id=? AND session_id=? ORDER BY item_key",
-        (project, session),
+        "SELECT total.count, recent.item_key FROM "
+        "(SELECT count(*) AS count FROM context_session_items WHERE project_id=? AND session_id=?) AS total "
+        "LEFT JOIN (SELECT item_key,updated_at FROM context_session_items WHERE project_id=? AND session_id=? "
+        "ORDER BY updated_at DESC, item_key LIMIT 30) AS recent ON 1=1 "
+        "ORDER BY recent.updated_at DESC, recent.item_key",
+        (project, session, project, session),
     ).fetchall()
+    count = rows[0]["count"]
     return {
         "project": project,
         "session_id": session,
-        "supplied_items": len(rows),
-        "recent_keys": [r["item_key"] for r in rows[:30]],
-        "truncated": len(rows) > 30,
+        "supplied_items": count,
+        "recent_keys": [r["item_key"] for r in rows if r["item_key"] is not None],
+        "truncated": count > 30,
         "note": "Reuse this project and session_id after compaction. Stored fingerprints suppress unchanged breadcrumbs; source contents are not stored.",
     }

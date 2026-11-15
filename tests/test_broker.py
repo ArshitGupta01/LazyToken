@@ -1,4 +1,7 @@
 import json
+import io
+import os
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -57,6 +60,169 @@ class ContextBrokerTests(unittest.TestCase):
         )
         self.assertTrue(self.call(session_id="session-1", budget=500)["results"])
 
+    def test_prompt_output_includes_context_only_when_useful_and_errors_are_not_prompt_text(self):
+        data = Path(self.temp.name) / "cli-data"
+        data.mkdir()
+        db = kn.connect(data / "network.sqlite3")
+        kn.sync(self.root, db)
+        db.close()
+        env = {**os.environ, "KN_HOME": str(data), "LAZYTOKEN_DISABLE_AUTOWATCH": "1"}
+        base = [
+            sys.executable,
+            str(Path(kn.__file__)),
+            "context",
+            "--project",
+            self.project,
+            "--prompt",
+        ]
+
+        def run(task, *extra):
+            return subprocess.run(
+                base + ["--task", task, *extra], capture_output=True, text=True, env=env
+            )
+
+        found = run("Find AuthService")
+        self.assertEqual(found.returncode, 0)
+        self.assertIn("untrusted evidence", found.stdout)
+        self.assertIn("AuthService.py", found.stdout)
+        self.assertNotIn("class AuthService:", found.stdout)
+        metadata = found.stdout.split("verify relevant source):\n", 1)[1]
+        brief = json.loads(metadata)
+        self.assertEqual(brief["project"], self.project)
+        self.assertNotIn("budget_scope", brief)
+        full = subprocess.run(
+            base[:-1] + ["--task", "Find AuthService"], capture_output=True, text=True, env=env
+        )
+        self.assertEqual(full.returncode, 0)
+        self.assertIn("budget_scope", json.loads(full.stdout))
+        self.assertLess(len(metadata), len(full.stdout))
+        missing = run("zebra quantum nonexistent")
+        self.assertEqual(missing.returncode, 0)
+        self.assertEqual(missing.stdout.strip(), "zebra quantum nonexistent")
+        invalid = run("Find AuthService", "--budget", "5")
+        self.assertNotEqual(invalid.returncode, 0)
+        self.assertEqual(invalid.stdout, "")
+        self.assertIn("error", invalid.stderr)
+
+    def test_prompt_falls_back_when_compact_json_has_more_tokenizer_tokens(self):
+        def counter(text):
+            return 1 if '"budget":' in text else 1000
+
+        output = io.StringIO()
+        arguments = [
+            "kn.py",
+            "context",
+            "--project",
+            self.project,
+            "--task",
+            "auth",
+            "--budget",
+            "300",
+            "--prompt",
+        ]
+        with (
+            patch("sys.argv", arguments),
+            patch("sys.stdout", output),
+            patch("kn.connect", return_value=self.db),
+            patch("token_budget.counter", return_value=(counter, "test", None)),
+        ):
+            kn.main()
+        metadata = output.getvalue().split("verify relevant source):\n", 1)[1]
+        self.assertEqual(json.loads(metadata)["budget"], 300)
+        self.assertLessEqual(counter(metadata), 300)
+
+    def test_prompt_refuses_to_print_if_tokenizer_changes_between_counts(self):
+        output, errors = io.StringIO(), io.StringIO()
+        arguments = [
+            "kn.py",
+            "context",
+            "--project",
+            self.project,
+            "--task",
+            "auth",
+            "--budget",
+            "300",
+            "--prompt",
+        ]
+        counters = [
+            (lambda text: 1, "test", None),
+            (lambda text: 1000, "test", None),
+        ]
+        with (
+            patch("sys.argv", arguments),
+            patch("sys.stdout", output),
+            patch("sys.stderr", errors),
+            patch("kn.connect", return_value=self.db),
+            patch("token_budget.counter", side_effect=counters),
+            self.assertRaises(SystemExit),
+        ):
+            kn.main()
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("Tokenizer changed", errors.getvalue())
+
+    def test_oversized_result_does_not_hide_smaller_matches(self):
+        rows = [
+            {"type": "file", "path": "x" * 2000, "score": 10, "why": "match"},
+            {"type": "file", "path": "auth.py", "score": 3, "why": "match"},
+        ]
+        with patch("features.ranked_search", return_value={"results": rows}):
+            result = self.call(budget=250)
+        self.assertTrue(result["truncated"])
+        self.assertEqual([item["path"] for item in result["results"]], ["auth.py"])
+        self.assertLessEqual(result["used_tokens"], 250)
+
+    def test_file_breadcrumb_is_omitted_when_a_symbol_already_supplies_the_path(self):
+        rows = [
+            {
+                "type": "symbol",
+                "name": "AuthService",
+                "path": "AuthService.py",
+                "line": 1,
+                "score": 6,
+                "why": "match",
+            },
+            {
+                "type": "file",
+                "name": "AuthService.py",
+                "path": "AuthService.py",
+                "score": 5,
+                "why": "match",
+            },
+            {"type": "file", "name": "other.py", "path": "other.py", "score": 4, "why": "match"},
+        ]
+        with patch("features.ranked_search", return_value={"results": rows}):
+            first = self.call(budget=400, session_id="dedup-path")
+            second = self.call(budget=400, session_id="dedup-path")
+        self.assertEqual(
+            [(r["type"], r["path"]) for r in first["results"]],
+            [("symbol", "AuthService.py"), ("file", "other.py")],
+        )
+        self.assertEqual(second["results"], [])
+
+    def test_file_breadcrumb_remains_when_symbol_cannot_fit(self):
+        rows = [
+            {
+                "type": "symbol",
+                "name": "x" * 2000,
+                "path": "AuthService.py",
+                "score": 6,
+                "why": "match",
+            },
+            {
+                "type": "file",
+                "name": "AuthService.py",
+                "path": "AuthService.py",
+                "score": 5,
+                "why": "match",
+            },
+        ]
+        with patch("features.ranked_search", return_value={"results": rows}):
+            result = self.call(budget=250)
+        self.assertTrue(result["truncated"])
+        self.assertEqual(
+            [(r["type"], r["path"]) for r in result["results"]], [("file", "AuthService.py")]
+        )
+
     def test_changed_file_is_resent_and_project_sessions_are_isolated(self):
         self.call(session_id="one", budget=500)
         (self.root / "AuthService.py").write_text(
@@ -75,6 +241,28 @@ class ContextBrokerTests(unittest.TestCase):
         )
         self.assertTrue(result["results"])
         self.assertTrue(all("project" not in x for x in result["results"]))
+
+    def test_checkpoint_returns_most_recent_keys_with_scoped_total(self):
+        rows = [(self.project, "long", f"entry{i:02}", "hash", i) for i in range(35)]
+        rows.append((self.project, "another", "not-in-session", "hash", 1000))
+        rows.append(("other-project", "long", "not-in-project", "hash", 1000))
+        rows.extend((self.project, "tie", key, "hash", 1) for key in ("z", "a"))
+        self.db.executemany("INSERT INTO context_session_items VALUES(?,?,?,?,?)", rows)
+        self.db.commit()
+        result = kn.feature_call(
+            "checkpoint", {"project": self.project, "session_id": "long"}, self.db
+        )
+        self.assertEqual(result["supplied_items"], 35)
+        self.assertEqual(result["recent_keys"], [f"entry{i:02}" for i in range(34, 4, -1)])
+        self.assertTrue(result["truncated"])
+        tie = kn.feature_call("checkpoint", {"project": self.project, "session_id": "tie"}, self.db)
+        self.assertEqual(tie["recent_keys"], ["a", "z"])
+        empty = kn.feature_call(
+            "checkpoint", {"project": self.project, "session_id": "empty"}, self.db
+        )
+        self.assertEqual(
+            (empty["supplied_items"], empty["recent_keys"], empty["truncated"]), (0, [], False)
+        )
 
     def test_skip_abstain_and_invalid_budget(self):
         self.assertEqual(self.call(skip_retrieval=True)["decision"], "skip")

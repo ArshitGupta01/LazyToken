@@ -626,12 +626,23 @@ def ranked_search(kn, args, conn):
     if not project:
         return {"error": "An indexed project is required."}
     query = str(args.get("query", ""))[:1000]
-    terms = [t for t in kn.split_words(query) if len(t) > 1][:12]
+    words = [t for t in kn.split_words(query) if len(t) > 1]
+    # Keep the limited search budget for meaningful terms in natural-language tasks.
+    stop_words = set(
+        "the and for with that this from while into where which what when how does its "
+        "is are was were to of in on at an or as by".split()
+    )
+    terms = list(dict.fromkeys(t for t in words if t not in stop_words))[:12]
+    if not terms:
+        terms = list(dict.fromkeys(words))[:12]
     aliases = {
         "authentication": ["auth", "login", "signin", "session"],
         "auth": ["authentication", "login", "session"],
         "user": ["account", "profile"],
         "login": ["auth", "signin", "session"],
+        "approval": ["approve", "review"],
+        "approved": ["approve", "review"],
+        "proposal": ["propose"],
     }
     terms = list(dict.fromkeys(terms + [alias for t in terms for alias in aliases.get(t, [])]))
     if not terms:
@@ -708,6 +719,19 @@ def ranked_search(kn, args, conn):
                     "why": "Task terms or a prefix matched this import.",
                 }
             )
+
+    def add_asset(entry):
+        memory = conn.execute(
+            "SELECT id FROM memory_proposals WHERE asset_id=?", (entry["id"],)
+        ).fetchone()
+        if memory:
+            entry["match_score"] = entry["score"]
+            entry.update(health(conn, memory["id"]))
+            entry["score"] *= 0.5 + 0.5 * entry["confidence"]
+            if entry["freshness"] in ("stale", "unverified"):
+                entry["score"] *= 0.3
+        rows.append(entry)
+
     for r in conn.execute(
         "SELECT id,kind,name,summary,tags,source FROM assets WHERE scope='global' OR (scope='project' AND project_id=?)",
         (project,),
@@ -724,15 +748,7 @@ def ranked_search(kn, args, conn):
                 "score": n,
                 "why": "Task terms matched this asset name, summary, or tags.",
             }
-            mem = conn.execute(
-                "SELECT id FROM memory_proposals WHERE asset_id=?", (r["id"],)
-            ).fetchone()
-            if mem:
-                entry.update(health(conn, mem["id"]))
-                entry["score"] *= 0.5 + 0.5 * entry["confidence"]
-                if entry["freshness"] == "stale":
-                    entry["score"] *= 0.3
-            rows.append(entry)
+            add_asset(entry)
     # Include scoped neighbors of directly matched assets, without crossing project boundaries.
     matched = {r["id"] for r in rows if r["type"] == "asset"}
     graph_links = {}
@@ -766,15 +782,15 @@ def ranked_search(kn, args, conn):
                 "via": "graph",
                 "why": f"Connected to {origin['name']} by {e['relation']} (weight {float(e['weight']):.2f}; {'global' if e['scope']=='*' else 'project'}).",
             }
-            memory = conn.execute(
-                "SELECT id FROM memory_proposals WHERE asset_id=?", (neighbor,)
-            ).fetchone()
-            if memory:
-                entry.update(health(conn, memory["id"]))
-                entry["score"] *= 0.5 + 0.5 * entry["confidence"]
-                if entry["freshness"] == "stale":
-                    entry["score"] *= 0.3
-            rows.append(entry)
+            add_asset(entry)
+    wants_tests = bool({"test", "tests", "testing"} & set(terms))
+    for row in rows:
+        path = row.get("path", "").replace("\\", "/").casefold()
+        parts = path.split("/")
+        if "vendor" in parts and "vendor" not in terms:
+            row["score"] *= 0.25
+        elif ("tests" in parts or parts[-1].startswith("test_")) and not wants_tests:
+            row["score"] *= 0.65
     rows.sort(key=lambda r: (-r["score"], str(r.get("name", "")).casefold(), r.get("path", "")))
     return {"query": query, "project": project, "results": rows[:limit]}
 

@@ -16,9 +16,10 @@ Commands below use the installed `lazytoken` launcher. For source development, u
 | `context ... --expand-assets`                                            | Include memory summaries/provenance within the budget.                                                       |
 | `context ... --model NAME --strict-budget`                               | Require a matching configured offline tokenizer; refuse estimation fallback.                                 |
 | `checkpoint --project PATH --session-id ID`                              | Return a compact reference to the context already supplied.                                                  |
-| `mcp [--compact-tools]`                                                  | Run the local stdio MCP server.                                                                              |
+| `mcp [--compact-tools]`                                                  | Run the local stdio MCP server; compact mode advertises fewer tools.                                        |
+| `context --project PATH --task TEXT --prompt`                             | Output the task and useful bounded metadata as a prompt; does not run an agent.                              |
 | `setup --project PATH [--client codex] [--client antigravity] [--apply]` | Preview or apply indexing and optional client registration.                                                  |
-| `setup --test-connection`                                                | Verify a local server initialization handshake.                                                              |
+| `setup --test-connection`                                                | Verify local MCP initialization and tool discovery.                                                           |
 | `setup --rollback RECEIPT`                                               | Restore unchanged managed configuration from its verified backup. Refuse newer edits.                        |
 | `doctor`                                                                 | Check runtime, package integrity, storage, SQLite, clients, watcher and dashboard port.                      |
 | `dashboard [--port N] [--no-browser]`                                    | Run the loopback-only 2D/3D graph; 3D loads on demand.                                                       |

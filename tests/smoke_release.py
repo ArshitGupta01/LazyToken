@@ -62,6 +62,15 @@ def smoke(package):
             "--strict-budget",
         )
         assert context["budget_type"] == "tokenizer:fixture-words", context
+        prompt = subprocess.run(
+            [str(executable), "context", "--project", str(project), "--task", "auth", "--prompt"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert prompt.returncode == 0 and "AuthService.py" in prompt.stdout, prompt.stderr
+        assert "untrusted evidence" in prompt.stdout
         result = run(
             "lazytoken",
             "complete_task",
@@ -110,15 +119,27 @@ def smoke(package):
                 "arguments": {"project": str(project), "task": "auth", "budget": 600},
             },
         }
+        initialize = {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {"protocolVersion": "2024-11-05"},
+        }
         rpc = subprocess.run(
-            [str(executable), "mcp"],
+            [str(executable), "mcp", "--compact-tools"],
             env=env,
-            input=json.dumps(request) + "\n",
+            input=json.dumps(initialize)
+            + "\n"
+            + json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+            + "\n"
+            + json.dumps(request)
+            + "\n",
             text=True,
             capture_output=True,
             timeout=30,
         )
-        reply = json.loads(rpc.stdout)
+        startup, reply = [json.loads(line) for line in rpc.stdout.splitlines()]
+        assert "get_task_context" in startup["result"]["instructions"], startup
         assert "result" in reply and not reply["result"]["isError"], reply
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))

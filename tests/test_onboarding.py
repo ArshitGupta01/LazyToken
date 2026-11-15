@@ -73,7 +73,18 @@ class SetupTests(unittest.TestCase):
         self.assertIn("newer edit", config.read_text())
 
     def test_real_local_handshake_uses_only_isolated_store(self):
-        self.assertTrue(onboarding.connection_test(kn)["mcp_initialize"])
+        result = onboarding.connection_test(kn)
+        self.assertTrue(result["mcp_initialize"])
+        self.assertGreater(result["tools_available"], 0)
+
+    def test_connection_test_reports_missing_launcher(self):
+        with patch(
+            "onboarding.entry",
+            return_value={"command": "missing-lazytoken-executable", "args": [], "env": {}},
+        ):
+            result = onboarding.connection_test(kn)
+        self.assertFalse(result["mcp_initialize"])
+        self.assertIn("error", result)
 
     def test_edit_during_indexing_is_not_overwritten(self):
         path = self.profile / ".codex/config.toml"

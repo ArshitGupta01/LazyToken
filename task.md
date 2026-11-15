@@ -27,8 +27,17 @@ LazyToken is a terminal-first, local AI coding memory/context CLI. The dashboard
 
 ## Token-efficiency gates
 
+### Current context-saving work
+
+- [x] Keep retrieval compact and optional, with scoped evidence paths, freshness warnings and session deduplication.
+- [x] Document the mixed pilot and prepare future comparison fixtures (`benchmark/FUTURE_TASKS.md`).
+- [x] Measure an isolated matched multi-file task with an approved lesson; neither run queried the graph, so a representative graph-use evaluation remains open.
+- [x] Offer an opt-in bounded initial prompt with `context --prompt`; two small matched trials were mixed and do not establish reliable savings.
+- [x] Run two isolated, order-reversed matched pairs on a larger source-tree fixture with a synthetic approved lesson; broader tasks and independent review remain open (`docs/BENCHMARK_PILOT.md`).
+- [ ] Improve retrieval only when it can replace a real search or repeated file read.
+
 - [ ] Human-reviewed representative relevance dataset and realistic profiling.
-- [ ] Separately authorized matched agent tasks using provider-reported usage and correctness gates.
+- [ ] Representative matched agent tasks using provider-reported usage and correctness gates. A small authorized fixture pilot is complete (`docs/BENCHMARK_PILOT.md`); larger and repeated trials remain pending.
 - [ ] Demonstrate lower total tokens per successful task after tool/retry/indexing overhead.
 - [ ] Document/test supported assistant lifecycle hooks before offering automatic integration.
 
@@ -37,3 +46,4 @@ Do not run real agent tasks, push, publish a release, or claim token savings wit
 - [x] Automatic selected-repository sync with debounce, bounded changed-file reads and evidence freshness.
 - [x] Manifest/import-derived framework graph and explicit all-project visualization without widening scoped retrieval.
 - [x] Fix six reproduced review defects: setup edit/receipt safety, empty search, verified rollback, strongest scoped graph evidence, and client configuration shape validation. See `docs/REVIEW_FIXES.md` for checks and limits.
+- [x] Connect reuse-first guidance to compact/full MCP initialization and expose lesson verification/freshness in initial context. Preserve bounded retrieval, session deduplication, explicit source inspection and human review.
