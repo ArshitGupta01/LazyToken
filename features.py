@@ -642,12 +642,20 @@ def ranked_search(kn, args, conn):
         terms = list(dict.fromkeys(words))[:12]
     aliases = {
         "authentication": ["auth", "login", "signin", "session"],
-        "auth": ["authentication", "login", "session"],
-        "user": ["account", "profile"],
+        "auth": ["authentication", "login", "session", "token", "validate"],
+        "user": ["account", "profile", "customer", "member"],
+        "customer": ["user", "account", "client"],
+        "account": ["user", "customer", "profile", "session"],
+        "expired": ["expire", "expiration", "timeout", "ttl", "validate", "active"],
+        "access": ["auth", "permission", "allow", "authorize", "gate", "guard"],
         "login": ["auth", "signin", "session"],
         "approval": ["approve", "review"],
         "approved": ["approve", "review"],
         "proposal": ["propose"],
+        "unarchive": ["restore", "active", "entry", "archive"],
+        "archive": ["unarchive", "status", "restore"],
+        "filter": ["query", "search", "match", "tag"],
+        "tag": ["filter", "category", "label"],
     }
     terms = list(dict.fromkeys(terms + [alias for t in terms for alias in aliases.get(t, [])]))
     if not terms:
@@ -887,6 +895,140 @@ def dependencies(kn, args, conn):
     return {"dependencies": items, "note": "Name-based candidates are not compiler-resolved."}
 
 
+def impact_analysis(kn, args, conn):
+    """Analyze blast radius, call hierarchy, and dependency impact for a symbol or file (GitNexus + Ponytail style)."""
+    project = project_id(kn, conn, args.get("project"))
+    if not project:
+        return {"error": "An indexed project is required."}
+    target = args.get("target") or args.get("symbol") or args.get("path")
+    if not isinstance(target, str) or not target.strip():
+        return {"error": "target (symbol name or file path) is required."}
+    target = target.strip()
+
+    is_file = (
+        "/" in target
+        or "\\" in target
+        or target.endswith((".py", ".js", ".ts", ".jsx", ".tsx", ".json", ".md"))
+    )
+
+    inbound_callers = []
+    outbound_callees = []
+    affected_files = set()
+
+    if is_file:
+        norm_path = target.replace("\\", "/")
+        file_symbols = [
+            r["name"]
+            for r in conn.execute(
+                "SELECT name FROM symbols WHERE project_id=? AND path=?", (project, norm_path)
+            ).fetchall()
+        ]
+        for sym in file_symbols:
+            short_sym = sym.split(".")[-1]
+            rows = conn.execute(
+                "SELECT caller_path, caller_symbol, line FROM symbol_calls WHERE project_id=? AND (callee_name=? OR callee_name=?)",
+                (project, sym, short_sym),
+            ).fetchall()
+            for r in rows:
+                if r["caller_path"] != norm_path:
+                    inbound_callers.append(
+                        {
+                            "caller_file": r["caller_path"],
+                            "caller_symbol": r["caller_symbol"],
+                            "callee": sym,
+                            "line": r["line"],
+                        }
+                    )
+                    affected_files.add(r["caller_path"])
+        out_rows = conn.execute(
+            "SELECT caller_symbol, callee_name, line FROM symbol_calls WHERE project_id=? AND caller_path=?",
+            (project, norm_path),
+        ).fetchall()
+        for r in out_rows:
+            outbound_callees.append(
+                {
+                    "caller_symbol": r["caller_symbol"],
+                    "callee": r["callee_name"],
+                    "line": r["line"],
+                }
+            )
+    else:
+        short_sym = target.split(".")[-1]
+        in_rows = conn.execute(
+            "SELECT caller_path, caller_symbol, line FROM symbol_calls WHERE project_id=? AND (callee_name=? OR callee_name=?)",
+            (project, target, short_sym),
+        ).fetchall()
+        for r in in_rows:
+            inbound_callers.append(
+                {
+                    "caller_file": r["caller_path"],
+                    "caller_symbol": r["caller_symbol"],
+                    "line": r["line"],
+                }
+            )
+            affected_files.add(r["caller_path"])
+        out_rows = conn.execute(
+            "SELECT caller_path, callee_name, line FROM symbol_calls WHERE project_id=? AND (caller_symbol=? OR caller_symbol=?)",
+            (project, target, short_sym),
+        ).fetchall()
+        for r in out_rows:
+            outbound_callees.append(
+                {
+                    "caller_file": r["caller_path"],
+                    "callee": r["callee_name"],
+                    "line": r["line"],
+                }
+            )
+
+    unique_callers = []
+    seen = set()
+    for c in inbound_callers:
+        key = (c.get("caller_file"), c.get("caller_symbol"), c.get("line"))
+        if key not in seen:
+            seen.add(key)
+            unique_callers.append(c)
+
+    call_count = len(unique_callers)
+    if call_count >= 5:
+        blast_radius = "high"
+        advice = (
+            f"HIGH BLAST RADIUS ({call_count} inbound call sites across {len(affected_files)} files). "
+            "Ponytail Senior Dev Rule: Do not modify existing function signature or return contract. "
+            "Make minimal surgical changes or introduce optional parameters to avoid cascading regressions."
+        )
+    elif call_count >= 2:
+        blast_radius = "medium"
+        advice = (
+            f"MEDIUM BLAST RADIUS ({call_count} inbound call sites across {len(affected_files)} files). "
+            "Ponytail Senior Dev Rule: Ensure callers are tested before changing behaviour."
+        )
+    elif call_count == 1:
+        blast_radius = "low"
+        advice = f"LOW BLAST RADIUS (1 call site). Verify caller at {unique_callers[0]['caller_file']}:{unique_callers[0]['line']}."
+    else:
+        blast_radius = "isolated"
+        advice = "ISOLATED (0 inbound call sites detected). Safe to refactor or remove if not dynamically invoked."
+
+    return {
+        "project": project,
+        "target": target,
+        "target_type": "file" if is_file else "symbol",
+        "blast_radius": blast_radius,
+        "inbound_call_count": call_count,
+        "affected_files_count": len(affected_files),
+        "affected_files": sorted(affected_files),
+        "inbound_callers": unique_callers[:25],
+        "outbound_calls": outbound_callees[:25],
+        "ponytail_guidance": advice,
+        "decision_ladder": [
+            "1. YAGNI: The best code is the code you never wrote.",
+            "2. Reuse: Check if an existing function in affected_files already solves this.",
+            "3. Minimal surgical change: Keep diffs bounded to the single target.",
+            "4. Verify: Run unit tests covering the inbound call sites.",
+        ],
+    }
+
+
 def inspect_source(kn, args, conn):
     """Explicit, bounded source inspection for an eligible indexed file."""
     project = project_id(kn, conn, args.get("project"))
@@ -895,7 +1037,18 @@ def inspect_source(kn, args, conn):
     end = args.get("end_line")
     if not project:
         return {"error": "An indexed project is required."}
-    if not isinstance(path, str) or not kn.safe_relative(path):
+    if not isinstance(path, str):
+        return {"error": "An eligible project-relative file path is required."}
+    norm_path = path.replace("\\", "/").strip().lower()
+    sensitive_patterns = (
+        r"(^|/)\.env(\.|$)",
+        r"\.(key|pem|pkcs12|pfx|p12)$",
+        r"(^|/)id_(rsa|dsa|ecdsa|ed25519)($|\.)",
+        r"(^|/)(credentials|secrets|token|master\.key)(\.json|\.ya?ml|\.txt)?$",
+    )
+    if any(re.search(pat, norm_path) for pat in sensitive_patterns):
+        return {"error": "File matches sensitive credential pattern and cannot be inspected."}
+    if not kn.safe_relative(path):
         return {"error": "An eligible project-relative file path is required."}
     if (
         any(isinstance(v, bool) or not isinstance(v, int) for v in (start, end))
@@ -932,8 +1085,21 @@ def inspect_source(kn, args, conn):
     secret_literal = re.compile(
         r"(?i)\b\w*(?:password|passwd|secret|api_?key|access_?token|refresh_?token|authorization|private_?key|credential|service_?role_?key)\w*\b.*?(?:=|:)\s*[\"\'][^\"\']+[\"\']"
     )
+    bearer_token = re.compile(r"(?i)\bbearer\s+[a-zA-Z0-9_\-\.]{20,}\b")
+    jwt_token = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
+    aws_key = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
+    github_token = re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{36,255}\b")
     for number, line in enumerate(lines[start - 1 : end], start):
-        value = "[redacted: possible credential]" if secret_literal.search(line) else line
+        if (
+            secret_literal.search(line)
+            or bearer_token.search(line)
+            or jwt_token.search(line)
+            or aws_key.search(line)
+            or github_token.search(line)
+        ):
+            value = "[redacted: possible credential]"
+        else:
+            value = line
         if size + len(value) > 12000:
             truncated = True
             break

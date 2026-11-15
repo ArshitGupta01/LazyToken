@@ -10,11 +10,11 @@ The run provides no valid comparison of LazyToken's benefit: no task succeeded a
 
 Two matched pairs used isolated copies of LazyToken's Python source and tests, with the same deliberately reintroduced session-checkpoint bug and task. The copied fixture omitted non-Python application assets. A small approved/verified **synthetic fixture lesson** identified the relevant module and database table; it simulated a reviewed memory and was not a human review of production knowledge. Only the brief arm received that lesson in its initial prompt through `context --prompt --expand-assets --budget 350`. Neither arm had an MCP server. Both agents ran the targeted broker tests; independent checks also verified ordering, the 30-key limit, ties, empty sessions and scope. All four runs passed. The starting bug was separately confirmed to fail the independent checks, and the known fix passed them.
 
-| Pair and order | Baseline total | Brief total | Difference | Baseline cached input | Brief cached input |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Baseline first | 122,884 | 121,086 | −1,798 (−1.46%) | 108,928 | 100,224 |
-| Brief first | 161,101 | 142,117 | −18,984 (−11.78%) | 124,800 | 129,024 |
-| Combined | 283,985 | 263,203 | −20,782 (−7.32%) | 233,728 | 229,248 |
+| Pair and order | Baseline total | Brief total |        Difference | Baseline cached input | Brief cached input |
+| -------------- | -------------: | ----------: | ----------------: | --------------------: | -----------------: |
+| Baseline first |        122,884 |     121,086 |   −1,798 (−1.46%) |               108,928 |            100,224 |
+| Brief first    |        161,101 |     142,117 | −18,984 (−11.78%) |               124,800 |            129,024 |
+| Combined       |        283,985 |     263,203 |  −20,782 (−7.32%) |               233,728 |            229,248 |
 
 Totals are provider-reported input plus output; cached input is already included in input. Uncached input summed to 46,196 for baseline and 31,306 with the brief. Baseline agent times were 55.032 and 58.204 seconds; brief agent times were 38.406 and 51.234 seconds, plus 0.562 and 0.578 seconds of local indexing and brief preparation. Indexing made no model calls. The harness also indexed the baseline fixture during setup, but that index was not supplied to the baseline agent. Dollar cost, unnecessary reads and retry counts were not independently measured.
 
@@ -34,12 +34,12 @@ A subsequent NB03-only experiment added startup guidance to batch small-task rea
 
 One additional matched run per condition repeated the same three cold-start notebook tasks with isolated stores and Codex gpt-6-luna at medium reasoning. All six runs passed their public and independent acceptance checks. Totals below are provider-reported input plus output tokens; indexing used no model calls.
 
-| Task | Baseline | LazyToken enabled | Difference |
-| --- | ---: | ---: | ---: |
-| NB06 | 75,302 | 63,445 | -11,857 |
-| NB03 | 64,379 | 90,101 | +25,722 |
-| NB04 | 79,462 | 63,866 | -15,596 |
-| Total | 219,143 | 217,412 | -1,731 (0.79%) |
+| Task  | Baseline | LazyToken enabled |     Difference |
+| ----- | -------: | ----------------: | -------------: |
+| NB06  |   75,302 |            63,445 |        -11,857 |
+| NB03  |   64,379 |            90,101 |        +25,722 |
+| NB04  |   79,462 |            63,866 |        -15,596 |
+| Total |  219,143 |           217,412 | -1,731 (0.79%) |
 
 None of the LazyToken runs called an MCP tool. These small, single-observation comparisons do not establish graph savings or a causal effect; model choices and order may affect results. Retries and unnecessary reads were not measured. The runner initially recorded retries as zero without measuring them; the saved records were corrected to unknown. Raw isolated traces remain in the local Codex workspace under `work/token-pilot-final-20261115`. The separate multi-file and reviewed-memory fixture still needs a matched agent trial.
 
@@ -63,10 +63,10 @@ The exact Ponytail primary skill was installed in an isolated user-skills folder
 
 | Case                      | Baseline total | LazyToken Cold-Start | LazyToken (v0.4.4+ With Memory) |  Net Change |
 | ------------------------- | -------------: | -------------------: | ------------------------------: | ----------: |
-| NB06: title validation    |         75,747 |               65,300 |                          65,300 |    -13.79%  |
-| NB03: tag filtering       |         62,839 |    107,416 *(retry)* |               **53,420** *(warmed)* | **-14.99%** |
-| NB04: unarchive operation |         76,167 |               63,505 |                          63,505 |    -16.62%  |
-| Combined Total            |        214,753 |   236,221 *(+10.0%)* |                     **182,225** | **-15.15%** |
+| NB06: title validation    |         75,747 |               65,300 |                          65,300 |     -13.79% |
+| NB03: tag filtering       |         62,839 |    107,416 _(retry)_ |           **53,420** _(warmed)_ | **-14.99%** |
+| NB04: unarchive operation |         76,167 |               63,505 |                          63,505 |     -16.62% |
+| Combined Total            |        214,753 |   236,221 _(+10.0%)_ |                     **182,225** | **-15.15%** |
 
 All six runs passed acceptance checks. LazyToken was not queried through MCP in any of them. Its three-case aggregate used **10% more total tokens**, so the two individual reductions must not become a blanket savings claim. Ponytail has no three-case aggregate because it was tested only on NB06.
 

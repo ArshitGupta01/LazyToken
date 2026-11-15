@@ -399,10 +399,13 @@ def task_context(kn, args, conn):
     if not isinstance(mode, str) or mode not in MODES:
         return {"error": "mode must be compact, balanced, or deep."}
     skip = args.get("skip_retrieval", False)
-    repeat = args.get("include_seen", False)
+    rehydrate = args.get("rehydrate", False)
+    repeat = args.get("include_seen", False) or rehydrate
     complete = args.get("context_is_complete", False)
-    if not all(isinstance(x, bool) for x in (skip, repeat, complete)):
-        return {"error": "skip_retrieval, include_seen and context_is_complete must be booleans."}
+    if not all(isinstance(x, bool) for x in (skip, repeat, complete, rehydrate)):
+        return {
+            "error": "skip_retrieval, include_seen, rehydrate and context_is_complete must be booleans."
+        }
     explicit_text_task = (
         task.lstrip()
         .casefold()
@@ -485,6 +488,8 @@ def task_context(kn, args, conn):
         "truncated": False,
         "suppressed_seen": 0,
     }
+    if rehydrate:
+        response["rehydrated"] = True
     if fallback:
         response["tokenizer_fallback"] = fallback
     response["budget_scope"] = (
@@ -725,11 +730,16 @@ def task_context(kn, args, conn):
                         if used(response) > budget:
                             response["recap"] = [item["key"] for item in suppressed_items][:1]
                             if used(response) > budget:
-                                response.pop("recap", None)
+                                response["recap"] = [
+                                    item.get("name") or item["key"].split(":")[-2]
+                                    for item in suppressed_items
+                                ][:1]
                                 if used(response) > budget:
-                                    return {
-                                        "error": "Budget is too small for session recap metadata."
-                                    }
+                                    response.pop("recap", None)
+                                    if used(response) > budget:
+                                        return {
+                                            "error": "Budget is too small for session recap metadata."
+                                        }
         if "recap" not in response:
             return {"error": "Budget is too small for session recap metadata."}
         if used(response) > budget:

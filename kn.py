@@ -168,6 +168,9 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
       CREATE TABLE IF NOT EXISTS asset_link_evidence(source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, relation TEXT NOT NULL, scope TEXT NOT NULL, weight REAL NOT NULL, evidence TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(source_id,target_id,relation,scope));
       CREATE TABLE IF NOT EXISTS retrievals(at INTEGER NOT NULL, project_id TEXT NOT NULL DEFAULT '', query_chars INTEGER NOT NULL, result_chars INTEGER NOT NULL, estimated_tokens INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS task_measurements(id INTEGER PRIMARY KEY, task TEXT NOT NULL, baseline_tokens INTEGER NOT NULL, network_tokens INTEGER NOT NULL, indexing_tokens INTEGER NOT NULL, measured_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,line));
+      CREATE TABLE IF NOT EXISTS index_skipped_files(project_id TEXT NOT NULL, path TEXT NOT NULL, reason TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY(project_id,path));
+      CREATE INDEX IF NOT EXISTS symbol_calls_callee_idx ON symbol_calls(project_id, callee_name);
       CREATE INDEX IF NOT EXISTS symbol_name_idx ON symbols(name);
       CREATE INDEX IF NOT EXISTS asset_name_idx ON assets(name);
       CREATE INDEX IF NOT EXISTS asset_link_source_idx ON asset_links(source_id);
@@ -394,10 +397,11 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
     index_state = conn.execute(
         "SELECT extractor_version FROM index_state WHERE project_id=?", (project,)
     ).fetchone()
-    reextract = not index_state or index_state[0] < 3
+    reextract = not index_state or index_state[0] < 4
     present: set[str] = set()
     added = changed = removed = 0
     errors = []
+    skipped = []
     changed_paths: list[str] = []
     removed_paths: list[str] = []
     for rel in list_files(root):
@@ -413,7 +417,16 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                 raw = source.read(1_000_001)
             if len(raw) > 1_000_000 or b"\x00" in raw:
                 present.discard(rel)
+                reason = "oversized" if len(raw) > 1_000_000 else "binary"
+                conn.execute(
+                    "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)",
+                    (project, rel, reason, len(raw)),
+                )
+                skipped.append({"path": rel, "reason": reason, "bytes": len(raw)})
                 continue
+            conn.execute(
+                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", (project, rel)
+            )
             digest = hashlib.sha256(raw).hexdigest()
             present.add(rel)
             old = conn.execute(
@@ -432,34 +445,72 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
             changed_paths.append(rel)
             conn.execute("DELETE FROM symbols WHERE project_id=? AND path=?", (project, rel))
             conn.execute("DELETE FROM imports WHERE project_id=? AND source=?", (project, rel))
-            for n, line in enumerate(body.splitlines(), 1):
-                m = SYMBOLS.match(line)
-                if m:
-                    conn.execute(
+            conn.execute(
+                "DELETE FROM symbol_calls WHERE project_id=? AND caller_path=?", (project, rel)
+            )
+            if path.suffix.lower() == ".py":
+                from source_index import python_calls, python_imports, python_symbols
+
+                py_syms = python_symbols(body)
+                if py_syms:
+                    conn.executemany(
                         "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
-                        (project, rel, m.group(1), n),
+                        [(project, rel, name, lineno) for name, lineno in py_syms],
                     )
-                if path.suffix.lower() not in {".js", ".jsx", ".ts", ".tsx", ".py"}:
+                else:
+                    for n, line in enumerate(body.splitlines(), 1):
+                        m = SYMBOLS.match(line)
+                        if m:
+                            conn.execute(
+                                "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
+                                (project, rel, m.group(1), n),
+                            )
+                conn.executemany(
+                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?)",
+                    [
+                        (project, rel, caller, callee, lineno)
+                        for caller, callee, lineno in python_calls(body)
+                    ],
+                )
+                conn.executemany(
+                    "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
+                    [(project, rel, target) for target in python_imports(body)],
+                )
+            elif path.suffix.lower() in {".js", ".jsx", ".ts", ".tsx"}:
+                from source_index import javascript_imports, javascript_symbols
+
+                js_syms = javascript_symbols(body)
+                if js_syms:
+                    conn.executemany(
+                        "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
+                        [(project, rel, name, lineno) for name, lineno in js_syms],
+                    )
+                else:
+                    for n, line in enumerate(body.splitlines(), 1):
+                        m = SYMBOLS.match(line)
+                        if m:
+                            conn.execute(
+                                "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
+                                (project, rel, m.group(1), n),
+                            )
+                conn.executemany(
+                    "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
+                    [(project, rel, target) for target in javascript_imports(body)],
+                )
+            else:
+                for n, line in enumerate(body.splitlines(), 1):
+                    m = SYMBOLS.match(line)
+                    if m:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
+                            (project, rel, m.group(1), n),
+                        )
                     imp = IMPORTS.match(line)
                     if imp:
                         conn.execute(
                             "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
                             (project, rel, imp.group(1)),
                         )
-            if path.suffix.lower() == ".py":
-                from source_index import python_imports
-
-                conn.executemany(
-                    "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
-                    [(project, rel, target) for target in python_imports(body)],
-                )
-            if path.suffix.lower() in {".js", ".jsx", ".ts", ".tsx"}:
-                from source_index import javascript_imports
-
-                conn.executemany(
-                    "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
-                    [(project, rel, target) for target in javascript_imports(body)],
-                )
         except OSError:
             errors.append(rel)
             continue
@@ -468,12 +519,18 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
             conn.execute("DELETE FROM files WHERE project_id=? AND path=?", (project, row[0]))
             conn.execute("DELETE FROM symbols WHERE project_id=? AND path=?", (project, row[0]))
             conn.execute("DELETE FROM imports WHERE project_id=? AND source=?", (project, row[0]))
+            conn.execute(
+                "DELETE FROM symbol_calls WHERE project_id=? AND caller_path=?", (project, row[0])
+            )
+            conn.execute(
+                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", (project, row[0])
+            )
             removed_paths.append(row[0])
             removed += 1
     conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (int(time.time()), project))
     conn.execute("DELETE FROM index_errors WHERE project_id=?", (project,))
     conn.executemany("INSERT INTO index_errors VALUES(?,?)", [(project, path) for path in errors])
-    conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,3)", (project,))
+    conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,4)", (project,))
     features.refresh_fts(conn, project, changed_paths, removed_paths)
     import frameworks
 
@@ -485,6 +542,8 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
         "removed": removed,
         "unchanged": max(0, len(present) - added - changed - len(errors)),
         "files": len(present),
+        "skipped": skipped,
+        "skipped_count": len(skipped),
         "error_count": len(errors),
         "error_paths": errors,
     }
@@ -990,6 +1049,8 @@ def feature_call(action: str, args: dict[str, Any], conn: sqlite3.Connection) ->
         return features.review(sys.modules[__name__], args, conn)
     if action == "dependencies":
         return features.dependencies(sys.modules[__name__], args, conn)
+    if action == "impact":
+        return features.impact_analysis(sys.modules[__name__], args, conn)
     if action == "discover":
         return features.discover(conn)
     return {"error": "Unknown LazyToken action."}
@@ -1003,6 +1064,8 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
         "get_task_context": "task_context",
         "clear_context_session": "clear_session",
         "inspect_source_range": "inspect_source",
+        "inspect_impact": "impact",
+        "impact": "impact",
         "checkpoint": "checkpoint",
         "session_checkpoint": "checkpoint",
     }
@@ -1226,6 +1289,15 @@ def main() -> None:
     sr = sub.add_parser("search")
     sr.add_argument("query")
     sr.add_argument("--project", default="")
+    impact_cmd = sub.add_parser(
+        "impact",
+        help="Blast-radius and call-graph impact analysis for a symbol or file (GitNexus + Ponytail style)",
+    )
+    impact_cmd.add_argument(
+        "target",
+        help="Symbol name (e.g. 'Class.method' or 'func') or project-relative file path",
+    )
+    impact_cmd.add_argument("--project", default="")
     lt = sub.add_parser("lazytoken", help="Run a LazyToken action with JSON arguments")
     lt.add_argument(
         "action",
@@ -1239,6 +1311,7 @@ def main() -> None:
             "checkpoint",
             "audit_scopes",
             "inspect_source",
+            "impact",
             "benchmark_record",
             "benchmark_list",
             "benchmark_runs",
@@ -1560,6 +1633,13 @@ def main() -> None:
         print(json.dumps(seed_project(Path(a.root), db), indent=2))
     elif a.cmd == "search":
         print(json.dumps(search(a.query, db, a.project), indent=2, ensure_ascii=False))
+    elif a.cmd == "impact":
+        result = features.impact_analysis(
+            sys.modules[__name__], {"target": a.target, "project": a.project}, db
+        )
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        if isinstance(result, dict) and "error" in result:
+            raise SystemExit(1)
     elif a.cmd == "lazytoken":
         raw = Path(a.json[1:]).read_text(encoding="utf-8-sig") if a.json.startswith("@") else a.json
         args = json.loads(raw)
