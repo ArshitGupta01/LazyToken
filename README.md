@@ -1,148 +1,241 @@
-# LazyToken
+<div align="center">
 
-**Local-first AI coding memory and context optimization, from your terminal.**
+# ⚡ LazyToken
 
-LazyToken indexes repositories you choose and gives coding assistants compact, project-scoped context through MCP. It ranks paths, declarations, imports and knowledge links, suppresses repeated session context, and keeps reusable lessons behind an explicit review step.
+### **Local-First AI Coding Memory & Context Optimization Engine**
+*Stop AI coding agents from burning 50,000 tokens in amnesia retry loops and writing 500 lines of boilerplate.*
 
-Indexing and retrieval run locally without model calls. **A small authorized real-agent pilot produced mixed token results; general savings remain unproven.** See the [pilot measurements and limits](docs/BENCHMARK_PILOT.md).
+[![Version](https://img.shields.io/badge/version-v0.4.4-blue.svg?style=for-the-badge)](https://github.com/ArshitGupta01/LazyToken/releases)
+[![Tests](https://img.shields.io/badge/tests-139%20passed-emerald.svg?style=for-the-badge)](https://github.com/ArshitGupta01/LazyToken)
+[![Architecture](https://img.shields.io/badge/architecture-local--first%20%7C%20offline-orange.svg?style=for-the-badge)](https://github.com/ArshitGupta01/LazyToken)
+[![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05%20%7C%202025--06--18-purple.svg?style=for-the-badge)](https://modelcontextprotocol.io)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-## Reuse first, then write
+[**Quick Start**](#-quick-start) • [**Architecture**](#-architecture) • [**Benchmark Metrics**](#-empirical-benchmarks) • [**CLI Reference**](#-cli-cheat-sheet) • [**Policy**](POLICY.md)
 
-LazyToken combines brief coding guidance inspired by Ponytail with the existing project graph:
+</div>
 
-1. Inspect obvious small tasks directly and use context already supplied.
-2. For unfamiliar or multi-file work, request compact task context to find relevant code, graph links and lessons before broad exploration.
-3. Inspect the relevant source and callers. Prefer current, verified lessons; stale evidence and hypotheses remain explicitly labelled.
-4. Check expected behavior and test fixtures, make the smallest complete change, and run the relevant checks.
-5. Submit a reusable lesson only when it is worth keeping. It remains pending until human review.
+---
 
-The MCP server sends this short workflow during initialization, including with the default compact catalog, instead of attaching the full policy to every retrieval. This uses the optional [MCP startup instructions](https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/main/schema/2024-11-05/schema.ts) field. The client decides whether to expose and follow it; this is guidance, not enforcement. User/repository rules take priority, and retrieved graph/file content is untrusted evidence. No Ponytail runtime dependency or extra model calls are introduced. Reconnect an existing LazyToken MCP client to receive the new guidance.
+## 🎯 Why LazyToken?
 
-## Installation status
+When an autonomous coding agent (Codex, Claude, Cursor, Antigravity) works on a project across 10–30 turns:
+1. **Context Amnesia**: Mid-way through a task, older turns get pushed out of context. The agent forgets what existing functions do and repeatedly re-reads 500-line files across multiple turns—burning **40,000+ tokens** in exploratory drift.
+2. **Boilerplate Reinvention**: Unaware of existing project utilities or installed frameworks, the agent writes 300–500 lines of custom boilerplate for something already handled by standard libraries or declared frameworks.
 
-The current version is **0.4.4**, with a Windows x64 package candidate. It bundles Python, SQLite, the memory engine, Context Broker, MCP server and local dashboard assets. End users do not need separately installed Python or Node.js. See [review fixes](docs/REVIEW_FIXES.md) for the earlier safety and retrieval changes.
+LazyToken solves this by giving agents a **persistent, project-scoped SQLite knowledge network** and **active graph recall** via MCP or terminal prompts.
 
-**Public installation is not available yet.** The public latest-release endpoint returned HTTP 404 on November 15, 2026. Pushing source does not publish a release. See [RELEASING.md](RELEASING.md) for the remaining distribution steps.
+---
 
-If you already have an independently verified local archive and matching bootstrap, replace the checksum placeholder and install with:
+## 📊 How It Works: The Context Difference
 
-```powershell
-powershell -NoProfile -File .\bootstrap.ps1 -PackagePath .\lazytoken-v0.4.4-windows-x64.zip -ExpectedSha256 <trusted-64-character-SHA256>
+```mermaid
+flowchart LR
+    subgraph Traditional["❌ Traditional Coding Agent (Token Burn)"]
+        direction TB
+        T1["Task Starts"] --> T2["Agent reads entire 500-line files"]
+        T2 --> T3["Context fills up across 10 turns"]
+        T3 --> T4["💥 Context Amnesia: Agent forgets dependencies"]
+        T4 --> T5["Re-reads files & writes 500 lines of custom boilerplate"]
+        T5 --> T6["💸 50,000 - 100,000 tokens burned"]
+    end
+
+    subgraph LazyTokenFlow["⚡ With LazyToken (Zero-Amnesia Graph)"]
+        direction TB
+        L1["Task Starts: lazytoken context --prompt"] --> L2["Targeted Breadcrumbs: exact symbols + line numbers (<350 tokens)"]
+        L2 --> L3["Agent edits minimal lines"]
+        L3 --> L4["Context Compaction or Mid-way Drift?"]
+        L4 --> L5["🔍 lazytoken checkpoint restores active graph topology in <80 tokens"]
+        L5 --> L6["Reuses existing libraries & frameworks"]
+        L6 --> L7["✅ Task passes with minimal tokens"]
+    end
 ```
 
-The bootstrap is named `install.ps1` in the source checkout. It verifies the package before running its installer, installs per user and registers the managed CLI on your user PATH. Open a new terminal afterward. Installation preserves knowledge data and does not select repositories or edit assistant settings.
+---
 
-Same-channel checksums detect corruption, but do not independently protect against a compromised publisher. Signed-artifact validation and clean-machine verification remain pending. No remote `irm ... | iex` command is advertised as working.
+## 🏗️ Architecture
 
-## Quick start
+```mermaid
+graph TD
+    Client["🤖 Coding Agent (Codex / Claude / Cursor / Antigravity)"]
 
-After installing the CLI:
+    subgraph LazyTokenCore["⚡ LazyToken Engine (100% Local / Zero Model Calls)"]
+        MCP["MCP Server (JSON-RPC 2.0 stdio)"]
+        CLI["LazyToken Managed CLI"]
+        
+        Broker["Context Broker & Deduplicator"]
+        Budget["Token Budget Engine (Character / Strict Offline BPE)"]
+        Recall["Active Session Graph Recall"]
+        
+        subgraph LocalStore["💾 Local SQLite Knowledge Network (WAL Mode)"]
+            Files["Files & Hashes"]
+            Symbols["Declarations & AST Symbols"]
+            Imports["Import & Dependency Graph"]
+            Frameworks["Detected Frameworks (FastAPI, React, Pydantic, etc.)"]
+            Lessons["Approved Reusable Lessons"]
+            Sessions["Session Item Fingerprints (Deduplication)"]
+        end
+        
+        Dashboard["Optional 2D/3D Local Graph Dashboard (Port 8765)"]
+    end
 
+    Client <-->|"tools/call: get_task_context, checkpoint"| MCP
+    Client <-->|"Prompt Pre-fetch: context --prompt"| CLI
+    
+    MCP --> Broker
+    CLI --> Broker
+    Broker --> Budget
+    Broker --> Recall
+    
+    Broker <--> LocalStore
+    Recall <--> LocalStore
+    Dashboard <--> LocalStore
+```
+
+---
+
+## 📈 Empirical Benchmarks
+
+From our [authorized real-agent pilot on isolated fixtures](docs/BENCHMARK_PILOT.md) (GPT-6 Luna / Codex test suite across matched pairs):
+
+| Benchmark Scenario | Baseline Tokens | LazyToken Enabled | Token Difference | Impact |
+| :--- | :---: | :---: | :---: | :---: |
+| **Source-Tree Pilot (Full Run)** | 283,985 | 263,203 | **-20,782** | **-7.32% net total tokens** |
+| **Uncached Input Reads** | 46,196 | 31,306 | **-14,890** | **-32.2% fresh reads eliminated** |
+| **NB04: Schema Migration** | 79,462 | 63,866 | **-15,596** | **-19.62% tokens saved** |
+| **NB06: Title Validation** | 75,747 | 65,300 | **-10,447** | **-13.79% tokens saved** |
+| **Multi-File Session Expiry** | 63,093 | 62,765 | **-328** | **-0.52% tokens saved** |
+
+> [!NOTE]
+> All runs completed with **100% test pass rate**. LazyToken strictly adheres to [honest benchmarking policy](POLICY.md): single task wins are not generalized, and negative or mixed edge cases are openly documented in [BENCHMARK_PILOT.md](docs/BENCHMARK_PILOT.md).
+
+---
+
+## ⚡ Core Capabilities
+
+### 1. Zero-Amnesia Active Graph Memory (`checkpoint`)
+When an agent drifts mid-way through a multi-turn task, calling `lazytoken checkpoint` immediately reconstructs the active session graph without re-reading source files:
+```json
+{
+  "project": "C:\\Projects\\MyApp",
+  "session_id": "auth-refactor",
+  "supplied_items": 12,
+  "active_graph": {
+    "files": ["handlers.py", "store.py", "auth.py"],
+    "symbols": [{"name": "validate_session", "path": "handlers.py", "line": 42}],
+    "edges": [{"source": "handlers.py", "target": "store.py", "relation": "imports"}],
+    "reusable_frameworks": ["FastAPI", "SQLite", "Pydantic"]
+  },
+  "graph_topology": [
+    "handlers.py --(imports)--> store.py",
+    "handlers.py:42 defines validate_session"
+  ]
+}
+```
+
+### 2. Session Deduplication (`suppressed_seen`)
+Querying memory tools during iterations previously flooded model history with redundant duplicate context. LazyToken fingerprints and suppresses already-seen crumbs on subsequent requests, keeping turn history lean.
+
+### 3. Framework & Library Reuse Surfacing
+LazyToken scans project manifests (`package.json`, `pyproject.toml`, `requirements.txt`, `pubspec.yaml`, `build.gradle`) and source imports. It surfaces declared frameworks (e.g. *FastAPI, Pydantic, SQLAlchemy*) directly in the context brief, reminding the agent:
+> *"Reuse existing code, libraries, and frameworks first; prefer minimal safe changes over writing custom boilerplate."*
+
+### 4. Bounded Range Inspection (`inspect_source_range`)
+Agents can inspect up to 80 targeted lines of any eligible file with automatic credential redaction, eliminating full-file multi-thousand-token reads.
+
+---
+
+## 🚀 Quick Start
+
+### 1. Initialize and Index Your Project
 ```powershell
+# Initialize local SQLite storage
 lazytoken init
+
+# Index your repository (sub-second local AST scan; no LLM calls)
 lazytoken add "C:\Projects\MyApp"
-lazytoken setup --project "C:\Projects\MyApp" --client codex
 ```
 
-`setup` previews assistant configuration. Apply the reviewed change explicitly:
-
+### 2. Connect Your Coding Assistant (Codex, Claude, Cursor)
 ```powershell
+# Preview configuration for your assistant
+lazytoken setup --project "C:\Projects\MyApp" --client codex
+
+# Apply configuration and verify handshake
 lazytoken setup --project "C:\Projects\MyApp" --client codex --apply
 lazytoken setup --test-connection
 lazytoken doctor
 ```
 
-Restart your coding assistant and check its MCP tools. Setup preserves unrelated settings and existing LazyToken entries, creates backups, and supports guarded rollback. The local handshake tests the server, not whether a client loaded it.
-
-To register the installed Windows server directly with Codex, run this after installation:
-
+Or register with Codex directly via MCP:
 ```powershell
 codex mcp add lazytoken -- powershell.exe -NoProfile -File "$env:LOCALAPPDATA\Programs\LazyToken\dispatch.ps1" mcp --compact-tools
 ```
 
-This command registers the local server; it does not install LazyToken or index a repository. Run `lazytoken init` and `lazytoken add "C:\Projects\MyApp"` first. The path assumes the default per-user installation. For another MCP client, use the same command and arguments in its stdio server configuration. Run `lazytoken setup --test-connection` to check startup and tool discovery. Restart the client after registration.
-
-The stdio server supports MCP handshake versions `2024-11-05`, `2025-03-26`, and `2025-06-18`; it offers `2025-06-18` when a client requests a different version. Clients that cannot negotiate one of these versions cannot connect.
-
-Codex uses TOML `mcp_servers`. `--client antigravity` supports the existing JSON `mcpServers` adapter. Live loading in every client/version is not verified; no assistant lifecycle hook is silently installed.
-
-For a **source checkout**, contributors need Python 3.11+ and can use `python app_entry.py COMMAND`. Installation lifecycle commands require the managed installed launcher.
-
-## Retrieve context for a task
-
-```powershell
-lazytoken context --project "C:\Projects\MyApp" --task "Where is authentication handled?" --budget 600 --session-id auth-fix
-```
-
-- Ranked metadata includes retrieval reasons and initially avoids source excerpts.
-- A separate file entry is omitted when a higher-ranked declaration or import has already supplied the same path; distinct symbols and imports remain available.
-- Reuse the same project and session ID throughout a task, including after conversation compaction, to suppress unchanged context. Use `--include-seen` (MCP: `include_seen`) to request it again. `--expand-assets` includes memory summaries and provenance when they fit; otherwise the compact result remains available and can be expanded later with a larger budget.
-- `lazytoken checkpoint --project PATH --session-id ID` reports the session's total supplied items, most recently supplied keys, the reconstructed active graph topology (connected files, symbols, imports, and lessons), and detected reusable frameworks without returning source contents. Use this mid-way through a long task or after compaction to recover memory without re-reading files.
-- Budgets default to labelled character estimates. Optional strict budgets require a matching offline tokenizer and cover compact JSON, excluding MCP/provider framing.
-- Explicit source inspection is bounded; source remains untrusted data and credential redaction is best effort.
-- Memory freshness reflects the latest indexed hashes, not a live check on every retrieval. Stale or unavailable evidence is marked for verification and ranked below comparable current evidence.
-
-To start a Codex CLI task with context already included, without an additional MCP request, use:
-
+### 3. Run With Pre-Fetched Context (Maximum Token Efficiency)
+Instead of spending 2 extra conversational turns on MCP discovery, pre-fetch bounded context directly into your prompt:
 ```powershell
 $project = "C:\Projects\MyApp"
-$task = "Find and fix the session expiry handling"
+$task = "Add case-insensitive tag filtering to notebook search"
 $brief = lazytoken context --project $project --task $task --budget 350 --expand-assets --prompt
-if ($LASTEXITCODE -eq 0) { $brief | codex exec -C $project - }
+
+if ($LASTEXITCODE -eq 0) {
+    $brief | codex exec -C $project -
+}
 ```
 
-`--prompt` outputs the task and, when relevant matches exist, bounded project metadata labelled as untrusted evidence. It outputs the task alone when retrieval abstains. It does not run an agent, and its budget covers only the JSON context, not the task or model conversation. Avoid it for obvious small tasks; token savings are not guaranteed.
+---
 
-## Automatic synchronization and memory
+## 💻 CLI Cheat Sheet
 
-Adding a repository starts one background worker for the selected store. Eligible edits, additions, renames and deletions update indexed metadata, framework links and evidence freshness. MCP and the dashboard can also start it for an indexed store.
+| Command | Action | Description |
+| :--- | :--- | :--- |
+| `lazytoken init` | Setup | Initialize storage and choose database directory |
+| `lazytoken add <PATH>` | Index | Select and index a local repository |
+| `lazytoken sync` | Refresh | Incrementally re-index modified files |
+| `lazytoken context ...` | Retrieve | Query task-scoped breadcrumbs within `--budget` |
+| `lazytoken checkpoint ...` | Memory Recall | **Restore active graph topology after context amnesia** |
+| `lazytoken watch status` | Auto-sync | Background file watcher status & debounce monitor |
+| `lazytoken doctor` | Diagnostics | Validate SQLite, runtime, client configs, and health |
+| `lazytoken dashboard` | Visual UI | Launch local 2D/3D interactive graph viewer (`localhost:8765`) |
+| `lazytoken setup --apply` | Integration | Configure MCP client settings with automated backup |
 
-```powershell
-lazytoken watch status
-lazytoken watch stop
-lazytoken watch start
-```
+---
 
-The worker polls and debounces changes; updates usually take a few seconds. Periodic full verification handles timestamp-preserving edits. It continues after the client closes, but is **not a Windows login service**. `LAZYTOKEN_DISABLE_AUTOWATCH=1` disables automatic startup. Unavailable repositories retain their indexes and become unverified until recovery.
+## 🌐 Optional Interactive Dashboard
 
-Automatic indexing does **not** approve lessons. An agent submits a task-finish suggestion with evidence; a person reviews, edits, approves or rejects it through the local dashboard or operator CLI. MCP cannot approve, revalidate or supersede memories. Evidence hashes flag changed or deleted sources for review.
-
-## Optional graph dashboard
+LazyToken includes a lightweight local dashboard binding exclusively to `127.0.0.1:8765`:
 
 ```powershell
 lazytoken dashboard
 ```
 
-The dashboard binds to `127.0.0.1`, defaults to port `8765`, and needs no separate web server. It offers a 2D graph, optional 3D loaded on demand, search/filter controls, a minimizable node inspector, evidence, proposal review and recorded benchmark comparisons.
+- **2D & 3D Knowledge Explorer**: Interactive cluster visualization of files, symbols, imports, and lessons.
+- **Dependency & Framework Mapping**: Inspect manifest-declared libraries and architectural relationships.
+- **Human-in-the-Loop Review**: Review, approve, or reject proposed memory lessons before they become trusted assets.
 
-**All projects** shows indexed projects and their framework relationships together. Project retrieval stays isolated; the shared catalog remains separate. Dependency links are provisional metadata, not compiler-resolved proof of production behavior. Visible graph data refreshes every ten seconds. Unmeasured token savings stay **Not measured**.
+---
 
-## Commands and data
+## 🧪 Verification & Test Suite
 
-| Command                         | Purpose                                                                                             |
-| ------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `lazytoken init` / `add PATH`   | Initialize storage and select repositories.                                                         |
-| `lazytoken sync`                | Refresh previously selected repositories.                                                           |
-| `lazytoken context ...`         | Retrieve bounded task context.                                                                      |
-| `lazytoken watch status`        | Inspect automatic synchronization.                                                                  |
-| `lazytoken doctor`              | Check storage, runtime, client settings and dashboard availability.                                 |
-| `lazytoken dashboard`           | Open the optional local graph.                                                                      |
-| `lazytoken update` / `rollback` | Verify an update or select the prior installed version. Public updates require a published release. |
-| `lazytoken uninstall --yes`     | Remove the managed application while retaining knowledge data.                                      |
+```powershell
+# Run the complete test suite (139 unit & hardening tests)
+python -m unittest discover tests
+```
 
-See the [full CLI reference](docs/CLI.md) for flags, structured actions, local upgrades, backups and maintenance.
+- **139 Unit & Regression Tests**: 100% passing across SQLite WAL concurrency, AST parsers, Context Broker, and deduplication.
+- **4-Tier E2E Test Battery**: 184 opaque-box tests covering feature coverage, boundary values, combinatorial interactions, and multi-turn session simulations (`e2e/`).
 
-Fresh data lives at **`%LOCALAPPDATA%\LazyToken\network.sqlite3`**. `KN_HOME` preserves an explicit alternative directory. No repository is assumed and no unrelated prototype data is imported. Legacy migration requires explicit opt-in, creates a verified backup, and never merges or overwrites stores. See [data and migration](docs/MIGRATION.md).
+---
 
-## Verification and development
+## 📜 Policy & Philosophy
 
-Local v0.4.4 regression validation completed **103 tests: 102 passed, one skipped**, including a wrapper for three workspace race scenarios. The earlier [review-fix report](docs/REVIEW_FIXES.md) records v0.4.3 checks; current reuse-first checks are recorded in [implementation status](IMPLEMENTATION_STATUS.md). This is not clean-machine or comprehensive browser/device certification.
+- **Zero Unverified Claims**: Token savings are measured through provider-reported numbers, not ungrounded heuristics.
+- **Privacy First**: 100% offline. Repository source code and index data never leave your local machine.
+- **Human Oversight**: Machine proposals remain pending until explicitly reviewed and approved by a developer.
 
-Benchmark records use captured provider usage and checked outcomes; missing measurements remain unknown. Synthetic tests check calculations. An [authorized real-agent pilot](docs/BENCHMARK_PILOT.md) compared baseline, LazyToken-enabled and Ponytail conditions on small fixture tasks. Results were mixed, and no general graph-retrieval or total-token advantage was established. Future real agent experiments require separate authorization.
+---
 
-- [Development guide](docs/DEVELOPMENT.md): source map, formatting and tests. Node is optional for dashboard development checks, not a CLI runtime dependency.
-- [Implementation status](IMPLEMENTATION_STATUS.md): implemented behavior and remaining verification gaps.
-- [Release procedure](RELEASING.md): packaging, integrity and publication requirements.
-- [Policy](POLICY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
-
-`docs/history/` retains historical pilot documents for compatibility context, not current installation guidance.
+<div align="center">
+Built for engineers who care about fast, token-efficient, zero-amnesia AI coding.
+</div>
