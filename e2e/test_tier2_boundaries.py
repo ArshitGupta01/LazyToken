@@ -13,6 +13,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import broker
 import dashboard
 import features
@@ -21,9 +25,9 @@ import retrieval_eval
 import source_index
 import token_budget
 from benchmark import harness
-from tests.e2e.common import E2ETestCase, McpClient
+from e2e.common import E2ETestCase, McpClient
 
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 # ============================================================================
@@ -50,9 +54,7 @@ class TestF1SQLiteConcurrencyBoundaries(E2ETestCase):
             self.assertIn("indexed project is required", ranked["error"].lower())
 
             # Task context without indexed project must return an error response, not crash
-            ctx = broker.task_context(
-                kn, {"project": "nonexistent_project", "task": "hello"}, conn
-            )
+            ctx = broker.task_context(kn, {"project": "nonexistent_project", "task": "hello"}, conn)
             self.assertIn("error", ctx)
             self.assertIn("indexed project is required", ctx["error"].lower())
 
@@ -101,10 +103,7 @@ class TestF1SQLiteConcurrencyBoundaries(E2ETestCase):
             except Exception as exc:
                 thread_errors.append(exc)
 
-        threads = [
-            threading.Thread(target=worker_writer, args=(t_id,))
-            for t_id in range(10)
-        ]
+        threads = [threading.Thread(target=worker_writer, args=(t_id,)) for t_id in range(10)]
         for t in threads:
             t.start()
         for t in threads:
@@ -181,9 +180,11 @@ class TestF2ImportMatchingBoundaries(E2ETestCase):
         extreme_path = f"enterprise.core.{long_submodule}.deep_service"
         self.assertGreater(len(extreme_path), 300)
 
-        repo = self.create_repo({
-            "service.py": f"import {extreme_path}\n\ndef run():\n    pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "service.py": f"import {extreme_path}\n\ndef run():\n    pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             sync_res = kn.sync(repo, conn)
@@ -199,10 +200,12 @@ class TestF2ImportMatchingBoundaries(E2ETestCase):
 
     def test_f2_malformed_ast_syntax_files(self) -> None:
         """Files with broken syntax must not crash indexing; valid files in repo must still be indexed."""
-        repo = self.create_repo({
-            "broken.py": "def broken_syntax(::: (( [[[ \nwhile for else return ??\n",
-            "healthy.py": "def healthy_func():\n    return 42\n",
-        })
+        repo = self.create_repo(
+            {
+                "broken.py": "def broken_syntax(::: (( [[[ \nwhile for else return ??\n",
+                "healthy.py": "def healthy_func():\n    return 42\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             sync_res = kn.sync(repo, conn)
@@ -225,13 +228,15 @@ class TestF2ImportMatchingBoundaries(E2ETestCase):
 
     def test_f2_circular_5_node_import_loops(self) -> None:
         """A circular import dependency spanning 5 nodes must be indexed and queried without infinite recursion."""
-        repo = self.create_repo({
-            "node_1.py": "import node_2\ndef f1(): return 1\n",
-            "node_2.py": "import node_3\ndef f2(): return 2\n",
-            "node_3.py": "import node_4\ndef f3(): return 3\n",
-            "node_4.py": "import node_5\ndef f4(): return 4\n",
-            "node_5.py": "import node_1\ndef f5(): return 5\n",
-        })
+        repo = self.create_repo(
+            {
+                "node_1.py": "import node_2\ndef f1(): return 1\n",
+                "node_2.py": "import node_3\ndef f2(): return 2\n",
+                "node_3.py": "import node_4\ndef f3(): return 3\n",
+                "node_4.py": "import node_5\ndef f4(): return 4\n",
+                "node_5.py": "import node_1\ndef f5(): return 5\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             sync_res = kn.sync(repo, conn)
@@ -250,10 +255,12 @@ class TestF2ImportMatchingBoundaries(E2ETestCase):
 
     def test_f2_unicode_and_emoji_module_names(self) -> None:
         """Module names and identifiers with Unicode and emoji characters must be indexed without encoding crashes."""
-        repo = self.create_repo({
-            "util_🚀.py": "def launch():\n    return 'blastoff'\n",
-            "módule_ñ.py": "from util_🚀 import launch\ndef calcular():\n    return launch()\n",
-        })
+        repo = self.create_repo(
+            {
+                "util_🚀.py": "def launch():\n    return 'blastoff'\n",
+                "módule_ñ.py": "from util_🚀 import launch\ndef calcular():\n    return launch()\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             sync_res = kn.sync(repo, conn)
@@ -310,7 +317,9 @@ class TestF3SessionFreshnessBoundaries(E2ETestCase):
             conn.commit()
 
             # Verify checkpoint returns supplied_items = 500 and recent_keys is bounded (30 items)
-            chk = broker.session_checkpoint(kn, {"project": project_id, "session_id": session_id}, conn)
+            chk = broker.session_checkpoint(
+                kn, {"project": project_id, "session_id": session_id}, conn
+            )
             self.assertNotIn("error", chk)
             self.assertEqual(chk.get("supplied_items"), 500)
             self.assertTrue(chk.get("truncated"))
@@ -395,7 +404,9 @@ class TestF3SessionFreshnessBoundaries(E2ETestCase):
             ).fetchone()[0]
 
             # Modify file content (fingerprint should change on resync)
-            (repo / "worker.py").write_text("def do_work(): return 'v2_modified_body'\n", encoding="utf-8")
+            (repo / "worker.py").write_text(
+                "def do_work(): return 'v2_modified_body'\n", encoding="utf-8"
+            )
             kn.sync(repo, conn)
 
             # Turn 2: modified item should NOT be suppressed because fingerprint differs
@@ -420,7 +431,11 @@ class TestF3SessionFreshnessBoundaries(E2ETestCase):
 
             res = broker.task_context(
                 kn,
-                {"project": str(repo), "task": "nonexistent_query_xyz_999", "session_id": session_id},
+                {
+                    "project": str(repo),
+                    "task": "nonexistent_query_xyz_999",
+                    "session_id": session_id,
+                },
                 conn,
             )
             self.assertNotIn("error", res)
@@ -503,8 +518,12 @@ class TestF4AmnesiaRecoveryBoundaries(E2ETestCase):
                     kn, {"project": str(repo), "task": "link_fn", "session_id": session_id}, conn
                 )
                 self.assertNotIn("error", res, f"Turn {turn} failed: {res.get('error')}")
-                self.assertEqual(len(res.get("results", [])), 0, f"Turn {turn} had unsuppressed items")
-                self.assertGreater(res.get("suppressed_seen", 0), 0, f"Turn {turn} missing suppressed count")
+                self.assertEqual(
+                    len(res.get("results", [])), 0, f"Turn {turn} had unsuppressed items"
+                )
+                self.assertGreater(
+                    res.get("suppressed_seen", 0), 0, f"Turn {turn} missing suppressed count"
+                )
                 self.assertIn("recap", res, f"Turn {turn} missing recap breadcrumbs")
 
             # Verify no duplicate rows
@@ -518,29 +537,39 @@ class TestF4AmnesiaRecoveryBoundaries(E2ETestCase):
 
     def test_f4_alternating_suppression_turns(self) -> None:
         """Alternating between two queries across turns must correctly alternate suppression and touch updated_at timestamps."""
-        repo = self.create_repo({
-            "alpha_mod.py": "def alpha_service(): return 'A'\n",
-            "beta_mod.py": "def beta_handler(): return 'B'\n",
-        })
+        repo = self.create_repo(
+            {
+                "alpha_mod.py": "def alpha_service(): return 'A'\n",
+                "beta_mod.py": "def beta_handler(): return 'B'\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
             session_id = "sess_alternate"
 
             # Turn 1: Query A (seen)
-            r1 = broker.task_context(kn, {"project": str(repo), "task": "alpha_service", "session_id": session_id}, conn)
+            r1 = broker.task_context(
+                kn, {"project": str(repo), "task": "alpha_service", "session_id": session_id}, conn
+            )
             self.assertGreater(len(r1.get("results", [])), 0)
 
             # Turn 2: Query B (seen)
-            r2 = broker.task_context(kn, {"project": str(repo), "task": "beta_handler", "session_id": session_id}, conn)
+            r2 = broker.task_context(
+                kn, {"project": str(repo), "task": "beta_handler", "session_id": session_id}, conn
+            )
             self.assertGreater(len(r2.get("results", [])), 0)
 
             # Turn 3: Query A (suppressed)
-            r3 = broker.task_context(kn, {"project": str(repo), "task": "alpha_service", "session_id": session_id}, conn)
+            r3 = broker.task_context(
+                kn, {"project": str(repo), "task": "alpha_service", "session_id": session_id}, conn
+            )
             self.assertGreaterEqual(r3.get("suppressed_seen", 0), 1)
 
             # Turn 4: Query B (suppressed)
-            r4 = broker.task_context(kn, {"project": str(repo), "task": "beta_handler", "session_id": session_id}, conn)
+            r4 = broker.task_context(
+                kn, {"project": str(repo), "task": "beta_handler", "session_id": session_id}, conn
+            )
             self.assertGreaterEqual(r4.get("suppressed_seen", 0), 1)
         finally:
             conn.close()
@@ -555,12 +584,16 @@ class TestF4AmnesiaRecoveryBoundaries(E2ETestCase):
 
             # Turn 1: query with large budget to see all items
             broker.task_context(
-                kn, {"project": str(repo), "task": "func", "session_id": session_id, "budget": 2000}, conn
+                kn,
+                {"project": str(repo), "task": "func", "session_id": session_id, "budget": 2000},
+                conn,
             )
 
             # Turn 2: tight budget of 100 tokens on full suppression
             res2 = broker.task_context(
-                kn, {"project": str(repo), "task": "func", "session_id": session_id, "budget": 100}, conn
+                kn,
+                {"project": str(repo), "task": "func", "session_id": session_id, "budget": 100},
+                conn,
             )
             # Response must either succeed with truncated recap or return clean budget error, never raise unhandled exception
             if "error" not in res2:
@@ -633,7 +666,7 @@ class TestF5BulkCandidateQueriesBoundaries(E2ETestCase):
         injection_queries = [
             "' OR '1'='1",
             "'; DROP TABLE files; --",
-            "\" UNION SELECT * FROM sqlite_master --",
+            '" UNION SELECT * FROM sqlite_master --',
             "1' OR 1=1; DELETE FROM projects; --",
         ]
         repo = self.create_repo({"safe.py": "def safe(): pass\n"})
@@ -648,7 +681,9 @@ class TestF5BulkCandidateQueriesBoundaries(E2ETestCase):
                 self.assertNotIn("error", ctx)
 
             # Verify files table remains completely intact
-            count = conn.execute("SELECT count(*) FROM files WHERE project_id=?", (str(repo),)).fetchone()[0]
+            count = conn.execute(
+                "SELECT count(*) FROM files WHERE project_id=?", (str(repo),)
+            ).fetchone()[0]
             self.assertEqual(count, 1)
         finally:
             conn.close()
@@ -687,19 +722,25 @@ class TestF6TokenizerSupportBoundaries(E2ETestCase):
             self.assertIn("budget must be an integer from 100 to 16000", r1["error"])
 
             # Out of bounds: 100000 tokens
-            r100k = broker.task_context(kn, {"project": str(repo), "task": "main", "budget": 100000}, conn)
+            r100k = broker.task_context(
+                kn, {"project": str(repo), "task": "main", "budget": 100000}, conn
+            )
             self.assertIn("error", r100k)
             self.assertIn("budget must be an integer from 100 to 16000", r100k["error"])
 
             # Valid boundary: 100 tokens
-            r_min = broker.task_context(kn, {"project": str(repo), "task": "main", "budget": 100}, conn)
+            r_min = broker.task_context(
+                kn, {"project": str(repo), "task": "main", "budget": 100}, conn
+            )
             if "error" in r_min:
                 self.assertIn("Budget is too small", r_min["error"])
             else:
                 self.assertEqual(r_min.get("budget"), 100)
 
             # Valid boundary: 16000 tokens
-            r_max = broker.task_context(kn, {"project": str(repo), "task": "main", "budget": 16000}, conn)
+            r_max = broker.task_context(
+                kn, {"project": str(repo), "task": "main", "budget": 16000}, conn
+            )
             self.assertNotIn("error", r_max)
             self.assertEqual(r_max.get("budget"), 16000)
         finally:
@@ -838,7 +879,9 @@ class TestF7SinglePassBudgetingBoundaries(E2ETestCase):
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
-            res = broker.task_context(kn, {"project": str(repo), "task": "file", "budget": -50}, conn)
+            res = broker.task_context(
+                kn, {"project": str(repo), "task": "file", "budget": -50}, conn
+            )
             self.assertIn("error", res)
             self.assertIn("budget must be an integer from 100 to 16000", res["error"])
         finally:
@@ -857,14 +900,20 @@ class TestF7SinglePassBudgetingBoundaries(E2ETestCase):
             for _ in range(5):
                 res = broker.task_context(
                     kn,
-                    {"project": str(repo), "task": "func alpha beta gamma delta", "include_seen": True},
+                    {
+                        "project": str(repo),
+                        "task": "func alpha beta gamma delta",
+                        "include_seen": True,
+                    },
                     conn,
                 )
                 keys = [r.get("name") for r in res.get("results", [])]
                 orderings.append(keys)
 
             for order in orderings[1:]:
-                self.assertEqual(order, orderings[0], "Context output ordering must be 100% deterministic")
+                self.assertEqual(
+                    order, orderings[0], "Context output ordering must be 100% deterministic"
+                )
         finally:
             conn.close()
 
@@ -877,10 +926,12 @@ class TestF8LeanContextBoundaries(E2ETestCase):
 
     def test_f8_zero_byte_source_files_in_compact_mode(self) -> None:
         """0-byte source files in compact mode must be indexed and retrieved without division by zero or errors."""
-        repo = self.create_repo({
-            "empty_one.py": "",
-            "empty_two.py": "",
-        })
+        repo = self.create_repo(
+            {
+                "empty_one.py": "",
+                "empty_two.py": "",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             sync_res = kn.sync(repo, conn)
@@ -895,7 +946,12 @@ class TestF8LeanContextBoundaries(E2ETestCase):
 
     def test_f8_100kb_single_source_file_in_compact_mode(self) -> None:
         """A single 100KB source file containing hundreds of functions must remain strictly bounded by compact budget (250 tokens)."""
-        funcs = "\n".join([f"def handler_{i}():\n    # large comment block to test high-density compact parsing\n    return 'payload_data_{i:04d}_{'x'*100}'\n" for i in range(800)])
+        funcs = "\n".join(
+            [
+                f"def handler_{i}():\n    # large comment block to test high-density compact parsing\n    return 'payload_data_{i:04d}_{'x'*100}'\n"
+                for i in range(800)
+            ]
+        )
         self.assertGreater(len(funcs), 100000)
 
         repo = self.create_repo({"large_module.py": funcs})
@@ -938,9 +994,9 @@ class TestF8LeanContextBoundaries(E2ETestCase):
     def test_f8_json_serialization_edge_cases(self) -> None:
         """Raw quotes, backslashes, tabs, and newlines in docstrings must serialize into valid JSON that round-trips cleanly."""
         code = (
-            'def edge_case_fn():\n'
+            "def edge_case_fn():\n"
             '    """Handles "double quotes" and \'single\' and \\\\ backslashes and \\t tabs and \\n newlines."""\n'
-            '    return True\n'
+            "    return True\n"
         )
         repo = self.create_repo({"special.py": code})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
@@ -980,7 +1036,9 @@ class TestF9UnifiedPipelineBoundaries(E2ETestCase):
 
     def test_f9_concurrent_calls_kn_context_and_features_bounded_context(self) -> None:
         """Simultaneous concurrent calls to kn.context and features.bounded_context must succeed without SQLite concurrency errors."""
-        repo = self.create_repo({"app.py": "def app(): pass\n", "helper.py": "def helper(): pass\n"})
+        repo = self.create_repo(
+            {"app.py": "def app(): pass\n", "helper.py": "def helper(): pass\n"}
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -1007,7 +1065,9 @@ class TestF9UnifiedPipelineBoundaries(E2ETestCase):
                 c = kn.connect(db_path)
                 try:
                     for _ in range(5):
-                        res = features.bounded_context(kn, {"project": str(repo), "query": "app"}, c)
+                        res = features.bounded_context(
+                            kn, {"project": str(repo), "query": "app"}, c
+                        )
                         assert "error" not in res
                 finally:
                     c.close()
@@ -1048,7 +1108,9 @@ class TestF9UnifiedPipelineBoundaries(E2ETestCase):
             self.assertIn("error", res_broker)
             self.assertIn("indexed project is required", res_broker["error"].lower())
 
-            res_bounded = features.bounded_context(kn, {"project": fake_path, "query": "anything"}, conn)
+            res_bounded = features.bounded_context(
+                kn, {"project": fake_path, "query": "anything"}, conn
+            )
             self.assertIn("error", res_bounded)
             self.assertIn("indexed project is required", res_bounded["error"].lower())
         finally:
@@ -1061,9 +1123,7 @@ class TestF9UnifiedPipelineBoundaries(E2ETestCase):
         try:
             kn.sync(repo, conn)
             for i in range(50):
-                broker.task_context(
-                    kn, {"project": str(repo), "task": f"test_cache_{i}"}, conn
-                )
+                broker.task_context(kn, {"project": str(repo), "task": f"test_cache_{i}"}, conn)
             # Verify internal search cache max length is respected
             self.assertLessEqual(len(broker._SEARCH_CACHE), 16)
         finally:
@@ -1100,9 +1160,7 @@ class TestF10PrefixPromptsBoundaries(E2ETestCase):
             long_task = "Task description " * 600  # >10000 chars
             self.assertGreater(len(long_task), 10000)
 
-            res = broker.task_context(
-                kn, {"project": str(repo), "task": long_task}, conn
-            )
+            res = broker.task_context(kn, {"project": str(repo), "task": long_task}, conn)
             self.assertIn("error", res)
             self.assertIn("task must be non-empty text up to 2000 characters", res["error"])
         finally:
@@ -1114,9 +1172,9 @@ class TestF10PrefixPromptsBoundaries(E2ETestCase):
         proc_init = self.run_cli(["init", "--project", str(repo)])
         self.assertEqual(proc_init.returncode, 0)
 
-        proc_ctx = self.run_cli([
-            "context", "--project", str(repo), "--task", "examine empty project"
-        ])
+        proc_ctx = self.run_cli(
+            ["context", "--project", str(repo), "--task", "examine empty project"]
+        )
         self.assertEqual(proc_ctx.returncode, 0)
         self.assertNotIn("Traceback", proc_ctx.stderr)
 
@@ -1146,7 +1204,11 @@ class TestF10PrefixPromptsBoundaries(E2ETestCase):
             for i in range(50):
                 res = broker.task_context(
                     kn,
-                    {"project": str(repo), "task": f"compute task variant {i}", "include_seen": True},
+                    {
+                        "project": str(repo),
+                        "task": f"compute task variant {i}",
+                        "include_seen": True,
+                    },
                     conn,
                 )
                 self.assertNotIn("error", res)
@@ -1202,19 +1264,36 @@ class TestF11CLIDiscoverabilityBoundaries(E2ETestCase):
     def test_f11_cli_help_on_every_registered_subcommand(self) -> None:
         """Every registered subcommand in kn.py must accept --help and return exit code 0 with informative help."""
         subcommands = [
-            "sync", "seed", "watch", "mcp", "search", "lazytoken",
-            "backup", "restore", "doctor", "init", "context", "checkpoint"
+            "sync",
+            "seed",
+            "watch",
+            "mcp",
+            "search",
+            "lazytoken",
+            "backup",
+            "restore",
+            "doctor",
+            "init",
+            "context",
+            "checkpoint",
         ]
         for subcmd in subcommands:
             proc = self.run_cli([subcmd, "--help"])
-            self.assertEqual(proc.returncode, 0, f"Subcommand '{subcmd} --help' failed with code {proc.returncode}")
-            self.assertIn(f"usage:", proc.stdout.lower(), f"Subcommand '{subcmd}' missing usage in help")
+            self.assertEqual(
+                proc.returncode,
+                0,
+                f"Subcommand '{subcmd} --help' failed with code {proc.returncode}",
+            )
+            self.assertIn(
+                f"usage:", proc.stdout.lower(), f"Subcommand '{subcmd}' missing usage in help"
+            )
 
     def test_f11_cli_help_formatting_under_narrow_terminal_width(self) -> None:
         """CLI help formatting under narrow terminal width (40 columns) must render without wrapping crash."""
         narrow_env = {**self.env, "COLUMNS": "40", "LINES": "24"}
         cmd = [sys.executable, str(ROOT_DIR / "kn.py"), "--help"]
         import subprocess
+
         proc = subprocess.run(
             cmd,
             env=narrow_env,
@@ -1233,6 +1312,7 @@ class TestF11CLIDiscoverabilityBoundaries(E2ETestCase):
         ascii_env = {**self.env, "PYTHONIOENCODING": "ascii:replace"}
         cmd = [sys.executable, str(ROOT_DIR / "kn.py"), "doctor"]
         import subprocess
+
         proc = subprocess.run(
             cmd,
             env=ascii_env,
@@ -1374,9 +1454,7 @@ class TestF13MCPProtocolBoundaries(E2ETestCase):
         mcp.proc.stdin.flush()
         line = mcp.proc.stdout.readline()
         res = json.loads(line)
-        self.assertTrue(
-            res.get("error") is not None or res.get("result", {}).get("isError", False)
-        )
+        self.assertTrue(res.get("error") is not None or res.get("result", {}).get("isError", False))
 
     def test_f13_mcp_tool_call_extra_unexpected_parameters(self) -> None:
         """Calling a tool with extra unexpected parameters must be handled gracefully without crashing MCP server."""
@@ -1444,6 +1522,7 @@ class TestF14DashboardBoundaries(E2ETestCase):
         port = server.server_address[1]
 
         try:
+
             def fetch(path: str) -> int:
                 url = f"http://127.0.0.1:{port}{path}"
                 with urllib.request.urlopen(url, timeout=4) as resp:
@@ -1512,9 +1591,7 @@ class TestF15BenchmarkSuiteBoundaries(E2ETestCase):
     def test_f15_benchmark_missing_required_fields_in_corpus(self) -> None:
         """Corpus containing tasks missing required fields (id, prompt, etc.) must raise ValueError during validation."""
         incomplete_file = self.temp_dir / "incomplete_corpus.json"
-        incomplete_file.write_text(
-            json.dumps({"tasks": [{"id": "t1"}]}), encoding="utf-8"
-        )
+        incomplete_file.write_text(json.dumps({"tasks": [{"id": "t1"}]}), encoding="utf-8")
         with self.assertRaises(ValueError) as ctx:
             harness.load_corpus(incomplete_file)
         self.assertIn("every task needs", str(ctx.exception).lower())
@@ -1549,11 +1626,13 @@ class TestF16SimulationRecallBoundaries(E2ETestCase):
 
     def test_f16_20_turn_simulation_alternating_tasks(self) -> None:
         """A 20-turn simulation alternating between 3 different tasks must execute with zero unhandled exceptions."""
-        repo = self.create_repo({
-            "auth.py": "def authenticate(): pass\n",
-            "billing.py": "def process_payment(): pass\n",
-            "metrics.py": "def record_metrics(): pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "auth.py": "def authenticate(): pass\n",
+                "billing.py": "def process_payment(): pass\n",
+                "metrics.py": "def record_metrics(): pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -1582,12 +1661,16 @@ class TestF16SimulationRecallBoundaries(E2ETestCase):
             for batch in range(5):
                 query = " ".join([f"func_{batch * 10 + j}" for j in range(10)])
                 res = broker.task_context(
-                    kn, {"project": str(repo), "task": query, "session_id": session_id, "budget": 1500}, conn
+                    kn,
+                    {"project": str(repo), "task": query, "session_id": session_id, "budget": 1500},
+                    conn,
                 )
                 self.assertNotIn("error", res)
 
             # Checkpoint session state
-            chk = broker.session_checkpoint(kn, {"project": str(repo), "session_id": session_id}, conn)
+            chk = broker.session_checkpoint(
+                kn, {"project": str(repo), "session_id": session_id}, conn
+            )
             self.assertNotIn("error", chk)
             self.assertGreater(chk.get("supplied_items", 0), 10)
         finally:
@@ -1613,7 +1696,9 @@ class TestF16SimulationRecallBoundaries(E2ETestCase):
         # Post-crash reconnection: Turn 2
         conn2 = kn.connect(db_path)
         try:
-            chk = broker.session_checkpoint(kn, {"project": str(repo), "session_id": session_id}, conn2)
+            chk = broker.session_checkpoint(
+                kn, {"project": str(repo), "session_id": session_id}, conn2
+            )
             self.assertGreater(chk.get("supplied_items", 0), 0)
 
             # Turn 2 must recognize item from pre-crash session and suppress it with recap

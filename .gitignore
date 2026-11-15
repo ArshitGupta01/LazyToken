@@ -12,3 +12,5 @@ mcp_config.json
 benchmark/results/
 build/
 release/
+work/
+

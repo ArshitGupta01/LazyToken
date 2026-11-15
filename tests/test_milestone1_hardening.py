@@ -115,7 +115,9 @@ class Milestone1HardeningTests(unittest.TestCase):
         # Project also has features.py and retrieval_eval.py which contain "re" as a substring
         (self.root / "helper.py").write_text("def assist():\n    return 42\n", encoding="utf-8")
         (self.root / "features.py").write_text("class Features:\n    pass\n", encoding="utf-8")
-        (self.root / "retrieval_eval.py").write_text("def evaluate():\n    pass\n", encoding="utf-8")
+        (self.root / "retrieval_eval.py").write_text(
+            "def evaluate():\n    pass\n", encoding="utf-8"
+        )
         (self.root / "main.py").write_text(
             "import re\nimport helper\ndef run():\n    return helper.assist()\n",
             encoding="utf-8",
@@ -155,7 +157,9 @@ class Milestone1HardeningTests(unittest.TestCase):
             "src/services/index.js",
         }
         # ../ from subfolder
-        resolved = _resolve_import_target("src/components/Header.tsx", "../utils/calc", active_files)
+        resolved = _resolve_import_target(
+            "src/components/Header.tsx", "../utils/calc", active_files
+        )
         self.assertEqual(resolved, "src/utils/calc.ts")
 
         # ./ from same folder
@@ -192,14 +196,21 @@ class Milestone1HardeningTests(unittest.TestCase):
 
     # --- 4. Active Session Item Freshness & Deduplication ---
     def test_session_item_timestamp_refreshed_on_suppression_prevents_eviction(self):
-        (self.root / "foundational.py").write_text("class FoundationalCore:\n    pass\n", encoding="utf-8")
+        (self.root / "foundational.py").write_text(
+            "class FoundationalCore:\n    pass\n", encoding="utf-8"
+        )
         kn.sync(self.root, self.db)
 
         session_id = "long-session"
         # Turn 1: Retrieve foundational.py
         ret1 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "FoundationalCore setup", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "FoundationalCore setup",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertTrue(ret1["results"])
@@ -230,7 +241,12 @@ class Milestone1HardeningTests(unittest.TestCase):
         # Now run Turn 2: Query FoundationalCore again
         ret2 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "FoundationalCore setup", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "FoundationalCore setup",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertGreater(ret2["suppressed_seen"], 0)
@@ -249,14 +265,21 @@ class Milestone1HardeningTests(unittest.TestCase):
 
     # --- 5. Context Amnesia Elimination & Recovery Recap ---
     def test_full_suppression_returns_recovery_recap_and_active_graph(self):
-        (self.root / "core.py").write_text("class CoreEngine:\n    def start(self): pass\n", encoding="utf-8")
+        (self.root / "core.py").write_text(
+            "class CoreEngine:\n    def start(self): pass\n", encoding="utf-8"
+        )
         kn.sync(self.root, self.db)
 
         session_id = "amnesia-test-session"
         # Turn 1: retrieve
         ret1 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "CoreEngine start", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "CoreEngine start",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertTrue(ret1["results"])
@@ -264,7 +287,12 @@ class Milestone1HardeningTests(unittest.TestCase):
         # Turn 2: same task in same session -> full suppression
         ret2 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "CoreEngine start", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "CoreEngine start",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertEqual(ret2["results"], [])
@@ -281,7 +309,9 @@ class Milestone1HardeningTests(unittest.TestCase):
     # --- 6. Cross-Turn Graph Edge Preservation ---
     def test_cross_turn_graph_edge_preservation(self):
         (self.root / "helper.py").write_text("def assist():\n    return 42\n", encoding="utf-8")
-        (self.root / "service.py").write_text("import helper\ndef run():\n    return helper.assist()\n", encoding="utf-8")
+        (self.root / "service.py").write_text(
+            "import helper\ndef run():\n    return helper.assist()\n", encoding="utf-8"
+        )
         kn.sync(self.root, self.db)
 
         session_id = "cross-turn-session"
@@ -289,7 +319,12 @@ class Milestone1HardeningTests(unittest.TestCase):
         # Turn 1: Query only helper
         ret1 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "assist helper", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "assist helper",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertIn("helper.py", [r.get("path") for r in ret1["results"]])
@@ -297,7 +332,12 @@ class Milestone1HardeningTests(unittest.TestCase):
         # Turn 2: Query service (service imports helper)
         ret2 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "service run", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "service run",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         # Even if results only has service.py, the edge service.py -> helper.py must be computed
@@ -360,18 +400,27 @@ class Milestone1HardeningTests(unittest.TestCase):
         active_files = {"main.py", "re.py"}
         self.assertEqual(_resolve_import_target("main.py", "re", active_files), "re.py")
         active_files_nested = {"src/main.py", "src/re.py"}
-        self.assertEqual(_resolve_import_target("src/main.py", "re", active_files_nested), "src/re.py")
+        self.assertEqual(
+            _resolve_import_target("src/main.py", "re", active_files_nested), "src/re.py"
+        )
 
     def test_cross_turn_graph_edge_reverse_direction(self):
         (self.root / "helper.py").write_text("def assist():\n    return 42\n", encoding="utf-8")
-        (self.root / "service.py").write_text("import helper\ndef run():\n    return helper.assist()\n", encoding="utf-8")
+        (self.root / "service.py").write_text(
+            "import helper\ndef run():\n    return helper.assist()\n", encoding="utf-8"
+        )
         kn.sync(self.root, self.db)
 
         session_id = "reverse-session"
         # Turn 1: Retrieve service
         ret1 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "service run", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "service run",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertIn("service.py", [r.get("path") for r in ret1["results"]])
@@ -379,7 +428,12 @@ class Milestone1HardeningTests(unittest.TestCase):
         # Turn 2: Retrieve helper
         ret2 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "assist helper", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "assist helper",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         # Verify edge service.py -> helper.py is present
@@ -423,23 +477,35 @@ class Milestone1HardeningTests(unittest.TestCase):
     # --- 9. Challenger Edge Cases: Import Target Resolution ---
     def test_challenger_edge_cases_import_target_resolution(self):
         # 1. Standard library imports do not match arbitrary nested subdirectories
-        self.assertIsNone(_resolve_import_target("main.py", "string", {"main.py", "vendor/foo/string.py"}))
-        self.assertIsNone(_resolve_import_target("main.py", "difflib", {"main.py", "sub/difflib.py"}))
+        self.assertIsNone(
+            _resolve_import_target("main.py", "string", {"main.py", "vendor/foo/string.py"})
+        )
+        self.assertIsNone(
+            _resolve_import_target("main.py", "difflib", {"main.py", "sub/difflib.py"})
+        )
         self.assertIsNone(_resolve_import_target("main.py", "re", {"main.py", "tools/re.py"}))
         self.assertIsNone(_resolve_import_target("main.py", "io", {"main.py", "helpers/io.py"}))
 
         # 2. Self-import guard & bare stem restriction
-        self.assertIsNone(_resolve_import_target("server.py", "server", {"server.py", "sub/server.py"}))
-        self.assertIsNone(_resolve_import_target("server.py", "server.py", {"server.py", "sub/server.py"}))
+        self.assertIsNone(
+            _resolve_import_target("server.py", "server", {"server.py", "sub/server.py"})
+        )
+        self.assertIsNone(
+            _resolve_import_target("server.py", "server.py", {"server.py", "sub/server.py"})
+        )
         self.assertIsNone(_resolve_import_target("main.py", "server", {"main.py", "sub/server.py"}))
 
         # 3. TypeScript declaration index files (.d.ts, /index.d.ts)
         self.assertEqual(
-            _resolve_import_target("src/main.ts", "./types", {"src/main.ts", "src/types/index.d.ts"}),
+            _resolve_import_target(
+                "src/main.ts", "./types", {"src/main.ts", "src/types/index.d.ts"}
+            ),
             "src/types/index.d.ts",
         )
         self.assertEqual(
-            _resolve_import_target("src/main.ts", "./types/index", {"src/main.ts", "src/types/index.d.ts"}),
+            _resolve_import_target(
+                "src/main.ts", "./types/index", {"src/main.ts", "src/types/index.d.ts"}
+            ),
             "src/types/index.d.ts",
         )
 
@@ -452,7 +518,9 @@ class Milestone1HardeningTests(unittest.TestCase):
         )
         self.assertEqual(
             _resolve_import_target(
-                "src/app/main.ts", "..\\components\\button", {"src/app/main.ts", "src/components/button.tsx"}
+                "src/app/main.ts",
+                "..\\components\\button",
+                {"src/app/main.ts", "src/components/button.tsx"},
             ),
             "src/components/button.tsx",
         )
@@ -460,9 +528,13 @@ class Milestone1HardeningTests(unittest.TestCase):
     def test_checkpoint_active_graph_avoids_phantom_stdlib_and_self_edges(self):
         (self.root / "vendor" / "foo").mkdir(parents=True, exist_ok=True)
         (self.root / "sub").mkdir(parents=True, exist_ok=True)
-        (self.root / "vendor" / "foo" / "string.py").write_text("STR = 'vendor'\n", encoding="utf-8")
+        (self.root / "vendor" / "foo" / "string.py").write_text(
+            "STR = 'vendor'\n", encoding="utf-8"
+        )
         (self.root / "sub" / "server.py").write_text("class SubServer: pass\n", encoding="utf-8")
-        (self.root / "main.py").write_text("import string\nprint(string.ascii_letters)\n", encoding="utf-8")
+        (self.root / "main.py").write_text(
+            "import string\nprint(string.ascii_letters)\n", encoding="utf-8"
+        )
         (self.root / "server.py").write_text("import server\napp = 'main'\n", encoding="utf-8")
         kn.sync(self.root, self.db)
 
@@ -480,7 +552,6 @@ class Milestone1HardeningTests(unittest.TestCase):
             any(e["source"] == "server.py" and e["target"] == "sub/server.py" for e in edges),
             f"Phantom self-import edge found in edges: {edges}",
         )
-
 
     # --- 10. Challenger Iteration 2 Hardening: Key Parsing, Budget Shedding, & Touch Sync ---
     def test_build_session_graph_key_parsing_and_symbol_free_import_edges(self):
@@ -503,10 +574,16 @@ class Milestone1HardeningTests(unittest.TestCase):
 
         # 2. Verify import edges are discovered between files without symbols
         (self.root / "config.js").write_text("module.exports = { port: 3000 };\n", encoding="utf-8")
-        (self.root / "main.js").write_text("const config = require('./config');\n", encoding="utf-8")
+        (self.root / "main.js").write_text(
+            "const config = require('./config');\n", encoding="utf-8"
+        )
         kn.sync(self.root, self.db)
 
-        recent_with_db = ["file:config.js:config.js:", "file:main.js:main.js:", "import:main.js:./config:"]
+        recent_with_db = [
+            "file:config.js:config.js:",
+            "file:main.js:main.js:",
+            "import:main.js:./config:",
+        ]
         graph_db = broker.build_session_graph(kn, self.db, self.project, recent_with_db)
         edges = graph_db["active_graph"]["edges"]
         self.assertTrue(
@@ -526,7 +603,12 @@ class Milestone1HardeningTests(unittest.TestCase):
         # Turn 1: populate session
         ret1 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "ControllerService handle_request", "session_id": session_id, "budget": 1200},
+            {
+                "project": self.project,
+                "task": "ControllerService handle_request",
+                "session_id": session_id,
+                "budget": 1200,
+            },
             self.db,
         )
         self.assertTrue(ret1["results"])
@@ -535,23 +617,37 @@ class Milestone1HardeningTests(unittest.TestCase):
         for b in (100, 150, 200, 250):
             ret = kn.call(
                 "get_task_context",
-                {"project": self.project, "task": "ControllerService handle_request", "session_id": session_id, "budget": b},
+                {
+                    "project": self.project,
+                    "task": "ControllerService handle_request",
+                    "session_id": session_id,
+                    "budget": b,
+                },
                 self.db,
             )
             self.assertNotIn("error", ret, f"Budget {b} failed with error: {ret.get('error')}")
             self.assertEqual(ret["results"], [])
             self.assertGreater(ret["suppressed_seen"], 0)
-            self.assertLessEqual(ret.get("used_tokens", 0), b, f"Budget {b} exceeded: used={ret.get('used_tokens')}")
+            self.assertLessEqual(
+                ret.get("used_tokens", 0), b, f"Budget {b} exceeded: used={ret.get('used_tokens')}"
+            )
 
     def test_touch_synchronization_active_graph_current_turn(self):
-        (self.root / "foundational.py").write_text("class FoundationalCore:\n    pass\n", encoding="utf-8")
+        (self.root / "foundational.py").write_text(
+            "class FoundationalCore:\n    pass\n", encoding="utf-8"
+        )
         kn.sync(self.root, self.db)
 
         session_id = "sync-touch-session"
         # Turn 1: Retrieve foundational.py
         ret1 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "FoundationalCore", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "FoundationalCore",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertTrue(ret1["results"])
@@ -574,7 +670,12 @@ class Milestone1HardeningTests(unittest.TestCase):
         # so foundational.py appears in ret2's active_graph!
         ret2 = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "FoundationalCore", "session_id": session_id, "budget": 800},
+            {
+                "project": self.project,
+                "task": "FoundationalCore",
+                "session_id": session_id,
+                "budget": 800,
+            },
             self.db,
         )
         self.assertEqual(ret2["results"], [])

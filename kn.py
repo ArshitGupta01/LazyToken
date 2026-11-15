@@ -1490,7 +1490,7 @@ def main() -> None:
             raise SystemExit(1)
         if a.prompt:
             prompt = a.task
-            if result.get("results"):
+            if result.get("results") or result.get("recap"):
                 brief = {
                     "project": result["project"],
                     "budget_type": result["budget_type"],
@@ -1501,6 +1501,8 @@ def main() -> None:
                     "suppressed_seen",
                     "graph_edges",
                     "reusable_frameworks",
+                    "recap",
+                    "active_graph",
                     "graph_topology",
                 ):
                     if result.get(field):

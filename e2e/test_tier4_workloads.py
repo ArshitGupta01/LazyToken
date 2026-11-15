@@ -12,15 +12,17 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import broker
 import dashboard
 import features
 import kn
 import retrieval_eval
 import token_budget
-from tests.e2e.common import E2ETestCase, McpClient
-
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+from e2e.common import E2ETestCase, McpClient
 
 
 class TestTier4Workloads(E2ETestCase):
@@ -36,7 +38,7 @@ class TestTier4Workloads(E2ETestCase):
         files = {
             "core/__init__.py": "",
             "core/config.py": (
-                "\"\"\"Application configuration management.\"\"\"\n"
+                '"""Application configuration management."""\n'
                 "CONFIG = {\n"
                 "    'db_url': 'sqlite:///data.db',\n"
                 "    'debug': True,\n"
@@ -45,23 +47,23 @@ class TestTier4Workloads(E2ETestCase):
                 "    'retry_attempts': 3,\n"
                 "}\n"
                 "def get_config():\n"
-                "    \"\"\"Return application configuration dictionary.\"\"\"\n"
+                '    """Return application configuration dictionary."""\n'
                 "    return CONFIG\n"
             ),
             "core/db.py": (
-                "\"\"\"Database connection pool management.\"\"\"\n"
+                '"""Database connection pool management."""\n'
                 "from .config import get_config\n"
                 "class DatabasePool:\n"
                 "    def __init__(self):\n"
                 "        self.config = get_config()\n"
                 "        self.pool_size = self.config.get('max_connections', 10)\n"
                 "    def get_connection(self):\n"
-                "        \"\"\"Acquire an active database connection.\"\"\"\n"
+                '        """Acquire an active database connection."""\n'
                 "        return {'conn': 'active', 'timeout': self.config.get('timeout', 30)}\n"
             ),
             "models/__init__.py": "",
             "models/user.py": (
-                "\"\"\"User model and schema definition.\"\"\"\n"
+                '"""User model and schema definition."""\n'
                 "class User:\n"
                 "    def __init__(self, uid, username, role='user'):\n"
                 "        self.uid = uid\n"
@@ -72,51 +74,51 @@ class TestTier4Workloads(E2ETestCase):
             ),
             "utils/__init__.py": "",
             "utils/crypto.py": (
-                "\"\"\"Cryptographic hashing and verification utilities.\"\"\"\n"
+                '"""Cryptographic hashing and verification utilities."""\n'
                 "import hashlib\n"
                 "def hash_password(raw):\n"
-                "    \"\"\"Compute SHA-256 hash of password string.\"\"\"\n"
+                '    """Compute SHA-256 hash of password string."""\n'
                 "    return hashlib.sha256(raw.encode('utf-8')).hexdigest()\n"
                 "def verify_password(raw, hashed):\n"
-                "    \"\"\"Verify raw password against stored hash.\"\"\"\n"
+                '    """Verify raw password against stored hash."""\n'
                 "    return hash_password(raw) == hashed\n"
             ),
             "services/__init__.py": "",
             "services/auth_service.py": (
-                "\"\"\"Authentication service handling login and token validation.\"\"\"\n"
+                '"""Authentication service handling login and token validation."""\n'
                 "from ..core.db import DatabasePool\n"
                 "from ..utils.crypto import verify_password\n"
                 "class AuthService:\n"
                 "    def __init__(self, pool):\n"
                 "        self.pool = pool\n"
                 "    def authenticate(self, username, password):\n"
-                "        \"\"\"Verify user credentials and return authentication token.\"\"\"\n"
+                '        """Verify user credentials and return authentication token."""\n'
                 "        return {'token': f'auth_{username}', 'status': 'authenticated'}\n"
             ),
             "services/user_service.py": (
-                "\"\"\"User management and registration service.\"\"\"\n"
+                '"""User management and registration service."""\n'
                 "from ..models.user import User\n"
                 "class UserService:\n"
                 "    def __init__(self, pool):\n"
                 "        self.pool = pool\n"
                 "    def find_user(self, uid):\n"
-                "        \"\"\"Find user by ID.\"\"\"\n"
+                '        """Find user by ID."""\n'
                 "        return User(uid, 'alice')\n"
             ),
             "api/__init__.py": "",
             "api/middleware.py": (
-                "\"\"\"HTTP middleware for authentication and request validation.\"\"\"\n"
+                '"""HTTP middleware for authentication and request validation."""\n'
                 "from ..services.auth_service import AuthService\n"
                 "def auth_middleware(req):\n"
-                "    \"\"\"Verify request authentication header.\"\"\"\n"
+                '    """Verify request authentication header."""\n'
                 "    return req.get('auth') is not None\n"
             ),
             "api/routes.py": (
-                "\"\"\"API route handlers for users and authentication endpoints.\"\"\"\n"
+                '"""API route handlers for users and authentication endpoints."""\n'
                 "from .middleware import auth_middleware\n"
                 "from ..services.user_service import UserService\n"
                 "def setup_routes(app):\n"
-                "    \"\"\"Register application HTTP route handlers.\"\"\"\n"
+                '    """Register application HTTP route handlers."""\n'
                 "    return {'/api/auth': 'auth_handler', '/api/users': 'user_handler'}\n"
             ),
         }
@@ -163,7 +165,9 @@ class TestTier4Workloads(E2ETestCase):
                         },
                         conn,
                     )
-                    self.assertNotIn("error", res, f"Turn {turn_idx} returned error: {res.get('error')}")
+                    self.assertNotIn(
+                        "error", res, f"Turn {turn_idx} returned error: {res.get('error')}"
+                    )
                     turn_results.append(res)
                 else:
                     # Turn 10: Final checkpoint restoration & verification
@@ -179,7 +183,9 @@ class TestTier4Workloads(E2ETestCase):
             # Verification 2: Turn 8 suppression (AuthService was seen in Turn 4)
             turn8 = turn_results[7]
             self.assertGreaterEqual(
-                turn8.get("suppressed_seen", 0), 1, "Turn 8 must suppress previously seen AuthService"
+                turn8.get("suppressed_seen", 0),
+                1,
+                "Turn 8 must suppress previously seen AuthService",
             )
 
             # Verification 3: Turn 9 recap recovery (core/db.py & core/config.py seen in Turn 1)
@@ -187,7 +193,9 @@ class TestTier4Workloads(E2ETestCase):
             self.assertGreaterEqual(turn9.get("suppressed_seen", 0), 1)
             recap = turn9.get("recap")
             self.assertIsNotNone(recap, "Turn 9 must provide recap breadcrumbs on suppression")
-            recap_keys = [item.get("key", "") if isinstance(item, dict) else str(item) for item in recap]
+            recap_keys = [
+                item.get("key", "") if isinstance(item, dict) else str(item) for item in recap
+            ]
             self.assertTrue(
                 any("core/db.py" in k or "core/config.py" in k for k in recap_keys),
                 f"Foundational Turn 1 items missing from Turn 9 recap: {recap_keys}",
@@ -198,8 +206,13 @@ class TestTier4Workloads(E2ETestCase):
                 "SELECT item_key FROM context_session_items WHERE session_id=?", (session_id,)
             ).fetchall()
             keys = [r["item_key"] for r in session_rows]
-            self.assertTrue(any("core/db.py" in k for k in keys), "Turn 1 core/db.py evicted from session items")
-            self.assertTrue(any("core/config.py" in k for k in keys), "Turn 1 core/config.py evicted from session")
+            self.assertTrue(
+                any("core/db.py" in k for k in keys), "Turn 1 core/db.py evicted from session items"
+            )
+            self.assertTrue(
+                any("core/config.py" in k for k in keys),
+                "Turn 1 core/config.py evicted from session",
+            )
 
             # Verification 5: Token compression ratio (>60% reduction vs unoptimized raw source reading)
             total_session_tokens = sum(r.get("used_tokens", 0) for r in turn_results[:9])
@@ -224,10 +237,12 @@ class TestTier4Workloads(E2ETestCase):
     # Features: F1, F11, F13, F14
     # ------------------------------------------------------------------------
     def test_s2_multi_interface_sync_and_query_cycle(self) -> None:
-        repo = self.create_repo({
-            "main.py": "def main():\n    return 'hello world'\n",
-            "server.py": "def start_server(port):\n    return port\n",
-        })
+        repo = self.create_repo(
+            {
+                "main.py": "def main():\n    return 'hello world'\n",
+                "server.py": "def start_server(port):\n    return port\n",
+            }
+        )
         session_id = "sess_s2_cycle"
 
         # Step 1: CLI indexes repository
@@ -259,13 +274,17 @@ class TestTier4Workloads(E2ETestCase):
             with urllib.request.urlopen(req, timeout=3) as resp:
                 self.assertEqual(resp.status, 200)
                 dash_data = json.loads(resp.read().decode("utf-8"))
-                self.assertTrue("nodes" in dash_data or "session_id" in dash_data or "files" in dash_data)
+                self.assertTrue(
+                    "nodes" in dash_data or "session_id" in dash_data or "files" in dash_data
+                )
         finally:
             server.shutdown()
             server.server_close()
 
         # Step 4: CLI checkpoint validation
-        cli_cp = self.run_cli_json(["checkpoint", "--project", str(repo), "--session-id", session_id])
+        cli_cp = self.run_cli_json(
+            ["checkpoint", "--project", str(repo), "--session-id", session_id]
+        )
         self.assertNotIn("error", cli_cp)
         self.assertEqual(cli_cp.get("session_id"), session_id)
         self.assertGreater(cli_cp.get("supplied_items", 0), 0)
@@ -282,14 +301,14 @@ class TestTier4Workloads(E2ETestCase):
                 f"# Service module {i} with extensive documentation and comments\n"
                 f"# Provides domain-specific capabilities for processing event logs\n"
                 f"class ServiceHandler{i}:\n"
-                f"    \"\"\"ServiceHandler {i} manages connection and dispatching.\"\"\"\n"
+                f'    """ServiceHandler {i} manages connection and dispatching."""\n'
                 f"    def __init__(self, endpoint='https://api.example.com/v1/{i}'):\n"
                 f"        self.endpoint = endpoint\n"
                 f"        self.timeout = 30\n"
                 f"        self.retries = 5\n"
                 f"        self.active = True\n"
                 f"    def execute_{i}(self, payload):\n"
-                f"        \"\"\"Executes action {i} with verified security headers and audit logs.\"\"\"\n"
+                f'        """Executes action {i} with verified security headers and audit logs."""\n'
                 f"        if not payload:\n"
                 f"            raise ValueError('Invalid empty payload for service {i}')\n"
                 f"        return {{'status': 200, 'code': {i}, 'payload': payload}}\n"
@@ -343,9 +362,18 @@ class TestTier4Workloads(E2ETestCase):
         # Pipeline 4: Prefix-cache aligned prompt generation via CLI
         self.run_cli(["init", "--project", str(repo)])
         task_query = "dynamic_optimization_query_task"
-        proc = self.run_cli([
-            "context", "--project", str(repo), "--task", task_query, "--prompt", "--mode", "compact"
-        ])
+        proc = self.run_cli(
+            [
+                "context",
+                "--project",
+                str(repo),
+                "--task",
+                task_query,
+                "--prompt",
+                "--mode",
+                "compact",
+            ]
+        )
         self.assertEqual(proc.returncode, 0)
         output = proc.stdout
         task_idx = output.find(task_query)
@@ -419,11 +447,13 @@ class TestTier4Workloads(E2ETestCase):
     # Features: F1, F5, F13
     # ------------------------------------------------------------------------
     def test_s5_high_concurrency_multi_client_stress(self) -> None:
-        repo = self.create_repo({
-            "service_a.py": "def compute_a(): return 1\n",
-            "service_b.py": "def compute_b(): return 2\n",
-            "service_c.py": "def compute_c(): return 3\n",
-        })
+        repo = self.create_repo(
+            {
+                "service_a.py": "def compute_a(): return 1\n",
+                "service_b.py": "def compute_b(): return 2\n",
+                "service_c.py": "def compute_c(): return 3\n",
+            }
+        )
         db_file = self.temp_dir / "network.sqlite3"
         init_conn = kn.connect(db_file)
         try:
@@ -541,8 +571,7 @@ class TestTier4Workloads(E2ETestCase):
             ),
             "backend/services/__init__.py": "",
             "backend/services/auth.py": (
-                "def verify_token(token):\n"
-                "    return len(token) > 0\n"
+                "def verify_token(token):\n" "    return len(token) > 0\n"
             ),
             "backend/features.py": (
                 "# Named features.py to test that stdlib 're' does not link here\n"
@@ -557,8 +586,7 @@ class TestTier4Workloads(E2ETestCase):
                 "export const Navbar = () => <nav>LazyToken Navigation</nav>;\n"
             ),
             "docs/ARCHITECTURE.md": (
-                "# Architecture Guide\n"
-                "Comprehensive overview of backend and frontend systems.\n"
+                "# Architecture Guide\n" "Comprehensive overview of backend and frontend systems.\n"
             ),
         }
         repo = self.create_repo(files)
@@ -603,7 +631,9 @@ class TestTier4Workloads(E2ETestCase):
             has_ts_rel = any(
                 "App.tsx" in s and "./components/Navbar" in t for s, t in sources_to_targets
             )
-            self.assertTrue(has_ts_rel, f"TypeScript relative import not recorded: {sources_to_targets}")
+            self.assertTrue(
+                has_ts_rel, f"TypeScript relative import not recorded: {sources_to_targets}"
+            )
         finally:
             conn.close()
 
@@ -614,12 +644,14 @@ class TestTier4Workloads(E2ETestCase):
     # Features: F1, F3, F4, F9, F12
     # ------------------------------------------------------------------------
     def test_s7_propose_review_dynamic_memory_recall_cycle(self) -> None:
-        repo = self.create_repo({
-            "payments/processor.py": (
-                "def process_payment(amount, idempotency_key):\n"
-                "    return {'status': 'processed', 'amount': amount}\n"
-            )
-        })
+        repo = self.create_repo(
+            {
+                "payments/processor.py": (
+                    "def process_payment(amount, idempotency_key):\n"
+                    "    return {'status': 'processed', 'amount': amount}\n"
+                )
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -664,7 +696,9 @@ class TestTier4Workloads(E2ETestCase):
                 conn,
             )
             names = [r.get("name") for r in ctx_res1.get("results", [])]
-            self.assertIn("Payment Idempotency", names, "Approved memory lesson must be recalled in context")
+            self.assertIn(
+                "Payment Idempotency", names, "Approved memory lesson must be recalled in context"
+            )
 
             # Initial health check: freshness is 'current'
             h1 = features.health(conn, prop_id)
@@ -701,10 +735,12 @@ class TestTier4Workloads(E2ETestCase):
     # Features: F3, F4, F13, F16
     # ------------------------------------------------------------------------
     def test_s8_fault_recovery_checkpoint_restoration(self) -> None:
-        repo = self.create_repo({
-            "worker.py": "class Worker:\n    def execute(self): return True\n",
-            "job.py": "class Job:\n    def __init__(self, jid): self.jid = jid\n",
-        })
+        repo = self.create_repo(
+            {
+                "worker.py": "class Worker:\n    def execute(self): return True\n",
+                "job.py": "class Job:\n    def __init__(self, jid): self.jid = jid\n",
+            }
+        )
         session_id = "sess_s8_crash_recovery"
 
         # Step 1: Active session in progress with items populated
@@ -726,9 +762,9 @@ class TestTier4Workloads(E2ETestCase):
             conn.close()
 
         # Step 3: Checkpoint restoration via CLI `checkpoint` subcommand
-        cp_cli = self.run_cli_json([
-            "checkpoint", "--project", str(repo), "--session-id", session_id
-        ])
+        cp_cli = self.run_cli_json(
+            ["checkpoint", "--project", str(repo), "--session-id", session_id]
+        )
         self.assertNotIn("error", cp_cli)
         self.assertEqual(cp_cli.get("session_id"), session_id)
         self.assertGreaterEqual(cp_cli.get("supplied_items", 0), 2)
@@ -744,7 +780,9 @@ class TestTier4Workloads(E2ETestCase):
         new_conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             r3 = broker.task_context(
-                kn, {"project": str(repo), "task": "Worker execute", "session_id": session_id}, new_conn
+                kn,
+                {"project": str(repo), "task": "Worker execute", "session_id": session_id},
+                new_conn,
             )
             self.assertNotIn("error", r3)
             # Item worker.py was seen prior to crash, so it must be suppressed now
@@ -755,4 +793,5 @@ class TestTier4Workloads(E2ETestCase):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

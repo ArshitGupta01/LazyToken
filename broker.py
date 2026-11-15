@@ -18,30 +18,193 @@ _PYTHON_STDLIB = getattr(
     "stdlib_module_names",
     frozenset(
         {
-            "abc", "argparse", "array", "ast", "asyncio", "base64", "binascii", "bisect",
-            "builtins", "bz2", "calendar", "cmath", "cmd", "code", "codecs", "collections",
-            "colorsys", "compileall", "concurrent", "configparser", "contextlib", "contextvars",
-            "copy", "copyreg", "csv", "ctypes", "curses", "dataclasses", "datetime", "dbm",
-            "decimal", "difflib", "dis", "doctest", "email", "encodings", "ensurepip", "enum",
-            "errno", "faulthandler", "fcntl", "filecmp", "fileinput", "fnmatch", "fractions",
-            "ftplib", "functools", "gc", "getopt", "getpass", "gettext", "glob", "graphlib",
-            "gzip", "hashlib", "heapq", "hmac", "html", "http", "idlelib", "imaplib", "imghdr",
-            "importlib", "inspect", "io", "ipaddress", "itertools", "json", "keyword", "linecache",
-            "locale", "logging", "lzma", "mailbox", "mailcap", "marshal", "math", "mimetypes",
-            "mmap", "modulefinder", "msilib", "msvcrt", "multiprocessing", "netrc", "nntplib",
-            "numbers", "operator", "optparse", "os", "ossaudiodev", "pathlib", "pdb", "pickle",
-            "pickletools", "pipes", "pkgutil", "platform", "plistlib", "poplib", "posix",
-            "posixpath", "pprint", "profile", "pstats", "pty", "pwd", "py_compile", "pyclbr",
-            "pydoc", "queue", "quopri", "random", "re", "readline", "reprlib", "resource",
-            "rlcompleter", "runpy", "sched", "secrets", "select", "selectors", "shelve", "shlex",
-            "shutil", "signal", "site", "smtpd", "smtplib", "sndhdr", "socket", "socketserver",
-            "spwd", "sqlite3", "ssl", "stat", "statistics", "string", "stringprep", "struct",
-            "subprocess", "sunau", "symtable", "sys", "sysconfig", "syslog", "tabnanny", "tarfile",
-            "telnetlib", "tempfile", "termios", "textwrap", "threading", "time", "timeit",
-            "tkinter", "token", "tokenize", "tomllib", "trace", "traceback", "tracemalloc", "tty",
-            "turtle", "turtledemo", "types", "typing", "unicodedata", "unittest", "urllib", "uu",
-            "uuid", "venv", "warnings", "wave", "weakref", "webbrowser", "winreg", "winsound",
-            "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp", "zipfile", "zipimport", "zlib",
+            "abc",
+            "argparse",
+            "array",
+            "ast",
+            "asyncio",
+            "base64",
+            "binascii",
+            "bisect",
+            "builtins",
+            "bz2",
+            "calendar",
+            "cmath",
+            "cmd",
+            "code",
+            "codecs",
+            "collections",
+            "colorsys",
+            "compileall",
+            "concurrent",
+            "configparser",
+            "contextlib",
+            "contextvars",
+            "copy",
+            "copyreg",
+            "csv",
+            "ctypes",
+            "curses",
+            "dataclasses",
+            "datetime",
+            "dbm",
+            "decimal",
+            "difflib",
+            "dis",
+            "doctest",
+            "email",
+            "encodings",
+            "ensurepip",
+            "enum",
+            "errno",
+            "faulthandler",
+            "fcntl",
+            "filecmp",
+            "fileinput",
+            "fnmatch",
+            "fractions",
+            "ftplib",
+            "functools",
+            "gc",
+            "getopt",
+            "getpass",
+            "gettext",
+            "glob",
+            "graphlib",
+            "gzip",
+            "hashlib",
+            "heapq",
+            "hmac",
+            "html",
+            "http",
+            "idlelib",
+            "imaplib",
+            "imghdr",
+            "importlib",
+            "inspect",
+            "io",
+            "ipaddress",
+            "itertools",
+            "json",
+            "keyword",
+            "linecache",
+            "locale",
+            "logging",
+            "lzma",
+            "mailbox",
+            "mailcap",
+            "marshal",
+            "math",
+            "mimetypes",
+            "mmap",
+            "modulefinder",
+            "msilib",
+            "msvcrt",
+            "multiprocessing",
+            "netrc",
+            "nntplib",
+            "numbers",
+            "operator",
+            "optparse",
+            "os",
+            "ossaudiodev",
+            "pathlib",
+            "pdb",
+            "pickle",
+            "pickletools",
+            "pipes",
+            "pkgutil",
+            "platform",
+            "plistlib",
+            "poplib",
+            "posix",
+            "posixpath",
+            "pprint",
+            "profile",
+            "pstats",
+            "pty",
+            "pwd",
+            "py_compile",
+            "pyclbr",
+            "pydoc",
+            "queue",
+            "quopri",
+            "random",
+            "re",
+            "readline",
+            "reprlib",
+            "resource",
+            "rlcompleter",
+            "runpy",
+            "sched",
+            "secrets",
+            "select",
+            "selectors",
+            "shelve",
+            "shlex",
+            "shutil",
+            "signal",
+            "site",
+            "smtpd",
+            "smtplib",
+            "sndhdr",
+            "socket",
+            "socketserver",
+            "spwd",
+            "sqlite3",
+            "ssl",
+            "stat",
+            "statistics",
+            "string",
+            "stringprep",
+            "struct",
+            "subprocess",
+            "sunau",
+            "symtable",
+            "sys",
+            "sysconfig",
+            "syslog",
+            "tabnanny",
+            "tarfile",
+            "telnetlib",
+            "tempfile",
+            "termios",
+            "textwrap",
+            "threading",
+            "time",
+            "timeit",
+            "tkinter",
+            "token",
+            "tokenize",
+            "tomllib",
+            "trace",
+            "traceback",
+            "tracemalloc",
+            "tty",
+            "turtle",
+            "turtledemo",
+            "types",
+            "typing",
+            "unicodedata",
+            "unittest",
+            "urllib",
+            "uu",
+            "uuid",
+            "venv",
+            "warnings",
+            "wave",
+            "weakref",
+            "webbrowser",
+            "winreg",
+            "winsound",
+            "wsgiref",
+            "xdrlib",
+            "xml",
+            "xmlrpc",
+            "zipapp",
+            "zipfile",
+            "zipimport",
+            "zlib",
             "zoneinfo",
         }
     ),
@@ -55,7 +218,11 @@ def _resolve_import_target(source: str, target: str, active_files: set[str]) -> 
         return None
 
     # Guard self-import: a module importing its own stem should not resolve to another file
-    if target == Path(norm_source).stem or target == Path(norm_source).name or target == norm_source:
+    if (
+        target == Path(norm_source).stem
+        or target == Path(norm_source).name
+        or target == norm_source
+    ):
         return None
 
     candidates = {f.replace("\\", "/") for f in active_files if f.replace("\\", "/") != norm_source}
@@ -312,7 +479,7 @@ def task_context(kn, args, conn):
                 else "Caller explicitly requested no retrieval."
             )
             if skip
-            else "Search project metadata for task-relevant breadcrumbs."
+            else "Ranked project metadata."
         ),
         "results": [],
         "truncated": False,
@@ -452,7 +619,14 @@ def task_context(kn, args, conn):
             if seen.get(key) == fingerprint:
                 response["suppressed_seen"] += 1
                 touched_suppressed.append(key)
-                suppressed_items.append({"key": key, "type": raw.get("type"), "path": raw.get("path"), "name": raw.get("name")})
+                suppressed_items.append(
+                    {
+                        "key": key,
+                        "type": raw.get("type"),
+                        "path": raw.get("path"),
+                        "name": raw.get("name"),
+                    }
+                )
                 if raw["type"] in ("symbol", "import") and raw.get("path"):
                     covered_paths.add(raw["path"])
                 continue
@@ -477,7 +651,9 @@ def task_context(kn, args, conn):
                 if seen.get(expanded_key) == expanded_fingerprint:
                     response["suppressed_seen"] += 1
                     touched_suppressed.append(expanded_key)
-                    suppressed_items.append({"key": expanded_key, "type": "asset", "name": raw.get("name")})
+                    suppressed_items.append(
+                        {"key": expanded_key, "type": "asset", "name": raw.get("name")}
+                    )
                     continue
         response["results"].append(crumb)
         if used(response) > budget:
@@ -500,9 +676,14 @@ def task_context(kn, args, conn):
                 "UPDATE context_session_items SET updated_at=? WHERE project_id=? AND session_id=? AND item_key=?",
                 [(now, project, session, k) for k in touched_suppressed],
             )
-        response["reason"] = "All matching breadcrumbs were already supplied in this session."
+        response.pop("reason", None)
         recap_items = [
-            {"key": item["key"], "type": item.get("type"), "path": item.get("path"), "name": item.get("name")}
+            {
+                "key": item["key"],
+                "type": item.get("type"),
+                "path": item.get("path"),
+                "name": item.get("name"),
+            }
             for item in suppressed_items
         ]
         response["recap"] = recap_items
@@ -522,8 +703,11 @@ def task_context(kn, args, conn):
             if used(response) > budget:
                 response.pop("graph_topology", None)
                 if used(response) > budget:
+                    response.pop("budget_scope", None)
                     response["recap"] = [item["key"] for item in suppressed_items][:3]
-                    response["active_context_summary"] = [item["key"] for item in suppressed_items][:3]
+                    response["active_context_summary"] = [item["key"] for item in suppressed_items][
+                        :3
+                    ]
                     if used(response) > budget:
                         response.pop("active_context_summary", None)
                         if used(response) > budget:
@@ -531,7 +715,13 @@ def task_context(kn, args, conn):
                             if used(response) > budget:
                                 response.pop("recap", None)
                                 if used(response) > budget:
-                                    response.pop("budget_scope", None)
+                                    return {
+                                        "error": "Budget is too small for session recap metadata."
+                                    }
+        if "recap" not in response:
+            return {"error": "Budget is too small for session recap metadata."}
+        if used(response) > budget:
+            return {"error": "Budget is too small for response metadata."}
     if response["results"]:
         result_files = {c.get("path") for c in response["results"] if c.get("path")}
         combined_files = result_files | session_files
@@ -545,7 +735,8 @@ def task_context(kn, args, conn):
                 target_file = _resolve_import_target(imp["source"], imp["target"], combined_files)
                 if target_file and (imp["source"] in result_files or target_file in result_files):
                     if not any(
-                        e["source"] == imp["source"] and e["target"] == target_file for e in graph_edges
+                        e["source"] == imp["source"] and e["target"] == target_file
+                        for e in graph_edges
                     ):
                         graph_edges.append(
                             {"source": imp["source"], "target": target_file, "relation": "imports"}
@@ -639,7 +830,9 @@ def build_session_graph(kn, conn, project, recent_keys):
             if target_file and not any(
                 e["source"] == imp["source"] and e["target"] == target_file for e in edges
             ):
-                edges.append({"source": imp["source"], "target": target_file, "relation": "imports"})
+                edges.append(
+                    {"source": imp["source"], "target": target_file, "relation": "imports"}
+                )
 
     active_lessons = []
     if active_asset_ids and conn:
@@ -654,7 +847,9 @@ def build_session_graph(kn, conn, project, recent_keys):
                 (row["id"], project),
             ):
                 if ev["path"] in active_files:
-                    edges.append({"source": row["name"], "target": ev["path"], "relation": "guides"})
+                    edges.append(
+                        {"source": row["name"], "target": ev["path"], "relation": "guides"}
+                    )
 
     reusable_frameworks = []
     if conn:

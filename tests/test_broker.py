@@ -96,6 +96,12 @@ class ContextBrokerTests(unittest.TestCase):
         self.assertEqual(full.returncode, 0)
         self.assertIn("budget_scope", json.loads(full.stdout))
         self.assertLess(len(metadata), len(full.stdout))
+        session_first = run("Find AuthService", "--session-id", "prompt-session")
+        self.assertEqual(session_first.returncode, 0)
+        session_repeat = run("Find AuthService", "--session-id", "prompt-session")
+        self.assertEqual(session_repeat.returncode, 0)
+        self.assertIn('"recap":', session_repeat.stdout)
+        self.assertIn("AuthService.py", session_repeat.stdout)
         missing = run("zebra quantum nonexistent")
         self.assertEqual(missing.returncode, 0)
         self.assertEqual(missing.stdout.strip(), "zebra quantum nonexistent")
@@ -399,19 +405,31 @@ class ContextBrokerTests(unittest.TestCase):
 
     def test_session_checkpoint_active_graph_and_midway_recall(self):
         (self.root / "helper.py").write_text("def assist():\n    return 42\n", encoding="utf-8")
-        (self.root / "service.py").write_text("import helper\ndef run():\n    return helper.assist()\n", encoding="utf-8")
+        (self.root / "service.py").write_text(
+            "import helper\ndef run():\n    return helper.assist()\n", encoding="utf-8"
+        )
         kn.sync(self.root, self.db)
 
         # 1. First task context retrieval
         ret = kn.call(
             "get_task_context",
-            {"project": self.project, "task": "run helper assist service", "session_id": "midway-session", "budget": 800},
+            {
+                "project": self.project,
+                "task": "run helper assist service",
+                "session_id": "midway-session",
+                "budget": 800,
+            },
             self.db,
         )
         self.assertNotIn("error", ret)
         self.assertTrue(ret["results"])
         self.assertIn("graph_edges", ret)
-        self.assertTrue(any(e["source"] == "service.py" and e["target"] == "helper.py" for e in ret["graph_edges"]))
+        self.assertTrue(
+            any(
+                e["source"] == "service.py" and e["target"] == "helper.py"
+                for e in ret["graph_edges"]
+            )
+        )
 
         # 2. Mid-way recall via checkpoint
         cp = kn.call(
@@ -423,9 +441,16 @@ class ContextBrokerTests(unittest.TestCase):
         self.assertIn("active_graph", cp)
         self.assertIn("service.py", cp["active_graph"]["files"])
         self.assertIn("helper.py", cp["active_graph"]["files"])
-        self.assertTrue(any(e["source"] == "service.py" and e["target"] == "helper.py" for e in cp["active_graph"]["edges"]))
+        self.assertTrue(
+            any(
+                e["source"] == "service.py" and e["target"] == "helper.py"
+                for e in cp["active_graph"]["edges"]
+            )
+        )
         self.assertIn("graph_topology", cp)
-        self.assertTrue(any("service.py --(imports)--> helper.py" in t for t in cp["graph_topology"]))
+        self.assertTrue(
+            any("service.py --(imports)--> helper.py" in t for t in cp["graph_topology"])
+        )
 
 
 if __name__ == "__main__":

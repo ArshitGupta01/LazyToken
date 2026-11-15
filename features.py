@@ -692,7 +692,7 @@ def ranked_search(kn, args, conn):
                     "path": r["path"],
                     "name": Path(r["path"]).name,
                     "score": n * 2,
-                    "why": "Task terms or a prefix matched this path.",
+                    "why": "Path match.",
                 }
             )
     for r in candidates("symbols", "path,name,line", "name||' '||path"):
@@ -707,7 +707,7 @@ def ranked_search(kn, args, conn):
                     "type": "symbol",
                     **dict(r),
                     "score": n,
-                    "why": "Task terms or a prefix matched this declaration or its path.",
+                    "why": "Symbol/path match.",
                 }
             )
     for r in candidates("imports", "source,target", "target"):
@@ -721,7 +721,7 @@ def ranked_search(kn, args, conn):
                     "path": r["source"],
                     "name": r["target"],
                     "score": target_score * 3 + score(r["source"]),
-                    "why": "Task terms or a prefix matched this import.",
+                    "why": "Import match.",
                 }
             )
 

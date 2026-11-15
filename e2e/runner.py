@@ -9,7 +9,7 @@ import time
 import unittest
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 
@@ -97,12 +97,8 @@ def main(argv: list[str] | None = None) -> int:
             "skipped": skipped,
             "duration_seconds": round(duration, 3),
             "success": success,
-            "failures": [
-                {"test": str(t), "traceback": tb} for t, tb in result.failures
-            ],
-            "errors": [
-                {"test": str(t), "traceback": tb} for t, tb in result.errors
-            ],
+            "failures": [{"test": str(t), "traceback": tb} for t, tb in result.failures],
+            "errors": [{"test": str(t), "traceback": tb} for t, tb in result.errors],
         }
         report_path = Path(args.json_report).resolve()
         report_path.parent.mkdir(parents=True, exist_ok=True)

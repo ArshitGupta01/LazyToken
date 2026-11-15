@@ -1,13 +1,13 @@
 # E2E Test Suite Ready
 
 ## Test Runner
-- **Full Test Suite Command**: `python tests/e2e/runner.py --all`
+- **Full Test Suite Command**: `python e2e/runner.py --all`
 - **Standard Library Discovery**: `python -m unittest discover tests`
 - **Individual Tier Commands**:
-  - Tier 1: `python tests/e2e/runner.py --tier 1`
-  - Tier 2: `python tests/e2e/runner.py --tier 2`
-  - Tier 3: `python tests/e2e/runner.py --tier 3`
-  - Tier 4: `python tests/e2e/runner.py --tier 4`
+  - Tier 1: `python e2e/runner.py --tier 1`
+  - Tier 2: `python e2e/runner.py --tier 2`
+  - Tier 3: `python e2e/runner.py --tier 3`
+  - Tier 4: `python e2e/runner.py --tier 4`
 - **Reporting**: Add `--json-report <path>` to output structured machine-readable test run metrics.
 - **Expected**: All tests pass cleanly with exit code 0 once all implementation milestones (M1–M4) are integrated.
 
@@ -22,7 +22,7 @@
 | 4. Real-World Application Scenarios | 8 | Realistic multi-turn simulations, refactoring sessions, and benchmarks |
 | **Total E2E Tests** | **184** | **100% Opaque-Box, Requirement-Driven Coverage** |
 
-In addition to the 184 E2E tests, the full repository suite includes the **121 baseline unit tests** (totaling 305+ discoverable tests), all of which continue to pass with 0 regressions.
+The core unit suite currently discovers **139 tests** (one Windows symlink test is skipped). The 184 E2E tests run separately with the command above; their pending gates are listed below.
 
 ---
 
@@ -49,12 +49,12 @@ In addition to the 184 E2E tests, the full repository suite includes the **121 b
 ---
 
 ## Test Infrastructure & Implementation Details
-- **Test Harness Base**: `tests/e2e/common.py` (`E2ETestCase`, `McpClient`)
-- **CLI Runner**: `tests/e2e/runner.py`
-- **Tier 1 Suite**: `tests/e2e/test_tier1_features.py` (80 tests)
-- **Tier 2 Suite**: `tests/e2e/test_tier2_boundaries.py` (80 tests)
-- **Tier 3 Suite**: `tests/e2e/test_tier3_combinations.py` (16 tests)
-- **Tier 4 Suite**: `tests/e2e/test_tier4_workloads.py` (8 tests)
+- **Test Harness Base**: `e2e/common.py` (`E2ETestCase`, `McpClient`)
+- **CLI Runner**: `e2e/runner.py`
+- **Tier 1 Suite**: `e2e/test_tier1_features.py` (80 tests)
+- **Tier 2 Suite**: `e2e/test_tier2_boundaries.py` (80 tests)
+- **Tier 3 Suite**: `e2e/test_tier3_combinations.py` (16 tests)
+- **Tier 4 Suite**: `e2e/test_tier4_workloads.py` (8 tests)
 
 ### Current Suite Acceptance Gate Status:
 - **Tier 1**: 69 passing, 11 pending gates (M2: F10 prompt prefix layout; M3: F11 CLI help unification, F12 format flags, F13 MCP schemas & resources, F14 dashboard `/api/session/<id>`).

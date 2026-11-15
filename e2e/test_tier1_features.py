@@ -12,15 +12,17 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import broker
 import dashboard
 import features
 import kn
 import retrieval_eval
 import token_budget
-from tests.e2e.common import E2ETestCase, McpClient
-
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+from e2e.common import E2ETestCase, McpClient
 
 
 # ============================================================================
@@ -65,8 +67,7 @@ class TestF1SQLiteConcurrency(E2ETestCase):
             }
             # Verify primary composite / lookup indexes exist
             self.assertTrue(
-                "context_session_lookup_idx" in indexes
-                or "idx_session_items_lookup" in indexes,
+                "context_session_lookup_idx" in indexes or "idx_session_items_lookup" in indexes,
                 f"Missing context session lookup index. Found: {indexes}",
             )
             self.assertIn("symbol_name_idx", indexes)
@@ -131,10 +132,12 @@ class TestF2RobustImportMatching(E2ETestCase):
     """F2: AST import matching without substring false positives, relative imports."""
 
     def test_f2_stdlib_import_does_not_match_repo_substring(self) -> None:
-        repo = self.create_repo({
-            "main.py": "import re\n\ndef run():\n    return re.compile('^a')\n",
-            "features.py": "def test():\n    pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "main.py": "import re\n\ndef run():\n    return re.compile('^a')\n",
+                "features.py": "def test():\n    pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -153,11 +156,13 @@ class TestF2RobustImportMatching(E2ETestCase):
             conn.close()
 
     def test_f2_relative_python_imports(self) -> None:
-        repo = self.create_repo({
-            "pkg/__init__.py": "",
-            "pkg/util.py": "def helper():\n    return 42\n",
-            "pkg/app.py": "from .util import helper\n\ndef main():\n    return helper()\n",
-        })
+        repo = self.create_repo(
+            {
+                "pkg/__init__.py": "",
+                "pkg/util.py": "def helper():\n    return 42\n",
+                "pkg/app.py": "from .util import helper\n\ndef main():\n    return helper()\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -182,10 +187,12 @@ class TestF2RobustImportMatching(E2ETestCase):
             conn.close()
 
     def test_f2_javascript_typescript_imports(self) -> None:
-        repo = self.create_repo({
-            "src/Button.tsx": "export const Button = () => <button>Click</button>;\n",
-            "src/App.tsx": "import { Button } from './Button';\nexport const App = () => <Button />;\n",
-        })
+        repo = self.create_repo(
+            {
+                "src/Button.tsx": "export const Button = () => <button>Click</button>;\n",
+                "src/App.tsx": "import { Button } from './Button';\nexport const App = () => <Button />;\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -199,9 +206,11 @@ class TestF2RobustImportMatching(E2ETestCase):
             conn.close()
 
     def test_f2_missing_and_external_imports_graceful(self) -> None:
-        repo = self.create_repo({
-            "service.py": "import requests\nimport nonexistent_module_xyz\n\ndef call():\n    pass\n"
-        })
+        repo = self.create_repo(
+            {
+                "service.py": "import requests\nimport nonexistent_module_xyz\n\ndef call():\n    pass\n"
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             sync_res = kn.sync(repo, conn)
@@ -212,10 +221,12 @@ class TestF2RobustImportMatching(E2ETestCase):
             conn.close()
 
     def test_f2_cyclic_imports_safe(self) -> None:
-        repo = self.create_repo({
-            "mod_a.py": "from mod_b import b_func\ndef a_func():\n    return b_func()\n",
-            "mod_b.py": "from mod_a import a_func\ndef b_func():\n    return 1\n",
-        })
+        repo = self.create_repo(
+            {
+                "mod_a.py": "from mod_b import b_func\ndef a_func():\n    return b_func()\n",
+                "mod_b.py": "from mod_a import a_func\ndef b_func():\n    return 1\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             sync_res = kn.sync(repo, conn)
@@ -235,15 +246,17 @@ class TestF3SessionItemFreshness(E2ETestCase):
     """F3: Updated_at refresh on suppression, deduplication, multiple sessions, clear."""
 
     def test_f3_multi_turn_touch_updated_at(self) -> None:
-        repo = self.create_repo({
-            "auth.py": "def authenticate(user, token):\n    return token == 'valid'\n"
-        })
+        repo = self.create_repo(
+            {"auth.py": "def authenticate(user, token):\n    return token == 'valid'\n"}
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
             # Turn 1: item is seen
             res1 = broker.task_context(
-                kn, {"project": str(repo), "task": "authenticate user", "session_id": "sess-touch"}, conn
+                kn,
+                {"project": str(repo), "task": "authenticate user", "session_id": "sess-touch"},
+                conn,
             )
             self.assertGreater(len(res1.get("results", [])), 0)
             row1 = conn.execute(
@@ -255,7 +268,9 @@ class TestF3SessionItemFreshness(E2ETestCase):
             # Turn 2: item is suppressed, touch updates timestamp
             time.sleep(1.1)
             res2 = broker.task_context(
-                kn, {"project": str(repo), "task": "authenticate user", "session_id": "sess-touch"}, conn
+                kn,
+                {"project": str(repo), "task": "authenticate user", "session_id": "sess-touch"},
+                conn,
             )
             self.assertGreaterEqual(res2.get("suppressed_seen", 0), 1)
             row2 = conn.execute(
@@ -268,9 +283,9 @@ class TestF3SessionItemFreshness(E2ETestCase):
             conn.close()
 
     def test_f3_timestamp_refresh_on_suppression(self) -> None:
-        repo = self.create_repo({
-            "store.py": "class Store:\n    def get(self, key):\n        return key\n"
-        })
+        repo = self.create_repo(
+            {"store.py": "class Store:\n    def get(self, key):\n        return key\n"}
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -298,30 +313,30 @@ class TestF3SessionItemFreshness(E2ETestCase):
             conn.close()
 
     def test_f3_no_duplicate_session_rows(self) -> None:
-        repo = self.create_repo({
-            "api.py": "def handler():\n    return {'status': 'ok'}\n"
-        })
+        repo = self.create_repo({"api.py": "def handler():\n    return {'status': 'ok'}\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
             session_id = "sess-nodup"
             for _ in range(3):
                 broker.task_context(
-                    kn, {"project": str(repo), "task": "handler api", "session_id": session_id}, conn
+                    kn,
+                    {"project": str(repo), "task": "handler api", "session_id": session_id},
+                    conn,
                 )
             rows = conn.execute(
                 "SELECT item_key, count(*) as cnt FROM context_session_items WHERE session_id=? GROUP BY item_key",
                 (session_id,),
             ).fetchall()
             for r in rows:
-                self.assertEqual(r["cnt"], 1, f"Duplicate session row detected for key: {r['item_key']}")
+                self.assertEqual(
+                    r["cnt"], 1, f"Duplicate session row detected for key: {r['item_key']}"
+                )
         finally:
             conn.close()
 
     def test_f3_multiple_sessions_isolated(self) -> None:
-        repo = self.create_repo({
-            "model.py": "class User:\n    pass\n"
-        })
+        repo = self.create_repo({"model.py": "class User:\n    pass\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -341,9 +356,7 @@ class TestF3SessionItemFreshness(E2ETestCase):
             conn.close()
 
     def test_f3_session_item_cleanup(self) -> None:
-        repo = self.create_repo({
-            "clean.py": "def cleanup():\n    pass\n"
-        })
+        repo = self.create_repo({"clean.py": "def cleanup():\n    pass\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -376,20 +389,22 @@ class TestF4ContextAmnesiaElimination(E2ETestCase):
     """F4: Recap breadcrumbs, topology preservation, reason explanation, turn 1 retention."""
 
     def test_f4_full_suppression_recap_breadcrumbs(self) -> None:
-        repo = self.create_repo({
-            "service.py": "def process_service():\n    return True\n"
-        })
+        repo = self.create_repo({"service.py": "def process_service():\n    return True\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
             session_id = "sess-amnesia"
             # Turn 1
             broker.task_context(
-                kn, {"project": str(repo), "task": "process service", "session_id": session_id}, conn
+                kn,
+                {"project": str(repo), "task": "process service", "session_id": session_id},
+                conn,
             )
             # Turn 2: All items already seen -> Full suppression
             res2 = broker.task_context(
-                kn, {"project": str(repo), "task": "process service", "session_id": session_id}, conn
+                kn,
+                {"project": str(repo), "task": "process service", "session_id": session_id},
+                conn,
             )
             self.assertEqual(len(res2.get("results", [])), 0)
             self.assertGreater(res2.get("suppressed_seen", 0), 0)
@@ -400,9 +415,7 @@ class TestF4ContextAmnesiaElimination(E2ETestCase):
             conn.close()
 
     def test_f4_active_graph_topology_preservation(self) -> None:
-        repo = self.create_repo({
-            "base.py": "class Base:\n    pass\n"
-        })
+        repo = self.create_repo({"base.py": "class Base:\n    pass\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -414,16 +427,16 @@ class TestF4ContextAmnesiaElimination(E2ETestCase):
                 kn, {"project": str(repo), "task": "Base class", "session_id": session_id}, conn
             )
             self.assertTrue(
-                "active_graph" in res2 or "graph_topology" in res2 or "active_context_summary" in res2,
+                "active_graph" in res2
+                or "graph_topology" in res2
+                or "active_context_summary" in res2,
                 "Response must preserve active graph topology on suppression",
             )
         finally:
             conn.close()
 
     def test_f4_reason_explanation_on_full_suppression(self) -> None:
-        repo = self.create_repo({
-            "helper.py": "def compute():\n    return 100\n"
-        })
+        repo = self.create_repo({"helper.py": "def compute():\n    return 100\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -440,10 +453,12 @@ class TestF4ContextAmnesiaElimination(E2ETestCase):
             conn.close()
 
     def test_f4_turn1_foundational_item_retention(self) -> None:
-        repo = self.create_repo({
-            "foundation.py": "class CoreEngine:\n    pass\n",
-            "plugin.py": "class Plugin:\n    pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "foundation.py": "class CoreEngine:\n    pass\n",
+                "plugin.py": "class Plugin:\n    pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -461,14 +476,14 @@ class TestF4ContextAmnesiaElimination(E2ETestCase):
                 "SELECT item_key FROM context_session_items WHERE session_id=?", (session_id,)
             ).fetchall()
             keys = [r["item_key"] for r in rows]
-            self.assertTrue(any("foundation.py" in k for k in keys), "Turn 1 item was evicted from session")
+            self.assertTrue(
+                any("foundation.py" in k for k in keys), "Turn 1 item was evicted from session"
+            )
         finally:
             conn.close()
 
     def test_f4_recovery_payload_structure(self) -> None:
-        repo = self.create_repo({
-            "widget.py": "def render():\n    return '<div/>'\n"
-        })
+        repo = self.create_repo({"widget.py": "def render():\n    return '<div/>'\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -529,9 +544,7 @@ class TestF5BulkCandidateContextQueries(E2ETestCase):
         try:
             kn.sync(repo, conn)
             for _ in range(10):
-                res = broker.task_context(
-                    kn, {"project": str(repo), "task": "alpha"}, conn
-                )
+                res = broker.task_context(kn, {"project": str(repo), "task": "alpha"}, conn)
                 self.assertNotIn("error", res)
             # Verify connection is still open and responsive
             check = conn.execute("SELECT 1").fetchone()
@@ -638,9 +651,7 @@ class TestF6BPETokenizerSupport(E2ETestCase):
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
-            res = broker.task_context(
-                kn, {"project": str(repo), "task": "main variable"}, conn
-            )
+            res = broker.task_context(kn, {"project": str(repo), "task": "main variable"}, conn)
             self.assertIn("budget_type", res)
             self.assertIsInstance(res["budget_type"], str)
             self.assertTrue(len(res["budget_type"]) > 0)
@@ -685,11 +696,13 @@ class TestF7SinglePassDeterministicBudgeting(E2ETestCase):
             conn.close()
 
     def test_f7_deterministic_output_ordering(self) -> None:
-        repo = self.create_repo({
-            "a_mod.py": "def alpha(): pass\n",
-            "b_mod.py": "def beta(): pass\n",
-            "c_mod.py": "def gamma(): pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "a_mod.py": "def alpha(): pass\n",
+                "b_mod.py": "def beta(): pass\n",
+                "c_mod.py": "def gamma(): pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -781,7 +794,9 @@ class TestF8HighDensityLeanContext(E2ETestCase):
         res = self.run_cli(["init", "--project", str(repo)])
         self.assertEqual(res.returncode, 0)
         # Verify CLI context runs in compact mode
-        proc = self.run_cli(["context", "--project", str(repo), "--task", "dsl_func", "--mode", "compact"])
+        proc = self.run_cli(
+            ["context", "--project", str(repo), "--task", "dsl_func", "--mode", "compact"]
+        )
         self.assertEqual(proc.returncode, 0)
         self.assertIn("compact", proc.stdout)
 
@@ -792,7 +807,9 @@ class TestF8HighDensityLeanContext(E2ETestCase):
         try:
             kn.sync(repo, conn)
             res_compact = broker.task_context(
-                kn, {"project": str(repo), "task": "savings", "mode": "compact", "budget": 250}, conn
+                kn,
+                {"project": str(repo), "task": "savings", "mode": "compact", "budget": 250},
+                conn,
             )
             res_deep = broker.task_context(
                 kn, {"project": str(repo), "task": "savings", "mode": "deep", "budget": 1200}, conn
@@ -859,9 +876,9 @@ class TestF9UnifiedContextRetrievalPipeline(E2ETestCase):
         # CLI sync and context
         self.run_cli(["init", "--project", str(repo)])
         session_id = "sess-parity"
-        proc1 = self.run_cli([
-            "context", "--project", str(repo), "--task", "dedup_func", "--session-id", session_id
-        ])
+        proc1 = self.run_cli(
+            ["context", "--project", str(repo), "--task", "dedup_func", "--session-id", session_id]
+        )
         self.assertEqual(proc1.returncode, 0)
         # Turn 2 via Python broker should observe the items seen in CLI
         conn = kn.connect(self.temp_dir / "network.sqlite3")
@@ -876,18 +893,18 @@ class TestF9UnifiedContextRetrievalPipeline(E2ETestCase):
     def test_f9_model_flag_propagation(self) -> None:
         repo = self.create_repo({"prop.py": "def prop(): pass\n"})
         self.run_cli(["init", "--project", str(repo)])
-        data = self.run_cli_json([
-            "context", "--project", str(repo), "--task", "prop", "--model", "gpt-4o"
-        ])
+        data = self.run_cli_json(
+            ["context", "--project", str(repo), "--task", "prop", "--model", "gpt-4o"]
+        )
         self.assertIn("budget_type", data)
 
     def test_f9_session_state_persistence_across_interfaces(self) -> None:
         repo = self.create_repo({"state.py": "def persist(): pass\n"})
         self.run_cli(["init", "--project", str(repo)])
         session_id = "sess-persist-cross"
-        self.run_cli([
-            "context", "--project", str(repo), "--task", "persist", "--session-id", session_id
-        ])
+        self.run_cli(
+            ["context", "--project", str(repo), "--task", "persist", "--session-id", session_id]
+        )
         # Open MCP client and query same session
         mcp = self.open_mcp_client()
         mcp.initialize()
@@ -909,9 +926,9 @@ class TestF10PrefixCacheOptimizedPrompts(E2ETestCase):
     def test_f10_static_declarations_before_dynamic_task(self) -> None:
         repo = self.create_repo({"auth.py": "def login(): pass\n"})
         self.run_cli(["init", "--project", str(repo)])
-        proc = self.run_cli([
-            "context", "--project", str(repo), "--task", "unique_dynamic_task_xyz", "--prompt"
-        ])
+        proc = self.run_cli(
+            ["context", "--project", str(repo), "--task", "unique_dynamic_task_xyz", "--prompt"]
+        )
         self.assertEqual(proc.returncode, 0)
         output = proc.stdout
         # Dynamic task text should appear after the static system/project framing
@@ -921,12 +938,12 @@ class TestF10PrefixCacheOptimizedPrompts(E2ETestCase):
     def test_f10_reproducible_prefix_across_tasks(self) -> None:
         repo = self.create_repo({"core.py": "def core(): pass\n"})
         self.run_cli(["init", "--project", str(repo)])
-        proc1 = self.run_cli([
-            "context", "--project", str(repo), "--task", "Task A", "--prompt", "--include-seen"
-        ])
-        proc2 = self.run_cli([
-            "context", "--project", str(repo), "--task", "Task B", "--prompt", "--include-seen"
-        ])
+        proc1 = self.run_cli(
+            ["context", "--project", str(repo), "--task", "Task A", "--prompt", "--include-seen"]
+        )
+        proc2 = self.run_cli(
+            ["context", "--project", str(repo), "--task", "Task B", "--prompt", "--include-seen"]
+        )
         out1 = proc1.stdout
         out2 = proc2.stdout
         # Leading static header should be identical
@@ -938,27 +955,25 @@ class TestF10PrefixCacheOptimizedPrompts(E2ETestCase):
     def test_f10_prompt_format_adherence(self) -> None:
         repo = self.create_repo({"doc.py": "def doc(): pass\n"})
         self.run_cli(["init", "--project", str(repo)])
-        proc = self.run_cli([
-            "context", "--project", str(repo), "--task", "documentation", "--prompt"
-        ])
+        proc = self.run_cli(
+            ["context", "--project", str(repo), "--task", "documentation", "--prompt"]
+        )
         self.assertEqual(proc.returncode, 0)
         # Should be plain prompt text, not raw JSON payload
-        self.assertFalse(proc.stdout.strip().startswith("{"), "Prompt mode must not output raw JSON")
+        self.assertFalse(
+            proc.stdout.strip().startswith("{"), "Prompt mode must not output raw JSON"
+        )
 
     def test_f10_prompt_mode_flag_acceptance(self) -> None:
         repo = self.create_repo({"flag.py": "def flag(): pass\n"})
         self.run_cli(["init", "--project", str(repo)])
-        proc = self.run_cli([
-            "context", "--project", str(repo), "--task", "flag", "--prompt"
-        ])
+        proc = self.run_cli(["context", "--project", str(repo), "--task", "flag", "--prompt"])
         self.assertEqual(proc.returncode, 0)
 
     def test_f10_token_count_reporting(self) -> None:
         repo = self.create_repo({"tok.py": "def count(): pass\n"})
         self.run_cli(["init", "--project", str(repo)])
-        proc = self.run_cli([
-            "context", "--project", str(repo), "--task", "count", "--prompt"
-        ])
+        proc = self.run_cli(["context", "--project", str(repo), "--task", "count", "--prompt"])
         self.assertEqual(proc.returncode, 0)
         self.assertTrue(len(proc.stdout) > 0)
 
@@ -1032,7 +1047,7 @@ class TestF12HumanCentricFormattedCLIOutput(E2ETestCase):
             0,
             f"CLI doctor --format text must succeed: {proc.stderr}",
         )
-        self.assertNotIn("{\"", proc.stdout.strip()[:2], "Text format must not be raw JSON")
+        self.assertNotIn('{"', proc.stdout.strip()[:2], "Text format must not be raw JSON")
 
     def test_f12_format_table_flag(self) -> None:
         proc = self.run_cli(["doctor", "--format", "table"])
@@ -1068,7 +1083,9 @@ class TestF13CompleteMCPProtocolResources(E2ETestCase):
         mcp.initialize()
         tools = mcp.list_tools()
         names = {t.get("name") for t in tools}
-        self.assertIn("checkpoint", names, f"'checkpoint' tool missing from tools/list. Found: {names}")
+        self.assertIn(
+            "checkpoint", names, f"'checkpoint' tool missing from tools/list. Found: {names}"
+        )
 
     def test_f13_checkpoint_schema_validation(self) -> None:
         mcp = self.open_mcp_client()
@@ -1103,9 +1120,7 @@ class TestF13CompleteMCPProtocolResources(E2ETestCase):
         mcp.initialize()
         resources = mcp.list_resources()
         self.assertIsInstance(resources, list)
-        self.assertTrue(
-            len(resources) > 0, "resources/list must return registered MCP resources"
-        )
+        self.assertTrue(len(resources) > 0, "resources/list must return registered MCP resources")
         for r in resources:
             uri = r.get("uri", "")
             self.assertTrue(
@@ -1209,6 +1224,7 @@ class TestF14ActiveSessionDashboard(E2ETestCase):
         port = server.server_address[1]
 
         try:
+
             def fetch(path: str) -> int:
                 url = f"http://127.0.0.1:{port}{path}"
                 with urllib.request.urlopen(url, timeout=3) as resp:
@@ -1308,34 +1324,48 @@ class TestF16MultiTurnSimulationRecall(E2ETestCase):
             conn.close()
 
     def test_f16_zero_unhandled_exceptions_across_turns(self) -> None:
-        repo = self.create_repo({
-            "service.py": "def process(): pass\n",
-            "model.py": "class Model: pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "service.py": "def process(): pass\n",
+                "model.py": "class Model: pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
             session_id = "sess-no-exc"
             # Execute mixed operations across turns (retrieve, suppress, recap, checkpoint)
-            r1 = broker.task_context(kn, {"project": str(repo), "task": "process", "session_id": session_id}, conn)
+            r1 = broker.task_context(
+                kn, {"project": str(repo), "task": "process", "session_id": session_id}, conn
+            )
             self.assertNotIn("error", r1)
-            r2 = broker.task_context(kn, {"project": str(repo), "task": "Model", "session_id": session_id}, conn)
+            r2 = broker.task_context(
+                kn, {"project": str(repo), "task": "Model", "session_id": session_id}, conn
+            )
             self.assertNotIn("error", r2)
-            r3 = broker.task_context(kn, {"project": str(repo), "task": "process", "session_id": session_id}, conn)
+            r3 = broker.task_context(
+                kn, {"project": str(repo), "task": "process", "session_id": session_id}, conn
+            )
             self.assertNotIn("error", r3)
-            r4 = broker.session_checkpoint(kn, {"project": str(repo), "session_id": session_id}, conn)
+            r4 = broker.session_checkpoint(
+                kn, {"project": str(repo), "session_id": session_id}, conn
+            )
             self.assertNotIn("error", r4)
-            r5 = broker.task_context(kn, {"project": str(repo), "task": "Model", "session_id": session_id}, conn)
+            r5 = broker.task_context(
+                kn, {"project": str(repo), "task": "Model", "session_id": session_id}, conn
+            )
             self.assertNotIn("error", r5)
         finally:
             conn.close()
 
     def test_f16_recall_of_turn1_foundational_items(self) -> None:
-        repo = self.create_repo({
-            "auth.py": "def authenticate(): pass\n",
-            "handlers.py": "def route(): pass\n",
-            "db.py": "def query(): pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "auth.py": "def authenticate(): pass\n",
+                "handlers.py": "def route(): pass\n",
+                "db.py": "def query(): pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -1436,7 +1466,6 @@ class TestF16MultiTurnSimulationRecall(E2ETestCase):
             self.assertEqual(res3.get("suppressed_seen", 0), 0)
         finally:
             conn.close()
-
 
 
 if __name__ == "__main__":

@@ -50,7 +50,7 @@
 
 ### Directory Layout
 ```
-tests/e2e/
+e2e/
 ├── __init__.py                     # Package initialization for unittest discovery
 ├── common.py                       # Base E2ETestCase, CLI runner, McpClient, mock repo generator
 ├── runner.py                       # Standalone CLI test runner (--tier 1..4, --all, --verbose, --json-report)
@@ -60,7 +60,7 @@ tests/e2e/
 └── test_tier4_workloads.py         # Tier 4: Real-World Workloads & Multi-Turn Simulations (8 scenarios)
 ```
 
-### Test Harness Components (`tests/e2e/common.py`)
+### Test Harness Components (`e2e/common.py`)
 1. **`E2ETestCase` (Base Class)**:
    - Inherits from `unittest.TestCase`.
    - Automatically provisions an isolated temporary directory for each test case.
@@ -83,8 +83,8 @@ tests/e2e/
      - `list_resources() -> list[dict]`
      - `read_resource(uri: str) -> dict`
      - `close()`
-3. **`TestRunner` (`tests/e2e/runner.py`)**:
-   - Standalone executable runner: `python tests/e2e/runner.py [--tier 1|2|3|4] [--all] [--verbose] [--json-report PATH]`.
+3. **`TestRunner` (`e2e/runner.py`)**:
+   - Standalone executable runner: `python e2e/runner.py [--tier 1|2|3|4] [--all] [--verbose] [--json-report PATH]`.
    - Integrates cleanly with standard library discovery: `python -m unittest discover tests`.
    - Exit code: `0` on all tests passing, `1` on any failure or error.
 
@@ -113,6 +113,6 @@ tests/e2e/
 - **Tier 4 (Real-World Scenarios)**: ≥8 complex end-to-end multi-turn application scenarios.
 - **Total Suite**: ≥184 comprehensive opaque-box E2E tests.
 - **Pass Semantics**:
-  - Full test suite executes cleanly via `python tests/e2e/runner.py --all` with exit code `0`.
+  - Full test suite executes cleanly via `python e2e/runner.py --all` with exit code `0`.
   - Zero unhandled exceptions or crashes.
-  - Zero regressions on existing 121 unit tests (`python -m unittest discover tests`).
+  - Zero regressions on the core unit suite (`python -m unittest discover -s tests -p test_*.py`).

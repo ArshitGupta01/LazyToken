@@ -12,15 +12,17 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import broker
 import dashboard
 import features
 import kn
 import retrieval_eval
 import token_budget
-from tests.e2e.common import E2ETestCase, McpClient
-
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+from e2e.common import E2ETestCase, McpClient
 
 
 class TestTier3Combinations(E2ETestCase):
@@ -31,11 +33,13 @@ class TestTier3Combinations(E2ETestCase):
     # Concurrent sessions touching timestamps under WAL mode without locks.
     # ------------------------------------------------------------------------
     def test_c1_concurrent_sessions_wal_timestamp_touch(self) -> None:
-        repo = self.create_repo({
-            "auth.py": "def authenticate(user): return user == 'admin'\n",
-            "service.py": "def process_order(order_id): return True\n",
-            "db.py": "def query_db(sql): return []\n",
-        })
+        repo = self.create_repo(
+            {
+                "auth.py": "def authenticate(user): return user == 'admin'\n",
+                "service.py": "def process_order(order_id): return True\n",
+                "db.py": "def query_db(sql): return []\n",
+            }
+        )
         db_file = self.temp_dir / "network.sqlite3"
         init_conn = kn.connect(db_file)
         try:
@@ -51,8 +55,7 @@ class TestTier3Combinations(E2ETestCase):
                 ).fetchall()
             }
             self.assertTrue(
-                "context_session_lookup_idx" in indexes
-                or "idx_session_items_lookup" in indexes,
+                "context_session_lookup_idx" in indexes or "idx_session_items_lookup" in indexes,
                 f"Missing session lookup index. Found: {indexes}",
             )
         finally:
@@ -75,7 +78,9 @@ class TestTier3Combinations(E2ETestCase):
                     conn,
                 )
                 if "error" in res1:
-                    errors.append(RuntimeError(f"Turn 1 error in worker {session_idx}: {res1['error']}"))
+                    errors.append(
+                        RuntimeError(f"Turn 1 error in worker {session_idx}: {res1['error']}")
+                    )
                     return
 
                 time.sleep(0.05)
@@ -91,22 +96,23 @@ class TestTier3Combinations(E2ETestCase):
                     conn,
                 )
                 if "error" in res2:
-                    errors.append(RuntimeError(f"Turn 2 error in worker {session_idx}: {res2['error']}"))
+                    errors.append(
+                        RuntimeError(f"Turn 2 error in worker {session_idx}: {res2['error']}")
+                    )
                     return
 
                 # Verify suppressed items were touched
                 if res2.get("suppressed_seen", 0) < 1:
-                    errors.append(AssertionError(f"Expected suppressed items in worker {session_idx}"))
+                    errors.append(
+                        AssertionError(f"Expected suppressed items in worker {session_idx}")
+                    )
             except Exception as exc:
                 errors.append(exc)
             finally:
                 conn.close()
 
         # Run 4 concurrent worker sessions
-        threads = [
-            threading.Thread(target=worker_session, args=(i,))
-            for i in range(4)
-        ]
+        threads = [threading.Thread(target=worker_session, args=(i,)) for i in range(4)]
         for t in threads:
             t.start()
         for t in threads:
@@ -191,10 +197,12 @@ class TestTier3Combinations(E2ETestCase):
     # Multi-turn deduplication leading to full suppression and recap recovery.
     # ------------------------------------------------------------------------
     def test_c3_multiturn_dedup_full_suppression_recap(self) -> None:
-        repo = self.create_repo({
-            "service.py": "def process_task():\n    return 'done'\n",
-            "config.py": "APP_NAME = 'LazyToken'\n",
-        })
+        repo = self.create_repo(
+            {
+                "service.py": "def process_task():\n    return 'done'\n",
+                "config.py": "APP_NAME = 'LazyToken'\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -227,7 +235,9 @@ class TestTier3Combinations(E2ETestCase):
 
             # Verify active graph topology is preserved
             self.assertTrue(
-                "active_graph" in res2 or "graph_topology" in res2 or "active_context_summary" in res2,
+                "active_graph" in res2
+                or "graph_topology" in res2
+                or "active_context_summary" in res2,
                 "Response must preserve active graph topology on full suppression",
             )
         finally:
@@ -322,15 +332,26 @@ class TestTier3Combinations(E2ETestCase):
     # Prompt generation using lean format with prefix caching.
     # ------------------------------------------------------------------------
     def test_c6_lean_format_prefix_cache_prompt(self) -> None:
-        repo = self.create_repo({
-            "auth.py": "def login_user(username, password):\n    return True\n",
-            "models.py": "class User:\n    pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "auth.py": "def login_user(username, password):\n    return True\n",
+                "models.py": "class User:\n    pass\n",
+            }
+        )
         self.run_cli(["init", "--project", str(repo)])
         dynamic_task = "dynamic_refactor_login_flow_12345"
-        proc = self.run_cli([
-            "context", "--project", str(repo), "--task", dynamic_task, "--prompt", "--mode", "compact"
-        ])
+        proc = self.run_cli(
+            [
+                "context",
+                "--project",
+                str(repo),
+                "--task",
+                dynamic_task,
+                "--prompt",
+                "--mode",
+                "compact",
+            ]
+        )
         self.assertEqual(proc.returncode, 0, f"CLI prompt failed: {proc.stderr}")
         output = proc.stdout
 
@@ -348,9 +369,7 @@ class TestTier3Combinations(E2ETestCase):
     # MCP get_task_context calling unified pipeline with session state.
     # ------------------------------------------------------------------------
     def test_c7_mcp_get_task_context_unified_session_state(self) -> None:
-        repo = self.create_repo({
-            "pipeline.py": "def execute_pipeline():\n    return 'success'\n"
-        })
+        repo = self.create_repo({"pipeline.py": "def execute_pipeline():\n    return 'success'\n"})
         mcp = self.open_mcp_client()
         mcp.initialize()
 
@@ -387,7 +406,15 @@ class TestTier3Combinations(E2ETestCase):
         # Unified help: verify subcommands advertised
         help_proc = self.run_cli(["--help"])
         self.assertEqual(help_proc.returncode, 0)
-        for expected_subcmd in ("sync", "search", "context", "doctor", "benchmark", "dashboard", "evaluate"):
+        for expected_subcmd in (
+            "sync",
+            "search",
+            "context",
+            "doctor",
+            "benchmark",
+            "dashboard",
+            "evaluate",
+        ):
             self.assertIn(
                 expected_subcmd,
                 help_proc.stdout,
@@ -396,15 +423,24 @@ class TestTier3Combinations(E2ETestCase):
 
         # Human-Centric formatting: text and table outputs
         text_proc = self.run_cli(["doctor", "--format", "text"])
-        self.assertEqual(text_proc.returncode, 0, f"doctor --format text failed: {text_proc.stderr}")
-        self.assertFalse(text_proc.stdout.strip().startswith("{"), "Text format must not be raw JSON")
+        self.assertEqual(
+            text_proc.returncode, 0, f"doctor --format text failed: {text_proc.stderr}"
+        )
+        self.assertFalse(
+            text_proc.stdout.strip().startswith("{"), "Text format must not be raw JSON"
+        )
 
         table_proc = self.run_cli(["doctor", "--format", "table"])
-        self.assertEqual(table_proc.returncode, 0, f"doctor --format table failed: {table_proc.stderr}")
+        self.assertEqual(
+            table_proc.returncode, 0, f"doctor --format table failed: {table_proc.stderr}"
+        )
 
         # Status indicators [OK], [WARN], or [FAIL]
         self.assertTrue(
-            any(tag in text_proc.stdout or tag in table_proc.stdout for tag in ("[OK]", "[WARN]", "[FAIL]")),
+            any(
+                tag in text_proc.stdout or tag in table_proc.stdout
+                for tag in ("[OK]", "[WARN]", "[FAIL]")
+            ),
             "Expected health indicators [OK]/[WARN]/[FAIL] in human formatted output",
         )
 
@@ -413,9 +449,7 @@ class TestTier3Combinations(E2ETestCase):
     # Simultaneous MCP tool queries and Dashboard /api/session/<id> graph visualization.
     # ------------------------------------------------------------------------
     def test_c9_mcp_and_dashboard_concurrent_access(self) -> None:
-        repo = self.create_repo({
-            "app.py": "def launch():\n    return 'running'\n"
-        })
+        repo = self.create_repo({"app.py": "def launch():\n    return 'running'\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         session_id = "sess-c9-simultaneous"
         try:
@@ -457,7 +491,9 @@ class TestTier3Combinations(E2ETestCase):
                 self.assertNotIn("error", mcp_res)
                 self.assertEqual(dash_resp.status, 200)
                 dash_data = json.loads(dash_resp.read().decode("utf-8"))
-                self.assertTrue("nodes" in dash_data or "session_id" in dash_data or "files" in dash_data)
+                self.assertTrue(
+                    "nodes" in dash_data or "session_id" in dash_data or "files" in dash_data
+                )
         finally:
             server.shutdown()
             server.server_close()
@@ -508,9 +544,7 @@ class TestTier3Combinations(E2ETestCase):
     # MCP server operating through database lock contention and busy_timeout.
     # ------------------------------------------------------------------------
     def test_c11_mcp_sqlite_lock_contention_busy_timeout(self) -> None:
-        repo = self.create_repo({
-            "data.py": "def fetch_data():\n    return {'k': 'v'}\n"
-        })
+        repo = self.create_repo({"data.py": "def fetch_data():\n    return {'k': 'v'}\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -548,16 +582,16 @@ class TestTier3Combinations(E2ETestCase):
         t.join(timeout=3)
 
         self.assertEqual(len(lock_error), 0, f"Lock holder thread errored: {lock_error}")
-        self.assertNotIn("error", call_res, f"MCP tool call failed under lock contention: {call_res}")
+        self.assertNotIn(
+            "error", call_res, f"MCP tool call failed under lock contention: {call_res}"
+        )
 
     # ------------------------------------------------------------------------
     # C12: F3 (Session Touch) + F14 (Dashboard)
     # Session item timestamps updated and reflected in active graph query.
     # ------------------------------------------------------------------------
     def test_c12_session_touch_reflected_in_dashboard(self) -> None:
-        repo = self.create_repo({
-            "handler.py": "def handle():\n    pass\n"
-        })
+        repo = self.create_repo({"handler.py": "def handle():\n    pass\n"})
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         session_id = "sess-c12-touch-dash"
         try:
@@ -604,10 +638,12 @@ class TestTier3Combinations(E2ETestCase):
     # Recap breadcrumbs generated in high-density compact representation.
     # ------------------------------------------------------------------------
     def test_c13_amnesia_recap_compact_lean_representation(self) -> None:
-        repo = self.create_repo({
-            "service.py": "def process(): return True\n",
-            "model.py": "class Model: pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "service.py": "def process(): return True\n",
+                "model.py": "class Model: pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -654,19 +690,33 @@ class TestTier3Combinations(E2ETestCase):
     # Tokenizer token estimation on prefix-cache formatted prompt.
     # ------------------------------------------------------------------------
     def test_c14_tokenizer_estimation_prefix_cache_prompt(self) -> None:
-        repo = self.create_repo({
-            "math_ops.py": "def add(a, b): return a + b\n"
-        })
+        repo = self.create_repo({"math_ops.py": "def add(a, b): return a + b\n"})
         self.run_cli(["init", "--project", str(repo)])
 
         # Generate prompt for Task A
-        proc_a = self.run_cli([
-            "context", "--project", str(repo), "--task", "Task A Implement Addition", "--prompt", "--include-seen"
-        ])
+        proc_a = self.run_cli(
+            [
+                "context",
+                "--project",
+                str(repo),
+                "--task",
+                "Task A Implement Addition",
+                "--prompt",
+                "--include-seen",
+            ]
+        )
         # Generate prompt for Task B
-        proc_b = self.run_cli([
-            "context", "--project", str(repo), "--task", "Task B Implement Subtraction", "--prompt", "--include-seen"
-        ])
+        proc_b = self.run_cli(
+            [
+                "context",
+                "--project",
+                str(repo),
+                "--task",
+                "Task B Implement Subtraction",
+                "--prompt",
+                "--include-seen",
+            ]
+        )
         self.assertEqual(proc_a.returncode, 0)
         self.assertEqual(proc_b.returncode, 0)
 
@@ -694,11 +744,13 @@ class TestTier3Combinations(E2ETestCase):
     # Graph expansion utilizing precise import edges in unified context retrieval.
     # ------------------------------------------------------------------------
     def test_c15_import_graph_expansion_unified_retrieval(self) -> None:
-        repo = self.create_repo({
-            "lib/base.py": "class BaseService:\n    def execute(self): return 1\n",
-            "lib/derived.py": "from .base import BaseService\nclass DerivedService(BaseService):\n    pass\n",
-            "lib/unrelated.py": "class Unrelated:\n    pass\n",
-        })
+        repo = self.create_repo(
+            {
+                "lib/base.py": "class BaseService:\n    def execute(self): return 1\n",
+                "lib/derived.py": "from .base import BaseService\nclass DerivedService(BaseService):\n    pass\n",
+                "lib/unrelated.py": "class Unrelated:\n    pass\n",
+            }
+        )
         conn = kn.connect(self.temp_dir / "network.sqlite3")
         try:
             kn.sync(repo, conn)
@@ -754,4 +806,5 @@ class TestTier3Combinations(E2ETestCase):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()
