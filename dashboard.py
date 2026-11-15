@@ -176,10 +176,15 @@ class Handler(BaseHTTPRequestHandler):
         target = HERE / (
             "index.html" if parsed.path in ("/", "/index.html") else parsed.path.lstrip("/")
         )
-        if not target.is_file():
-            return self._json(
-                {"error": "Dashboard asset missing; reinstall a verified package."}, 503
-            )
+        try:
+            resolved_target = target.resolve()
+            resolved_here = HERE.resolve()
+            if not resolved_target.is_file() or not resolved_target.is_relative_to(resolved_here):
+                return self._json(
+                    {"error": "Dashboard asset missing; reinstall a verified package."}, 503
+                )
+        except (OSError, ValueError):
+            return self._json({"error": "Access denied"}, 403)
         body = target.read_bytes()
         mime = {
             ".html": "text/html; charset=utf-8",

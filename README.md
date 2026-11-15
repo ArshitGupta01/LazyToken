@@ -6,8 +6,9 @@
 
 _Project-scoped SQLite graph network, bounded context broker, and zero-amnesia active session recall._
 
-[![Version](https://img.shields.io/badge/version-v0.4.4-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
-[![Tests Passing](https://img.shields.io/badge/tests-184%2F184%20E2E%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
+[![Version](https://img.shields.io/badge/version-v0.4.5-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
+[![Unit Tests](https://img.shields.io/badge/unit%20tests-169%20verified-10b981.svg?style=for-the-badge&logo=pytest&logoColor=white)](#-verification--test-readiness)
+[![E2E Tests](https://img.shields.io/badge/e2e%20tests-184%2F184%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
 [![Architecture](https://img.shields.io/badge/architecture-100%25%20local%20%7C%20offline-f59e0b.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
 [![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05%20%7C%202025--06--18-8b5cf6.svg?style=for-the-badge&logo=json&logoColor=white)](https://modelcontextprotocol.io)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64%20Native-0284c7.svg?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
@@ -151,13 +152,14 @@ LazyToken inspects `package.json`, `pyproject.toml`, `requirements.txt`, `pubspe
 
 ### 4. 🔍 Bounded Range Inspection (`inspect_source_range`)
 
-Need to inspect an AST declaration without loading a 2,000-line file? Agents can inspect up to 80 targeted lines with multi-pattern credential scanning (AWS, GitHub, JWT, Bearer) and sensitive file path denial (`.env*`, `*.pem`, `id_rsa*`).
+Need to inspect an AST declaration without loading a 2,000-line file? Agents can inspect up to 80 targeted lines with multi-pattern credential scanning (AWS, GitHub, JWT, Bearer, OpenAI, Anthropic, Google, Slack), sensitive file path denial (`.env*`, `*.pem`, `id_rsa*`), and clear security boundary limitation disclosures.
 
 ### 5. ⚡ Relational Impact Analysis & Ponytail Senior Dev Ladder (`inspect_impact`)
 
 Inspired by **[GitNexus](https://github.com/abhigyanpatwari/GitNexus)** and **[Ponytail](https://github.com/DietrichGebert/ponytail)**:
 
-- **GitNexus Zero-Server Code Intelligence**: Computes exact blast radius (`isolated`, `low`, `medium`, `high`), inbound callers, outbound call hierarchy, and affected files using AST symbol & call graphs.
+- **GitNexus Code Intelligence**: Computes inbound callers, outbound call hierarchies, stable symbol IDs (`project:path:symbol:line`), resolution methods (`explicit_class`, `inferred_type`, `explicit_import`, `lexical_scope`), and blast radius bands (`no_static_callers_detected`, `low`, `medium`, `high`) across Python and JavaScript/TypeScript.
+- **Defensive Absence Handling**: When zero callers are detected, LazyToken explicitly flags dynamic dispatch (`getattr`/`eval`), framework routes/hooks, and external package consumers—never assuming absence of static evidence equates to safe removal.
 - **Ponytail Senior Dev Ladder**: _"The best code is the code you never wrote."_ Injects actionable decision steps directly into agent briefs:
   1. **YAGNI**: Don't write it if unrequested.
   2. **Reuse**: Check if an existing function in `affected_files` already solves this.
@@ -343,7 +345,7 @@ lazytoken dashboard
 LazyToken is thoroughly tested across multiple acceptance tiers:
 
 ```powershell
-# 1. Run the core unit, security, and hardening suite (162 tests)
+# 1. Run the core unit, security, and code intelligence suite (169 tests)
 python -m unittest discover -s tests -p "test_*.py"
 
 # 2. Run the end-to-end opaque-box test runner (184 tests)
@@ -354,7 +356,7 @@ python -m black --check .
 npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css tests/workspace.test.cjs
 ```
 
-- **Core Unit Suite**: **162 discovered tests** (160 passing, 2 platform/environment skips).
+- **Core Unit Suite**: **169 discovered tests** (167 passing, 2 platform/environment skips).
 - **End-to-End Suite**: **184 passing tests** across 4 tiers (80 feature coverage, 80 boundary, 16 cross-feature, 8 workload).
 - **Format Verification**: 100% compliant with `black` and `prettier`.
 

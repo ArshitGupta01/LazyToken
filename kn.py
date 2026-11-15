@@ -168,10 +168,12 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
       CREATE TABLE IF NOT EXISTS asset_link_evidence(source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, relation TEXT NOT NULL, scope TEXT NOT NULL, weight REAL NOT NULL, evidence TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(source_id,target_id,relation,scope));
       CREATE TABLE IF NOT EXISTS retrievals(at INTEGER NOT NULL, project_id TEXT NOT NULL DEFAULT '', query_chars INTEGER NOT NULL, result_chars INTEGER NOT NULL, estimated_tokens INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS task_measurements(id INTEGER PRIMARY KEY, task TEXT NOT NULL, baseline_tokens INTEGER NOT NULL, network_tokens INTEGER NOT NULL, indexing_tokens INTEGER NOT NULL, measured_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, receiver TEXT NOT NULL DEFAULT '', resolved_callee TEXT NOT NULL DEFAULT '', confidence TEXT NOT NULL DEFAULT 'provisional', line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,receiver,line));
+      CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, receiver TEXT NOT NULL DEFAULT '', resolved_callee TEXT NOT NULL DEFAULT '', confidence TEXT NOT NULL DEFAULT 'provisional', caller_symbol_id TEXT NOT NULL DEFAULT '', callee_symbol_id TEXT NOT NULL DEFAULT '', resolution_method TEXT NOT NULL DEFAULT 'unresolved', line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,receiver,line));
       CREATE TABLE IF NOT EXISTS index_skipped_files(project_id TEXT NOT NULL, path TEXT NOT NULL, reason TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY(project_id,path));
       CREATE INDEX IF NOT EXISTS symbol_calls_callee_idx ON symbol_calls(project_id, callee_name);
       CREATE INDEX IF NOT EXISTS symbol_calls_resolved_idx ON symbol_calls(project_id, resolved_callee);
+      CREATE INDEX IF NOT EXISTS symbol_calls_caller_id_idx ON symbol_calls(project_id, caller_symbol_id);
+      CREATE INDEX IF NOT EXISTS symbol_calls_method_idx ON symbol_calls(project_id, resolution_method);
       CREATE INDEX IF NOT EXISTS symbol_name_idx ON symbols(name);
       CREATE INDEX IF NOT EXISTS asset_name_idx ON assets(name);
       CREATE INDEX IF NOT EXISTS asset_link_source_idx ON asset_links(source_id);
@@ -196,6 +198,18 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     if "confidence" not in call_cols:
         conn.execute(
             "ALTER TABLE symbol_calls ADD COLUMN confidence TEXT NOT NULL DEFAULT 'provisional'"
+        )
+    if "caller_symbol_id" not in call_cols:
+        conn.execute(
+            "ALTER TABLE symbol_calls ADD COLUMN caller_symbol_id TEXT NOT NULL DEFAULT ''"
+        )
+    if "callee_symbol_id" not in call_cols:
+        conn.execute(
+            "ALTER TABLE symbol_calls ADD COLUMN callee_symbol_id TEXT NOT NULL DEFAULT ''"
+        )
+    if "resolution_method" not in call_cols:
+        conn.execute(
+            "ALTER TABLE symbol_calls ADD COLUMN resolution_method TEXT NOT NULL DEFAULT 'unresolved'"
         )
     # Upgrade pre-scope links by attributing them to the project that uses both endpoints.
     conn.execute(
@@ -492,20 +506,29 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                             )
                 call_rows = []
                 for c in python_calls(body):
+                    caller_sym = c["caller_symbol"]
+                    caller_line = c.get("caller_line", 0)
+                    caller_id = f"{project}:{rel}:{caller_sym}:{caller_line}"
+                    callee_resolved = c.get("resolved_callee", c["callee_name"])
+                    callee_id = f"{project}::{callee_resolved}"
+                    method = c.get("resolution_method", "unresolved")
                     call_rows.append(
                         (
                             project,
                             rel,
-                            c["caller_symbol"],
+                            caller_sym,
                             c["callee_name"],
                             c.get("receiver", ""),
-                            c.get("resolved_callee", c["callee_name"]),
+                            callee_resolved,
                             c.get("confidence", "provisional"),
+                            caller_id,
+                            callee_id,
+                            method,
                             c["line"],
                         )
                     )
                 conn.executemany(
-                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     call_rows,
                 )
                 conn.executemany(
@@ -513,7 +536,11 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                     [(project, rel, target) for target in python_imports(body)],
                 )
             elif path.suffix.lower() in {".js", ".jsx", ".ts", ".tsx"}:
-                from source_index import javascript_imports, javascript_symbols
+                from source_index import (
+                    javascript_calls,
+                    javascript_imports,
+                    javascript_symbols,
+                )
 
                 js_syms = javascript_symbols(body)
                 if js_syms:
@@ -529,6 +556,33 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                                 "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
                                 (project, rel, m.group(1), n),
                             )
+                js_call_rows = []
+                for c in javascript_calls(body):
+                    caller_sym = c["caller_symbol"]
+                    caller_line = c.get("caller_line", 0)
+                    caller_id = f"{project}:{rel}:{caller_sym}:{caller_line}"
+                    callee_resolved = c.get("resolved_callee", c["callee_name"])
+                    callee_id = f"{project}::{callee_resolved}"
+                    method = c.get("resolution_method", "unresolved")
+                    js_call_rows.append(
+                        (
+                            project,
+                            rel,
+                            caller_sym,
+                            c["callee_name"],
+                            c.get("receiver", ""),
+                            callee_resolved,
+                            c.get("confidence", "provisional"),
+                            caller_id,
+                            callee_id,
+                            method,
+                            c["line"],
+                        )
+                    )
+                conn.executemany(
+                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    js_call_rows,
+                )
                 conn.executemany(
                     "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
                     [(project, rel, target) for target in javascript_imports(body)],
@@ -549,6 +603,10 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                         )
         except OSError:
             errors.append(rel)
+            conn.execute(
+                "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)",
+                (project, rel, "unreadable", 0),
+            )
             continue
     for row in conn.execute("SELECT path FROM files WHERE project_id=?", (project,)).fetchall():
         if row[0] not in present:
@@ -563,6 +621,13 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
             )
             removed_paths.append(row[0])
             removed += 1
+    for row in conn.execute(
+        "SELECT path FROM index_skipped_files WHERE project_id=?", (project,)
+    ).fetchall():
+        if not (root / row[0]).exists():
+            conn.execute(
+                "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", (project, row[0])
+            )
     conn.execute("UPDATE projects SET updated_at=? WHERE id=?", (int(time.time()), project))
     conn.execute("DELETE FROM index_errors WHERE project_id=?", (project,))
     conn.executemany("INSERT INTO index_errors VALUES(?,?)", [(project, path) for path in errors])

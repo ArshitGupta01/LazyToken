@@ -195,6 +195,38 @@ class LocalReviewTests(unittest.TestCase):
                 server.server_close()
                 thread.join()
 
+    def test_get_rejects_untrusted_host_and_path_traversal(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"KN_HOME": temp}):
+            server = dashboard.LocalServer(("127.0.0.1", 0), dashboard.Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            try:
+                # 1. Untrusted Host header on GET returns 403 (DNS rebinding protection)
+                conn.request("GET", "/api/session", headers={"Host": "evil.com"})
+                response = conn.getresponse()
+                self.assertEqual(response.status, 403)
+                self.assertIn("Invalid host", json.loads(response.read())["error"])
+
+                # 2. Legitimate Host returns token
+                conn.request(
+                    "GET", "/api/session", headers={"Host": f"127.0.0.1:{server.server_port}"}
+                )
+                response = conn.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(json.loads(response.read())["token"], server.review_token)
+
+                # 3. Path traversal attempts return 404
+                conn.request("GET", "/../dashboard.py")
+                response = conn.getresponse()
+                self.assertEqual(response.status, 404)
+                response.read()
+                conn.close()
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
 
 if __name__ == "__main__":
     unittest.main()

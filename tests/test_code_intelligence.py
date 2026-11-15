@@ -284,6 +284,203 @@ const calculateTotal = (items) => {
             self.assertIn("Mode_D_Full_Pipeline", r["modes"])
             self.assertTrue(r["modes"]["Mode_D_Full_Pipeline"]["caller_discovered"])
 
+    def test_nested_attribution_lambdas_decorators_comprehensions(self):
+        """LT-P0-002: Test decorators, default args, lambdas, and comprehensions ownership."""
+        code = """@route_decorator(build_route())
+def complex_controller(default_opt=get_default_val()):
+    def inner_sync():
+        sync_inner_call()
+    async def inner_async():
+        async_inner_call()
+    fn_lambda = lambda: lambda_dangerous_call()
+    filtered = [sanitize(x) for x in fetch_inputs()]
+    direct_controller_call()
+"""
+        calls = source_index.python_calls(code)
+        caller_map = {}
+        for c in calls:
+            caller_map.setdefault(c["caller_symbol"], []).append(c["callee_name"])
+
+        # complex_controller direct calls
+        outer_calls = caller_map.get("complex_controller", [])
+        self.assertIn("direct_controller_call", outer_calls)
+        self.assertIn("sanitize", outer_calls)
+        self.assertIn("fetch_inputs", outer_calls)
+
+        # Decorator and default argument calls must NOT belong to complex_controller
+        self.assertNotIn("build_route", outer_calls)
+        self.assertNotIn("route_decorator", outer_calls)
+        self.assertNotIn("get_default_val", outer_calls)
+
+        # Inner sync and async calls must NOT belong to complex_controller
+        self.assertNotIn("sync_inner_call", outer_calls)
+        self.assertNotIn("async_inner_call", outer_calls)
+
+        # Lambda calls must belong to lambda scope, not outer directly
+        self.assertNotIn("lambda_dangerous_call", outer_calls)
+        lambda_callers = [k for k in caller_map if "<lambda>" in k]
+        self.assertTrue(lambda_callers)
+        self.assertIn("lambda_dangerous_call", caller_map[lambda_callers[0]])
+
+        # Inner sync function calls
+        inner_sync_calls = caller_map.get("complex_controller.inner_sync", [])
+        self.assertIn("sync_inner_call", inner_sync_calls)
+
+        # Inner async function calls
+        inner_async_calls = caller_map.get("complex_controller.inner_async", [])
+        self.assertIn("async_inner_call", inner_async_calls)
+
+    def test_symbol_ids_and_resolution_evidence(self):
+        """LT-P0-001 & LT-P0-003: Symbol IDs, resolution method, and safety telemetry."""
+        repo = self.root / "repo_evidence"
+        repo.mkdir()
+        (repo / "service.py").write_text(
+            "class OrderService:\n"
+            "    def cancel(self, order_id):\n"
+            "        return False\n"
+            "    def process(self, order_id):\n"
+            "        return self.cancel(order_id)\n",
+            encoding="utf-8",
+        )
+        kn.sync(repo, self.db)
+        project = repo.name
+
+        res = features.impact_analysis(
+            kn, {"project": project, "target": "OrderService.cancel"}, self.db
+        )
+        self.assertNotIn("error", res)
+        self.assertEqual(res["target"], "OrderService.cancel")
+        self.assertIn("uncertainty_notice", res)
+        self.assertIn("evidence_breakdown", res)
+        self.assertEqual(res["evidence_breakdown"]["confirmed_callers"], 1)
+
+        caller = res["inbound_callers"][0]
+        self.assertIn("caller_symbol_id", caller)
+        self.assertIn("service.py", caller["caller_symbol_id"])
+        self.assertEqual(caller["resolution_method"], "explicit_class")
+        self.assertEqual(caller["state"], "resolved")
+
+    def test_additional_secret_patterns_and_security_boundary_notice(self):
+        """LT-P0-004: Expanded secret patterns and security boundary disclaimer."""
+        repo = self.root / "repo_secrets_expanded"
+        repo.mkdir()
+        openai_dummy = "sk-" + "abcdefghijklmnopqrstuvwxyz1234567890"
+        anthropic_dummy = "sk-ant-" + "api03-abcdefghijklmnopqrstuvwxyz1234567890"
+        google_dummy = "AIza" + "SyD-1234567890abcdefghijklmnopqrst"
+        slack_dummy = "xox" + "b-1234567890-abcdefghijklmnop"
+        (repo / "api_keys.py").write_text(
+            f'OPENAI = "{openai_dummy}"\n'
+            f'ANTHROPIC = "{anthropic_dummy}"\n'
+            f'GOOGLE = "{google_dummy}"\n'
+            f'SLACK = "{slack_dummy}"\n',
+            encoding="utf-8",
+        )
+        kn.sync(repo, self.db)
+        project = repo.name
+
+        res = features.inspect_source(
+            kn, {"project": project, "path": "api_keys.py", "start_line": 1, "end_line": 4}, self.db
+        )
+        self.assertNotIn("error", res)
+        for line in res["lines"]:
+            self.assertEqual(line["text"], "[redacted: possible credential]")
+        self.assertIn("not a universal security boundary", res["note"])
+
+    def test_javascript_calls_and_ts_declarations(self):
+        """LT-P1-101: JS/TS call extraction, abstract classes, enums, namespaces, and impact analysis."""
+        repo = self.root / "repo_ts"
+        repo.mkdir()
+        (repo / "order.ts").write_text(
+            'import { notifyUser } from "./notifier";\n'
+            "export enum Status { PENDING, CANCELLED }\n"
+            "export namespace OrderOps {\n"
+            "    export interface Spec { id: string; }\n"
+            "}\n"
+            "export abstract class BaseService {\n"
+            "    abstract cancel(id: string): boolean;\n"
+            "}\n"
+            "export class OrderService extends BaseService {\n"
+            "    cancel(id: string): boolean {\n"
+            "        return true;\n"
+            "    }\n"
+            "    async process(id: string): Promise<boolean> {\n"
+            "        const res = this.cancel(id);\n"
+            "        notifyUser(id);\n"
+            "        return res;\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        kn.sync(repo, self.db)
+        project = str(repo.resolve())
+
+        symbols = [
+            r[0]
+            for r in self.db.execute(
+                "SELECT name FROM symbols WHERE project_id=?", (project,)
+            ).fetchall()
+        ]
+        self.assertIn("Status", symbols)
+        self.assertIn("OrderOps", symbols)
+        self.assertIn("Spec", symbols)
+        self.assertIn("BaseService", symbols)
+        self.assertIn("OrderService", symbols)
+        self.assertIn("OrderService.cancel", symbols)
+        self.assertIn("OrderService.process", symbols)
+
+        # Impact analysis on OrderService.cancel in TypeScript
+        res = features.impact_analysis(
+            kn, {"project": project, "target": "OrderService.cancel"}, self.db
+        )
+        self.assertNotIn("error", res)
+        self.assertEqual(res["target"], "OrderService.cancel")
+        self.assertEqual(res["inbound_call_count"], 1)
+        caller = res["inbound_callers"][0]
+        self.assertEqual(caller["caller_symbol"], "OrderService.process")
+        self.assertEqual(caller["caller_file"], "order.ts")
+        self.assertEqual(caller["resolution_method"], "explicit_class")
+        self.assertEqual(caller["state"], "resolved")
+
+    def test_skipped_files_pruning_on_disk_removal(self):
+        """LT-P1-102: Deleting a skipped file on disk prunes it from the persistent inventory."""
+        repo = self.root / "repo_skip_prune"
+        repo.mkdir()
+        large_file = repo / "temporary_large.py"
+        large_file.write_bytes(b"B" * 1_000_005)
+        (repo / "normal.py").write_text("def ok(): pass\n", encoding="utf-8")
+
+        res1 = kn.sync(repo, self.db)
+        self.assertEqual(res1["skipped_count"], 1)
+        self.assertEqual(res1["skipped"][0]["path"], "temporary_large.py")
+
+        # Delete the large file
+        large_file.unlink()
+
+        res2 = kn.sync(repo, self.db)
+        self.assertEqual(res2["skipped_count"], 0)
+        self.assertEqual(res2["skipped"], [])
+
+    def test_dependencies_provenance_and_edge_kinds(self):
+        """LT-P1-103: dependencies feature returns edge_kind and provenance metadata."""
+        repo = self.root / "repo_dep_prov"
+        repo.mkdir()
+        (repo / "client.py").write_text(
+            "from api_service import ApiService\nclass App: pass\n", encoding="utf-8"
+        )
+        (repo / "api_service.py").write_text("class ApiService:\n    pass\n", encoding="utf-8")
+        kn.sync(repo, self.db)
+        project = repo.name
+
+        dep_res = features.dependencies(kn, {"project": project}, self.db)
+        self.assertNotIn("error", dep_res)
+        deps = dep_res["dependencies"]
+        self.assertTrue(deps)
+        match = [d for d in deps if d["source"] == "client.py"][0]
+        self.assertEqual(match["edge_kind"], "imports")
+        self.assertEqual(match["status"], "resolved")
+        self.assertIn("provenance", match)
+        self.assertEqual(match["provenance"]["source_file"], "client.py")
+
 
 if __name__ == "__main__":
     unittest.main()

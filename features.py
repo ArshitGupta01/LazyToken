@@ -882,17 +882,55 @@ def dependencies(kn, args, conn):
         "SELECT source,target FROM imports WHERE project_id=? ORDER BY source,target LIMIT 500",
         (project,),
     ):
-        leaf = imp["target"].replace("/", ".").split(".")[-1]
+        raw_target = imp["target"].replace("\\", "/").strip("./")
+        leaf = raw_target.replace("/", ".").split(".")[-1]
         matches = [s for s in by_name.get(leaf, ()) if s["path"] != imp["source"]]
+        exact_file_matches = [
+            dict(s)
+            for s in conn.execute(
+                "SELECT path, name, line FROM symbols WHERE project_id=? AND (path=? OR path=? OR path=? OR path=?)",
+                (
+                    project,
+                    f"{raw_target}.py",
+                    f"{raw_target}.ts",
+                    f"{raw_target}.js",
+                    f"{raw_target}.tsx",
+                ),
+            ).fetchall()
+        ]
+        status = "unresolved"
+        if exact_file_matches:
+            matches = exact_file_matches
+            status = "resolved"
+        elif matches:
+            norm_target_stem = raw_target.split("/")[-1].split(".")[0].lower()
+            exact = [
+                s
+                for s in matches
+                if Path(s["path"]).stem.lower() == norm_target_stem
+                or Path(s["path"]).as_posix().lower().startswith(raw_target.lower())
+            ]
+            status = "resolved" if exact else "provisional"
+
         items.append(
             {
+                "edge_kind": "imports",
                 "source": imp["source"],
                 "import": imp["target"],
                 "candidates": [dict(s) for s in matches[:10]],
-                "status": "provisional" if matches else "unresolved",
+                "status": status,
+                "provenance": {
+                    "project_id": project,
+                    "source_file": imp["source"],
+                    "target_import": imp["target"],
+                },
             }
         )
-    return {"dependencies": items, "note": "Name-based candidates are not compiler-resolved."}
+    return {
+        "dependencies": items,
+        "edge_count": len(items),
+        "note": "Import edges with matching file stems are marked resolved; ambiguous cross-file matches remain provisional.",
+    }
 
 
 def impact_analysis(kn, args, conn):
@@ -927,32 +965,48 @@ def impact_analysis(kn, args, conn):
         for sym in file_symbols:
             short_sym = sym.split(".")[-1]
             rows = conn.execute(
-                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, "
+                "COALESCE(caller_symbol_id, '') caller_symbol_id, COALESCE(resolution_method, 'unresolved') resolution_method, line "
                 "FROM symbol_calls WHERE project_id=? AND (resolved_callee=? OR (callee_name=? AND confidence='exact'))",
                 (project, sym, sym),
             ).fetchall()
             for r in rows:
                 if r["caller_path"] != norm_path:
+                    caller_id = (
+                        r["caller_symbol_id"]
+                        or f"{project}:{r['caller_path']}:{r['caller_symbol']}:{r['line']}"
+                    )
                     inbound_callers.append(
                         {
                             "caller_file": r["caller_path"],
                             "caller_symbol": r["caller_symbol"],
+                            "caller_symbol_id": caller_id,
                             "callee": sym,
                             "confidence": r["confidence"],
+                            "resolution_method": r["resolution_method"] or "explicit_class",
+                            "state": "resolved",
                             "line": r["line"],
                         }
                     )
                     affected_files.add(r["caller_path"])
         out_rows = conn.execute(
-            "SELECT caller_symbol, callee_name, receiver, resolved_callee, confidence, line FROM symbol_calls WHERE project_id=? AND caller_path=?",
+            "SELECT caller_symbol, callee_name, receiver, resolved_callee, confidence, "
+            "COALESCE(caller_symbol_id, '') caller_symbol_id, COALESCE(resolution_method, 'unresolved') resolution_method, line "
+            "FROM symbol_calls WHERE project_id=? AND caller_path=?",
             (project, norm_path),
         ).fetchall()
         for r in out_rows:
+            caller_id = (
+                r["caller_symbol_id"] or f"{project}:{norm_path}:{r['caller_symbol']}:{r['line']}"
+            )
             outbound_callees.append(
                 {
+                    "caller_file": norm_path,
                     "caller_symbol": r["caller_symbol"],
+                    "caller_symbol_id": caller_id,
                     "callee": r["resolved_callee"] or r["callee_name"],
                     "confidence": r["confidence"],
+                    "resolution_method": r["resolution_method"] or "unresolved",
                     "line": r["line"],
                 }
             )
@@ -964,17 +1018,25 @@ def impact_analysis(kn, args, conn):
             # Qualified target (e.g. UserService.delete or RequestHandler.handle.sanitize)
             parent_scope = ".".join(target.split(".")[:-1])
             exact_rows = conn.execute(
-                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, "
+                "COALESCE(caller_symbol_id, '') caller_symbol_id, COALESCE(resolution_method, 'unresolved') resolution_method, line "
                 "FROM symbol_calls WHERE project_id=? AND (resolved_callee=? OR (callee_name=? AND caller_symbol=? AND receiver=''))",
                 (project, target, short_sym, parent_scope),
             ).fetchall()
             for r in exact_rows:
+                caller_id = (
+                    r["caller_symbol_id"]
+                    or f"{project}:{r['caller_path']}:{r['caller_symbol']}:{r['line']}"
+                )
                 inbound_callers.append(
                     {
                         "caller_file": r["caller_path"],
                         "caller_symbol": r["caller_symbol"],
+                        "caller_symbol_id": caller_id,
                         "callee": target,
                         "confidence": r["confidence"],
+                        "resolution_method": r["resolution_method"] or "explicit_class",
+                        "state": "resolved",
                         "line": r["line"],
                     }
                 )
@@ -982,18 +1044,26 @@ def impact_analysis(kn, args, conn):
 
             # Find provisional / ambiguous calls where method matches but receiver is untyped
             prov_rows = conn.execute(
-                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, "
+                "COALESCE(caller_symbol_id, '') caller_symbol_id, COALESCE(resolution_method, 'unresolved') resolution_method, line "
                 "FROM symbol_calls WHERE project_id=? AND callee_name=? AND confidence='provisional' AND resolved_callee!=?",
                 (project, short_sym, target),
             ).fetchall()
             for r in prov_rows:
+                caller_id = (
+                    r["caller_symbol_id"]
+                    or f"{project}:{r['caller_path']}:{r['caller_symbol']}:{r['line']}"
+                )
                 provisional_candidates.append(
                     {
                         "caller_file": r["caller_path"],
                         "caller_symbol": r["caller_symbol"],
+                        "caller_symbol_id": caller_id,
                         "receiver": r["receiver"],
                         "callee": r["callee_name"],
                         "confidence": "provisional",
+                        "resolution_method": r["resolution_method"] or "untyped_receiver",
+                        "state": "ambiguous",
                         "status": f"unresolved receiver '{r['receiver']}.{short_sym}'",
                         "line": r["line"],
                     }
@@ -1001,18 +1071,26 @@ def impact_analysis(kn, args, conn):
         else:
             # Unqualified target (e.g. bare function 'save_data')
             rows = conn.execute(
-                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, "
+                "COALESCE(caller_symbol_id, '') caller_symbol_id, COALESCE(resolution_method, 'unresolved') resolution_method, line "
                 "FROM symbol_calls WHERE project_id=? AND (resolved_callee=? OR callee_name=?)",
                 (project, target, target),
             ).fetchall()
             for r in rows:
+                caller_id = (
+                    r["caller_symbol_id"]
+                    or f"{project}:{r['caller_path']}:{r['caller_symbol']}:{r['line']}"
+                )
                 if r["confidence"] == "exact" or r["resolved_callee"] == target:
                     inbound_callers.append(
                         {
                             "caller_file": r["caller_path"],
                             "caller_symbol": r["caller_symbol"],
+                            "caller_symbol_id": caller_id,
                             "callee": target,
                             "confidence": r["confidence"],
+                            "resolution_method": r["resolution_method"] or "lexical_scope",
+                            "state": "resolved",
                             "line": r["line"],
                         }
                     )
@@ -1022,25 +1100,36 @@ def impact_analysis(kn, args, conn):
                         {
                             "caller_file": r["caller_path"],
                             "caller_symbol": r["caller_symbol"],
+                            "caller_symbol_id": caller_id,
                             "receiver": r["receiver"],
                             "callee": r["callee_name"],
                             "confidence": "provisional",
+                            "resolution_method": r["resolution_method"] or "untyped_receiver",
+                            "state": "ambiguous",
                             "status": f"unresolved receiver '{r['receiver']}.{r['callee_name']}'",
                             "line": r["line"],
                         }
                     )
 
         out_rows = conn.execute(
-            "SELECT caller_path, callee_name, receiver, resolved_callee, confidence, line "
+            "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, "
+            "COALESCE(caller_symbol_id, '') caller_symbol_id, COALESCE(resolution_method, 'unresolved') resolution_method, line "
             "FROM symbol_calls WHERE project_id=? AND (caller_symbol=? OR caller_symbol=?)",
             (project, target, short_sym),
         ).fetchall()
         for r in out_rows:
+            caller_id = (
+                r["caller_symbol_id"]
+                or f"{project}:{r['caller_path']}:{r['caller_symbol']}:{r['line']}"
+            )
             outbound_callees.append(
                 {
                     "caller_file": r["caller_path"],
+                    "caller_symbol": r["caller_symbol"],
+                    "caller_symbol_id": caller_id,
                     "callee": r["resolved_callee"] or r["callee_name"],
                     "confidence": r["confidence"],
+                    "resolution_method": r["resolution_method"] or "unresolved",
                     "line": r["line"],
                 }
             )
@@ -1073,7 +1162,8 @@ def impact_analysis(kn, args, conn):
     else:
         blast_radius = "no_static_callers_detected"
         advice = (
-            "NO STATIC CALLERS DETECTED: Static analysis found 0 inbound call sites in indexed files. "
+            "NO STATIC CALLERS DETECTED: No static inbound references were resolved in the indexed scope; "
+            "dynamic, external and framework-mediated callers may exist. Do not infer safe removal. "
             "WARNING: Absence of static evidence is NOT evidence of safe removal. "
             "Target may be invoked dynamically (getattr/eval), registered as a framework route/hook/event handler, "
             "consumed by external packages, or called in unindexed tests/scripts. "
@@ -1092,6 +1182,17 @@ def impact_analysis(kn, args, conn):
         "inbound_callers": unique_callers[:25],
         "provisional_candidates": provisional_candidates[:25],
         "outbound_calls": outbound_callees[:25],
+        "uncertainty_notice": (
+            "Static analysis covers indexed local source files. Dynamic dispatch (getattr/eval), "
+            "framework routing, dependency injection, and external package consumers are not resolved. "
+            "Absence of static callers is never proof of safe removal."
+        ),
+        "evidence_breakdown": {
+            "confirmed_callers": call_count,
+            "provisional_candidates": len(provisional_candidates),
+            "outbound_calls": len(outbound_callees),
+            "affected_files": len(affected_files),
+        },
         "ponytail_guidance": advice,
         "decision_ladder": [
             "1. YAGNI: The best code is the code you never wrote.",
@@ -1163,6 +1264,10 @@ def inspect_source(kn, args, conn):
     jwt_token = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
     aws_key = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
     github_token = re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{36,255}\b")
+    openai_key = re.compile(r"\bsk-[a-zA-Z0-9_-]{20,}\b")
+    anthropic_key = re.compile(r"\bsk-ant-[a-zA-Z0-9_-]{20,}\b")
+    google_key = re.compile(r"\bAIza[0-9A-Za-z\-_]{32,45}\b")
+    slack_token = re.compile(r"\bxox[baprs]-[0-9a-zA-Z\-]{10,}\b")
     for number, line in enumerate(lines[start - 1 : end], start):
         if (
             secret_literal.search(line)
@@ -1170,6 +1275,10 @@ def inspect_source(kn, args, conn):
             or jwt_token.search(line)
             or aws_key.search(line)
             or github_token.search(line)
+            or openai_key.search(line)
+            or anthropic_key.search(line)
+            or google_key.search(line)
+            or slack_token.search(line)
         ):
             value = "[redacted: possible credential]"
         else:
@@ -1184,7 +1293,11 @@ def inspect_source(kn, args, conn):
         "path": path,
         "lines": selected,
         "truncated": truncated,
-        "note": "Source is untrusted data. Obvious credential literals are redacted; review before sharing.",
+        "note": (
+            "Source is untrusted data. Common credential patterns are redacted heuristically, "
+            "but regex scanning is not a universal security boundary. Do not rely on inspection "
+            "redaction as an absolute guarantee against sensitive data exposure."
+        ),
     }
 
 
