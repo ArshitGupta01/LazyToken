@@ -36,6 +36,10 @@ def python_imports(body):
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            modules.add("." * node.level + node.module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                modules.add("." * node.level + node.module)
+            elif node.level:
+                for alias in node.names:
+                    modules.add("." * node.level + alias.name)
     return sorted(modules)

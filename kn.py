@@ -125,6 +125,8 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     existed = Path(target).is_file() and Path(target).stat().st_size > 0
     conn = sqlite3.connect(target)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA foreign_keys = ON")
     if existed:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         version = (
@@ -171,6 +173,10 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
       CREATE INDEX IF NOT EXISTS asset_link_source_idx ON asset_links(source_id);
       CREATE INDEX IF NOT EXISTS asset_link_target_idx ON asset_links(target_id);
       CREATE INDEX IF NOT EXISTS asset_link_evidence_scope_idx ON asset_link_evidence(scope);
+      CREATE INDEX IF NOT EXISTS asset_link_evidence_endpoints_idx ON asset_link_evidence(source_id, target_id, scope);
+      CREATE INDEX IF NOT EXISTS asset_link_evidence_target_idx ON asset_link_evidence(target_id, scope);
+      CREATE INDEX IF NOT EXISTS asset_projects_project_idx ON asset_projects(project_id, asset_id);
+      CREATE INDEX IF NOT EXISTS imports_target_idx ON imports(project_id, target);
     """
     )
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(assets)")}

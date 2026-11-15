@@ -11,6 +11,8 @@ from pathlib import Path
 
 
 def migrate(conn):
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(
         """
     CREATE TABLE IF NOT EXISTS lazytoken_migrations(version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
@@ -19,6 +21,9 @@ def migrate(conn):
     CREATE TABLE IF NOT EXISTS memory_evidence(proposal_id INTEGER NOT NULL, path TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(proposal_id,path));
     CREATE TABLE IF NOT EXISTS context_session_items(project_id TEXT NOT NULL, session_id TEXT NOT NULL, item_key TEXT NOT NULL, fingerprint TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(project_id,session_id,item_key));
     CREATE TABLE IF NOT EXISTS fts_project_state(project_id TEXT PRIMARY KEY, complete INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS context_session_lookup_idx ON context_session_items(project_id, session_id, updated_at DESC, item_key);
+    CREATE INDEX IF NOT EXISTS memory_proposals_asset_idx ON memory_proposals(asset_id, status);
+    CREATE INDEX IF NOT EXISTS memory_proposals_proj_kind_idx ON memory_proposals(project_id, kind, status);
     INSERT OR IGNORE INTO lazytoken_migrations VALUES(1, strftime('%s','now'));
     INSERT OR IGNORE INTO lazytoken_migrations VALUES(2, strftime('%s','now'));
     """

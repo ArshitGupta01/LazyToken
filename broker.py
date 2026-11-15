@@ -4,12 +4,171 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import posixpath
+import sys
 import time
 import features
 import token_budget
 from collections import OrderedDict
 
 _SEARCH_CACHE = OrderedDict()
+
+_PYTHON_STDLIB = getattr(
+    sys,
+    "stdlib_module_names",
+    frozenset(
+        {
+            "abc", "argparse", "array", "ast", "asyncio", "base64", "binascii", "bisect",
+            "builtins", "bz2", "calendar", "cmath", "cmd", "code", "codecs", "collections",
+            "colorsys", "compileall", "concurrent", "configparser", "contextlib", "contextvars",
+            "copy", "copyreg", "csv", "ctypes", "curses", "dataclasses", "datetime", "dbm",
+            "decimal", "difflib", "dis", "doctest", "email", "encodings", "ensurepip", "enum",
+            "errno", "faulthandler", "fcntl", "filecmp", "fileinput", "fnmatch", "fractions",
+            "ftplib", "functools", "gc", "getopt", "getpass", "gettext", "glob", "graphlib",
+            "gzip", "hashlib", "heapq", "hmac", "html", "http", "idlelib", "imaplib", "imghdr",
+            "importlib", "inspect", "io", "ipaddress", "itertools", "json", "keyword", "linecache",
+            "locale", "logging", "lzma", "mailbox", "mailcap", "marshal", "math", "mimetypes",
+            "mmap", "modulefinder", "msilib", "msvcrt", "multiprocessing", "netrc", "nntplib",
+            "numbers", "operator", "optparse", "os", "ossaudiodev", "pathlib", "pdb", "pickle",
+            "pickletools", "pipes", "pkgutil", "platform", "plistlib", "poplib", "posix",
+            "posixpath", "pprint", "profile", "pstats", "pty", "pwd", "py_compile", "pyclbr",
+            "pydoc", "queue", "quopri", "random", "re", "readline", "reprlib", "resource",
+            "rlcompleter", "runpy", "sched", "secrets", "select", "selectors", "shelve", "shlex",
+            "shutil", "signal", "site", "smtpd", "smtplib", "sndhdr", "socket", "socketserver",
+            "spwd", "sqlite3", "ssl", "stat", "statistics", "string", "stringprep", "struct",
+            "subprocess", "sunau", "symtable", "sys", "sysconfig", "syslog", "tabnanny", "tarfile",
+            "telnetlib", "tempfile", "termios", "textwrap", "threading", "time", "timeit",
+            "tkinter", "token", "tokenize", "tomllib", "trace", "traceback", "tracemalloc", "tty",
+            "turtle", "turtledemo", "types", "typing", "unicodedata", "unittest", "urllib", "uu",
+            "uuid", "venv", "warnings", "wave", "weakref", "webbrowser", "winreg", "winsound",
+            "wsgiref", "xdrlib", "xml", "xmlrpc", "zipapp", "zipfile", "zipimport", "zlib",
+            "zoneinfo",
+        }
+    ),
+)
+
+
+def _resolve_import_target(source: str, target: str, active_files: set[str]) -> str | None:
+    norm_source = source.replace("\\", "/")
+    target = target.strip().replace("\\", "/")
+    if not target or not active_files:
+        return None
+
+    # Guard self-import: a module importing its own stem should not resolve to another file
+    if target == Path(norm_source).stem or target == Path(norm_source).name or target == norm_source:
+        return None
+
+    candidates = {f.replace("\\", "/") for f in active_files if f.replace("\\", "/") != norm_source}
+    if not candidates:
+        return None
+
+    # JS/TS Relative import
+    if target.startswith("./") or target.startswith("../"):
+        source_dir = posixpath.dirname(norm_source)
+        resolved_rel = posixpath.normpath(posixpath.join(source_dir, target))
+        for ext in (
+            "",
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".d.ts",
+            ".vue",
+            ".svelte",
+            "/index.js",
+            "/index.ts",
+            "/index.jsx",
+            "/index.tsx",
+            "/index.d.ts",
+        ):
+            cand = resolved_rel + ext
+            if cand in candidates:
+                return cand
+            if cand.startswith("./") and cand[2:] in candidates:
+                return cand[2:]
+        return None
+
+    # Python Relative import
+    if target.startswith("."):
+        leading_dots = len(target) - len(target.lstrip("."))
+        remainder = target.lstrip(".")
+        source_dir = posixpath.dirname(norm_source)
+        dir_parts = [p for p in source_dir.split("/") if p]
+        up_levels = leading_dots - 1
+        if up_levels > len(dir_parts):
+            return None
+        if up_levels > 0:
+            dir_parts = dir_parts[:-up_levels]
+        base_dir = "/".join(dir_parts)
+        rel_path = remainder.replace(".", "/")
+        if base_dir and rel_path:
+            full_cand = f"{base_dir}/{rel_path}"
+        elif base_dir:
+            full_cand = base_dir
+        else:
+            full_cand = rel_path
+
+        for cand in (
+            f"{full_cand}.py",
+            f"{full_cand}/__init__.py",
+            full_cand,
+        ):
+            if cand in candidates:
+                return cand
+        return None
+
+    # Standard library filter: ignore standard library imports unless an exact file exists
+    top_mod = target.split(".")[0]
+    if top_mod in _PYTHON_STDLIB:
+        source_dir = posixpath.dirname(norm_source)
+        for f in candidates:
+            if (
+                f == f"{target}.py"
+                or f == target
+                or (source_dir and posixpath.dirname(f) == source_dir and Path(f).stem == target)
+            ):
+                return f
+        return None
+
+    # Exact path or filename match
+    if target in candidates:
+        return target
+    if f"{target}.py" in candidates:
+        return f"{target}.py"
+
+    target_path = target.replace(".", "/")
+
+    # Check same directory as source
+    source_dir = posixpath.dirname(norm_source)
+    if source_dir:
+        same_dir = posixpath.normpath(posixpath.join(source_dir, target_path + ".py"))
+        if same_dir in candidates:
+            return same_dir
+        same_dir_init = posixpath.normpath(posixpath.join(source_dir, target_path, "__init__.py"))
+        if same_dir_init in candidates:
+            return same_dir_init
+
+    # Check from project root
+    if f"{target_path}.py" in candidates:
+        return f"{target_path}.py"
+    if f"{target_path}/__init__.py" in candidates:
+        return f"{target_path}/__init__.py"
+
+    # Segment-aligned suffix match (never substring)
+    is_bare = not "." in target and not "/" in target
+    for f in candidates:
+        if is_bare:
+            if source_dir and posixpath.dirname(f) == source_dir and Path(f).stem == target:
+                return f
+        else:
+            if (
+                f.endswith("/" + target_path + ".py")
+                or f.endswith("/" + target_path)
+                or f.endswith("/" + target)
+            ):
+                return f
+
+    return None
 
 
 def _revision(conn):
@@ -115,12 +274,25 @@ def task_context(kn, args, conn):
             response["used_tokens"] = max(response["used_tokens"], measured)
         raise ValueError("Unable to stabilize payload accounting.")
 
-    def finish(response, shown=()):
+    def finish(response, shown=(), touched=()):
         before = _revision(conn)
+        now = int(time.time())
+        if session:
+            max_ts_row = conn.execute(
+                "SELECT MAX(updated_at) FROM context_session_items WHERE project_id=? AND session_id=?",
+                (project, session),
+            ).fetchone()
+            if max_ts_row and max_ts_row[0] is not None and max_ts_row[0] >= now:
+                now = max_ts_row[0] + 1
+        if session and touched:
+            conn.executemany(
+                "UPDATE context_session_items SET updated_at=? WHERE project_id=? AND session_id=? AND item_key=?",
+                [(now, project, session, k) for k in touched],
+            )
         if session and shown:
             conn.executemany(
                 "INSERT INTO context_session_items VALUES(?,?,?,?,?) ON CONFLICT(project_id,session_id,item_key) DO UPDATE SET fingerprint=excluded.fingerprint,updated_at=excluded.updated_at",
-                shown,
+                [(p, s, k, f, now) for (p, s, k, f, _) in shown],
             )
         features.log_retrieval(kn, conn, project, task, response, commit=False)
         conn.commit()
@@ -181,6 +353,44 @@ def task_context(kn, args, conn):
         )
     shown = []
     covered_paths = set()
+    touched_suppressed = []
+    suppressed_items = []
+
+    # Batch prefetch to eliminate N+1 queries
+    asset_ids = [raw["id"] for raw in results if raw.get("type") == "asset" and "id" in raw]
+    evidence_by_asset: dict[int, list[str]] = {}
+    if asset_ids:
+        placeholders = ",".join("?" for _ in asset_ids)
+        for row in conn.execute(
+            f"SELECT m.asset_id, e.path FROM memory_evidence e JOIN memory_proposals m ON m.id=e.proposal_id "
+            f"WHERE m.project_id=? AND m.status='approved' AND m.asset_id IN ({placeholders}) "
+            f"ORDER BY m.asset_id, e.path",
+            (project, *asset_ids),
+        ):
+            evidence_by_asset.setdefault(row["asset_id"], []).append(row["path"])
+
+    candidate_paths = {raw["path"] for raw in results if raw.get("path")}
+    digests_by_path: dict[str, str] = {}
+    if candidate_paths:
+        placeholders = ",".join("?" for _ in candidate_paths)
+        for row in conn.execute(
+            f"SELECT path, digest FROM files WHERE project_id=? AND path IN ({placeholders})",
+            (project, *candidate_paths),
+        ):
+            digests_by_path[row["path"]] = row["digest"]
+
+    session_items: dict[str, str] = {}
+    session_files: set[str] = set()
+    if session:
+        for row in conn.execute(
+            "SELECT item_key, fingerprint FROM context_session_items WHERE project_id=? AND session_id=?",
+            (project, session),
+        ):
+            session_items[row["item_key"]] = row["fingerprint"]
+            parts = row["item_key"].split(":")
+            if parts and parts[0] in ("file", "symbol", "import") and len(parts) >= 2:
+                session_files.add(parts[1])
+
     for raw in results:
         if raw["type"] == "file" and raw.get("path") in covered_paths:
             continue
@@ -201,13 +411,9 @@ def task_context(kn, args, conn):
             if k in raw
         }
         if raw["type"] == "asset":
-            paths = conn.execute(
-                "SELECT e.path FROM memory_evidence e JOIN memory_proposals m ON m.id=e.proposal_id "
-                "WHERE m.asset_id=? AND m.project_id=? AND m.status='approved' ORDER BY e.path LIMIT 3",
-                (raw["id"], project),
-            ).fetchall()
+            paths = evidence_by_asset.get(raw["id"], [])[:3]
             if paths:
-                crumb["evidence_paths"] = [row["path"] for row in paths]
+                crumb["evidence_paths"] = paths
         expanded = expand and raw["type"] == "asset"
         if expanded:
             crumb.update(
@@ -236,25 +442,17 @@ def task_context(kn, args, conn):
         key = _key(crumb) + (":expanded" if expanded else "")
         fingerprint_data = {"crumb": crumb}
         if raw.get("path"):
-            indexed = conn.execute(
-                "SELECT digest FROM files WHERE project_id=? AND path=?", (project, raw["path"])
-            ).fetchone()
-            fingerprint_data["file_digest"] = indexed["digest"] if indexed else None
+            fingerprint_data["file_digest"] = digests_by_path.get(raw["path"])
         if raw["type"] == "asset":
             fingerprint_data.update({k: raw.get(k) for k in ("summary", "tags", "source")})
         fingerprint = hashlib.sha256(_encoded(fingerprint_data).encode("utf-8")).hexdigest()
         if session and not repeat:
             expanded_key = key + ":expanded" if raw["type"] == "asset" and not expanded else key
-            seen = {
-                row["item_key"]: row["fingerprint"]
-                for row in conn.execute(
-                    "SELECT item_key,fingerprint FROM context_session_items "
-                    "WHERE project_id=? AND session_id=? AND item_key IN (?,?)",
-                    (project, session, key, expanded_key),
-                )
-            }
+            seen = session_items
             if seen.get(key) == fingerprint:
                 response["suppressed_seen"] += 1
+                touched_suppressed.append(key)
+                suppressed_items.append({"key": key, "type": raw.get("type"), "path": raw.get("path"), "name": raw.get("name")})
                 if raw["type"] in ("symbol", "import") and raw.get("path"):
                     covered_paths.add(raw["path"])
                 continue
@@ -278,6 +476,8 @@ def task_context(kn, args, conn):
                 ).hexdigest()
                 if seen.get(expanded_key) == expanded_fingerprint:
                     response["suppressed_seen"] += 1
+                    touched_suppressed.append(expanded_key)
+                    suppressed_items.append({"key": expanded_key, "type": "asset", "name": raw.get("name")})
                     continue
         response["results"].append(crumb)
         if used(response) > budget:
@@ -288,36 +488,68 @@ def task_context(kn, args, conn):
         if raw["type"] in ("symbol", "import") and raw.get("path"):
             covered_paths.add(raw["path"])
     if not response["results"] and response["suppressed_seen"]:
+        if session and touched_suppressed:
+            now = int(time.time())
+            max_ts_row = conn.execute(
+                "SELECT MAX(updated_at) FROM context_session_items WHERE project_id=? AND session_id=?",
+                (project, session),
+            ).fetchone()
+            if max_ts_row and max_ts_row[0] is not None and max_ts_row[0] >= now:
+                now = max_ts_row[0] + 1
+            conn.executemany(
+                "UPDATE context_session_items SET updated_at=? WHERE project_id=? AND session_id=? AND item_key=?",
+                [(now, project, session, k) for k in touched_suppressed],
+            )
         response["reason"] = "All matching breadcrumbs were already supplied in this session."
+        recap_items = [
+            {"key": item["key"], "type": item.get("type"), "path": item.get("path"), "name": item.get("name")}
+            for item in suppressed_items
+        ]
+        response["recap"] = recap_items
+        response["active_context_summary"] = [item["key"] for item in suppressed_items]
+        if session:
+            recent_rows = conn.execute(
+                "SELECT item_key FROM context_session_items WHERE project_id=? AND session_id=? "
+                "ORDER BY updated_at DESC, item_key LIMIT 30",
+                (project, session),
+            ).fetchall()
+            recent_keys = [r["item_key"] for r in recent_rows]
+            graph_info = build_session_graph(kn, conn, project, recent_keys)
+            response["active_graph"] = graph_info["active_graph"]
+            response["graph_topology"] = graph_info["graph_topology"]
+        if used(response) > budget:
+            response.pop("active_graph", None)
+            if used(response) > budget:
+                response.pop("graph_topology", None)
+                if used(response) > budget:
+                    response["recap"] = [item["key"] for item in suppressed_items][:3]
+                    response["active_context_summary"] = [item["key"] for item in suppressed_items][:3]
+                    if used(response) > budget:
+                        response.pop("active_context_summary", None)
+                        if used(response) > budget:
+                            response["recap"] = [item["key"] for item in suppressed_items][:1]
+                            if used(response) > budget:
+                                response.pop("recap", None)
+                                if used(response) > budget:
+                                    response.pop("budget_scope", None)
     if response["results"]:
         result_files = {c.get("path") for c in response["results"] if c.get("path")}
-        if len(result_files) > 1:
+        combined_files = result_files | session_files
+        if len(combined_files) > 1 and result_files:
             graph_edges = []
-            placeholders = ",".join("?" for _ in result_files)
+            placeholders = ",".join("?" for _ in combined_files)
             for imp in conn.execute(
                 f"SELECT source, target FROM imports WHERE project_id=? AND source IN ({placeholders})",
-                (project, *result_files),
+                (project, *combined_files),
             ):
-                target = imp["target"]
-                target_file = next(
-                    (
-                        f
-                        for f in result_files
-                        if f != imp["source"]
-                        and (
-                            f.endswith("/" + target)
-                            or Path(f).stem == target
-                            or target.replace(".", "/") in f
+                target_file = _resolve_import_target(imp["source"], imp["target"], combined_files)
+                if target_file and (imp["source"] in result_files or target_file in result_files):
+                    if not any(
+                        e["source"] == imp["source"] and e["target"] == target_file for e in graph_edges
+                    ):
+                        graph_edges.append(
+                            {"source": imp["source"], "target": target_file, "relation": "imports"}
                         )
-                    ),
-                    None,
-                )
-                if target_file and not any(
-                    e["source"] == imp["source"] and e["target"] == target_file for e in graph_edges
-                ):
-                    graph_edges.append(
-                        {"source": imp["source"], "target": target_file, "relation": "imports"}
-                    )
             if graph_edges:
                 response["graph_edges"] = graph_edges[:6]
                 if used(response) > budget:
@@ -334,8 +566,10 @@ def task_context(kn, args, conn):
                 del response["reusable_frameworks"]
 
     if used(response) > budget:
+        response.pop("budget_scope", None)
+    if used(response) > budget:
         return {"error": "Budget is too small for response metadata."}
-    return finish(response, shown)
+    return finish(response, shown, touched_suppressed)
 
 
 def clear_session(kn, args, conn):
@@ -356,52 +590,59 @@ def build_session_graph(kn, conn, project, recent_keys):
     active_asset_ids = set()
 
     for key in recent_keys:
-        parts = key.split(":")
-        tag = parts[0]
-        if tag == "file" and len(parts) >= 2:
-            active_files.add(parts[1])
-        elif tag == "symbol" and len(parts) >= 4:
-            active_files.add(parts[1])
-            active_symbols.append(
-                {
-                    "path": parts[1],
-                    "name": parts[2],
-                    "line": int(parts[3]) if parts[3].isdigit() else 1,
-                }
-            )
-        elif tag == "import" and len(parts) >= 3:
-            active_files.add(parts[1])
-        elif tag == "asset" and len(parts) >= 2 and parts[1].isdigit():
-            active_asset_ids.add(int(parts[1]))
+        if key.startswith("file:"):
+            rest = key[5:]
+            p = rest.split(":", 1)[0]
+            if p:
+                active_files.add(p)
+        elif key.startswith("symbol:"):
+            rest = key[7:]
+            rparts = rest.rsplit(":", 2)
+            if len(rparts) == 3:
+                p, name, line_str = rparts
+                if p:
+                    active_files.add(p)
+                active_symbols.append(
+                    {
+                        "path": p,
+                        "name": name,
+                        "line": int(line_str) if line_str.isdigit() else 1,
+                    }
+                )
+        elif key.startswith("import:"):
+            rest = key[7:]
+            p = rest.split(":", 1)[0]
+            if p:
+                active_files.add(p)
+        elif key.startswith("asset:"):
+            parts = key.split(":")
+            if len(parts) >= 2 and parts[1].isdigit():
+                active_asset_ids.add(int(parts[1]))
+
+    seen_symbols = set()
+    deduped_symbols = []
+    for s in active_symbols:
+        sym_key = (s["path"], s["name"], s["line"])
+        if sym_key not in seen_symbols:
+            seen_symbols.add(sym_key)
+            deduped_symbols.append(s)
+    active_symbols = deduped_symbols
 
     edges = []
-    if active_files:
+    if active_files and conn:
         placeholders = ",".join("?" for _ in active_files)
         for imp in conn.execute(
             f"SELECT source, target FROM imports WHERE project_id=? AND source IN ({placeholders})",
             (project, *active_files),
         ):
-            target = imp["target"]
-            target_file = next(
-                (
-                    f
-                    for f in active_files
-                    if f != imp["source"]
-                    and (
-                        f.endswith("/" + target)
-                        or Path(f).stem == target
-                        or target.replace(".", "/") in f
-                    )
-                ),
-                None,
-            )
+            target_file = _resolve_import_target(imp["source"], imp["target"], active_files)
             if target_file and not any(
                 e["source"] == imp["source"] and e["target"] == target_file for e in edges
             ):
                 edges.append({"source": imp["source"], "target": target_file, "relation": "imports"})
 
     active_lessons = []
-    if active_asset_ids:
+    if active_asset_ids and conn:
         placeholders = ",".join("?" for _ in active_asset_ids)
         for row in conn.execute(
             f"SELECT id, name, summary FROM assets WHERE id IN ({placeholders}) AND scope IN ('project', 'global')",
@@ -415,12 +656,14 @@ def build_session_graph(kn, conn, project, recent_keys):
                 if ev["path"] in active_files:
                     edges.append({"source": row["name"], "target": ev["path"], "relation": "guides"})
 
-    framework_rows = conn.execute(
-        "SELECT a.name FROM assets a JOIN asset_projects p ON p.asset_id=a.id "
-        "WHERE p.project_id=? AND a.kind IN ('framework', 'library') ORDER BY a.name LIMIT 8",
-        (project,),
-    ).fetchall()
-    reusable_frameworks = [r["name"] for r in framework_rows]
+    reusable_frameworks = []
+    if conn:
+        framework_rows = conn.execute(
+            "SELECT a.name FROM assets a JOIN asset_projects p ON p.asset_id=a.id "
+            "WHERE p.project_id=? AND a.kind IN ('framework', 'library') ORDER BY a.name LIMIT 8",
+            (project,),
+        ).fetchall()
+        reusable_frameworks = [r["name"] for r in framework_rows]
 
     topology = []
     for edge in edges[:10]:
