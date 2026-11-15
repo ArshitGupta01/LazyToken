@@ -397,6 +397,36 @@ class ContextBrokerTests(unittest.TestCase):
             )
             self.assertEqual(result["budget_type"], "tokenizer:fixture-words")
 
+    def test_session_checkpoint_active_graph_and_midway_recall(self):
+        (self.root / "helper.py").write_text("def assist():\n    return 42\n", encoding="utf-8")
+        (self.root / "service.py").write_text("import helper\ndef run():\n    return helper.assist()\n", encoding="utf-8")
+        kn.sync(self.root, self.db)
+
+        # 1. First task context retrieval
+        ret = kn.call(
+            "get_task_context",
+            {"project": self.project, "task": "run helper assist service", "session_id": "midway-session", "budget": 800},
+            self.db,
+        )
+        self.assertNotIn("error", ret)
+        self.assertTrue(ret["results"])
+        self.assertIn("graph_edges", ret)
+        self.assertTrue(any(e["source"] == "service.py" and e["target"] == "helper.py" for e in ret["graph_edges"]))
+
+        # 2. Mid-way recall via checkpoint
+        cp = kn.call(
+            "checkpoint",
+            {"project": self.project, "session_id": "midway-session"},
+            self.db,
+        )
+        self.assertNotIn("error", cp)
+        self.assertIn("active_graph", cp)
+        self.assertIn("service.py", cp["active_graph"]["files"])
+        self.assertIn("helper.py", cp["active_graph"]["files"])
+        self.assertTrue(any(e["source"] == "service.py" and e["target"] == "helper.py" for e in cp["active_graph"]["edges"]))
+        self.assertIn("graph_topology", cp)
+        self.assertTrue(any("service.py --(imports)--> helper.py" in t for t in cp["graph_topology"]))
+
 
 if __name__ == "__main__":
     unittest.main()

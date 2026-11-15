@@ -997,6 +997,8 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
         "get_task_context": "task_context",
         "clear_context_session": "clear_session",
         "inspect_source_range": "inspect_source",
+        "checkpoint": "checkpoint",
+        "session_checkpoint": "checkpoint",
     }
     if name in direct_actions:
         return feature_call(direct_actions[name], args, conn)
@@ -1488,8 +1490,14 @@ def main() -> None:
                     "budget_type": result["budget_type"],
                     "results": result["results"],
                 }
-                for field in ("truncated", "suppressed_seen"):
-                    if result[field]:
+                for field in (
+                    "truncated",
+                    "suppressed_seen",
+                    "graph_edges",
+                    "reusable_frameworks",
+                    "graph_topology",
+                ):
+                    if result.get(field):
                         brief[field] = result[field]
                 encoded = json.dumps(
                     brief, ensure_ascii=False, separators=(",", ":"), sort_keys=True

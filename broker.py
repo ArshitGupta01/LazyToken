@@ -3,6 +3,7 @@
 from __future__ import annotations
 import hashlib
 import json
+from pathlib import Path
 import time
 import features
 import token_budget
@@ -288,6 +289,50 @@ def task_context(kn, args, conn):
             covered_paths.add(raw["path"])
     if not response["results"] and response["suppressed_seen"]:
         response["reason"] = "All matching breadcrumbs were already supplied in this session."
+    if response["results"]:
+        result_files = {c.get("path") for c in response["results"] if c.get("path")}
+        if len(result_files) > 1:
+            graph_edges = []
+            placeholders = ",".join("?" for _ in result_files)
+            for imp in conn.execute(
+                f"SELECT source, target FROM imports WHERE project_id=? AND source IN ({placeholders})",
+                (project, *result_files),
+            ):
+                target = imp["target"]
+                target_file = next(
+                    (
+                        f
+                        for f in result_files
+                        if f != imp["source"]
+                        and (
+                            f.endswith("/" + target)
+                            or Path(f).stem == target
+                            or target.replace(".", "/") in f
+                        )
+                    ),
+                    None,
+                )
+                if target_file and not any(
+                    e["source"] == imp["source"] and e["target"] == target_file for e in graph_edges
+                ):
+                    graph_edges.append(
+                        {"source": imp["source"], "target": target_file, "relation": "imports"}
+                    )
+            if graph_edges:
+                response["graph_edges"] = graph_edges[:6]
+                if used(response) > budget:
+                    del response["graph_edges"]
+
+        framework_rows = conn.execute(
+            "SELECT a.name FROM assets a JOIN asset_projects p ON p.asset_id=a.id "
+            "WHERE p.project_id=? AND a.kind IN ('framework', 'library') ORDER BY a.name LIMIT 6",
+            (project,),
+        ).fetchall()
+        if framework_rows:
+            response["reusable_frameworks"] = [r["name"] for r in framework_rows]
+            if used(response) > budget:
+                del response["reusable_frameworks"]
+
     if used(response) > budget:
         return {"error": "Budget is too small for response metadata."}
     return finish(response, shown)
@@ -305,6 +350,98 @@ def clear_session(kn, args, conn):
     return {"cleared": count}
 
 
+def build_session_graph(kn, conn, project, recent_keys):
+    active_files = set()
+    active_symbols = []
+    active_asset_ids = set()
+
+    for key in recent_keys:
+        parts = key.split(":")
+        tag = parts[0]
+        if tag == "file" and len(parts) >= 2:
+            active_files.add(parts[1])
+        elif tag == "symbol" and len(parts) >= 4:
+            active_files.add(parts[1])
+            active_symbols.append(
+                {
+                    "path": parts[1],
+                    "name": parts[2],
+                    "line": int(parts[3]) if parts[3].isdigit() else 1,
+                }
+            )
+        elif tag == "import" and len(parts) >= 3:
+            active_files.add(parts[1])
+        elif tag == "asset" and len(parts) >= 2 and parts[1].isdigit():
+            active_asset_ids.add(int(parts[1]))
+
+    edges = []
+    if active_files:
+        placeholders = ",".join("?" for _ in active_files)
+        for imp in conn.execute(
+            f"SELECT source, target FROM imports WHERE project_id=? AND source IN ({placeholders})",
+            (project, *active_files),
+        ):
+            target = imp["target"]
+            target_file = next(
+                (
+                    f
+                    for f in active_files
+                    if f != imp["source"]
+                    and (
+                        f.endswith("/" + target)
+                        or Path(f).stem == target
+                        or target.replace(".", "/") in f
+                    )
+                ),
+                None,
+            )
+            if target_file and not any(
+                e["source"] == imp["source"] and e["target"] == target_file for e in edges
+            ):
+                edges.append({"source": imp["source"], "target": target_file, "relation": "imports"})
+
+    active_lessons = []
+    if active_asset_ids:
+        placeholders = ",".join("?" for _ in active_asset_ids)
+        for row in conn.execute(
+            f"SELECT id, name, summary FROM assets WHERE id IN ({placeholders}) AND scope IN ('project', 'global')",
+            tuple(active_asset_ids),
+        ):
+            active_lessons.append({"id": row["id"], "name": row["name"], "summary": row["summary"]})
+            for ev in conn.execute(
+                "SELECT e.path FROM memory_evidence e JOIN memory_proposals m ON m.id=e.proposal_id WHERE m.asset_id=? AND m.project_id=?",
+                (row["id"], project),
+            ):
+                if ev["path"] in active_files:
+                    edges.append({"source": row["name"], "target": ev["path"], "relation": "guides"})
+
+    framework_rows = conn.execute(
+        "SELECT a.name FROM assets a JOIN asset_projects p ON p.asset_id=a.id "
+        "WHERE p.project_id=? AND a.kind IN ('framework', 'library') ORDER BY a.name LIMIT 8",
+        (project,),
+    ).fetchall()
+    reusable_frameworks = [r["name"] for r in framework_rows]
+
+    topology = []
+    for edge in edges[:10]:
+        topology.append(f"{edge['source']} --({edge['relation']})--> {edge['target']}")
+    for sym in active_symbols[:8]:
+        topology.append(f"{sym['path']}:{sym['line']} defines {sym['name']}")
+    for les in active_lessons[:4]:
+        topology.append(f"Lesson: {les['name']} - {les['summary'][:100]}")
+
+    return {
+        "active_graph": {
+            "files": sorted(active_files),
+            "symbols": active_symbols[:15],
+            "edges": edges[:15],
+            "lessons": active_lessons,
+            "reusable_frameworks": reusable_frameworks,
+        },
+        "graph_topology": topology,
+    }
+
+
 def session_checkpoint(kn, args, conn):
     project = features.project_id(kn, conn, args.get("project"))
     session = args.get("session_id")
@@ -319,11 +456,14 @@ def session_checkpoint(kn, args, conn):
         (project, session, project, session),
     ).fetchall()
     count = rows[0]["count"]
+    recent_keys = [r["item_key"] for r in rows if r["item_key"] is not None]
+    graph_info = build_session_graph(kn, conn, project, recent_keys)
     return {
         "project": project,
         "session_id": session,
         "supplied_items": count,
-        "recent_keys": [r["item_key"] for r in rows if r["item_key"] is not None],
+        "recent_keys": recent_keys,
         "truncated": count > 30,
+        **graph_info,
         "note": "Reuse this project and session_id after compaction. Stored fingerprints suppress unchanged breadcrumbs; source contents are not stored.",
     }

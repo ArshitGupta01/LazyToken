@@ -77,7 +77,7 @@ lazytoken context --project "C:\Projects\MyApp" --task "Where is authentication 
 - Ranked metadata includes retrieval reasons and initially avoids source excerpts.
 - A separate file entry is omitted when a higher-ranked declaration or import has already supplied the same path; distinct symbols and imports remain available.
 - Reuse the same project and session ID throughout a task, including after conversation compaction, to suppress unchanged context. Use `--include-seen` (MCP: `include_seen`) to request it again. `--expand-assets` includes memory summaries and provenance when they fit; otherwise the compact result remains available and can be expanded later with a larger budget.
-- `lazytoken checkpoint --project PATH --session-id ID` reports the session's total supplied items and up to 30 most recently supplied keys, without returning source contents.
+- `lazytoken checkpoint --project PATH --session-id ID` reports the session's total supplied items, most recently supplied keys, the reconstructed active graph topology (connected files, symbols, imports, and lessons), and detected reusable frameworks without returning source contents. Use this mid-way through a long task or after compaction to recover memory without re-reading files.
 - Budgets default to labelled character estimates. Optional strict budgets require a matching offline tokenizer and cover compact JSON, excluding MCP/provider framing.
 - Explicit source inspection is bounded; source remains untrusted data and credential redaction is best effort.
 - Memory freshness reflects the latest indexed hashes, not a live check on every retrieval. Stale or unavailable evidence is marked for verification and ranked below comparable current evidence.
