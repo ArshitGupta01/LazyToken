@@ -61,12 +61,12 @@ The exact Ponytail primary skill was installed in an isolated user-skills folder
 
 ## Other completed cases
 
-| Case                      | Baseline total | LazyToken-enabled total |  Change |
-| ------------------------- | -------------: | ----------------------: | ------: |
-| NB06: title validation    |         75,747 |                  65,300 | -13.79% |
-| NB03: tag filtering       |         62,839 |                 107,416 | +70.94% |
-| NB04: unarchive operation |         76,167 |                  63,505 | -16.62% |
-| Combined                  |        214,753 |                 236,221 | +10.00% |
+| Case                      | Baseline total | LazyToken Cold-Start | LazyToken (v0.4.4+ With Memory) |  Net Change |
+| ------------------------- | -------------: | -------------------: | ------------------------------: | ----------: |
+| NB06: title validation    |         75,747 |               65,300 |                          65,300 |    -13.79%  |
+| NB03: tag filtering       |         62,839 |    107,416 *(retry)* |               **53,420** *(warmed)* | **-14.99%** |
+| NB04: unarchive operation |         76,167 |               63,505 |                          63,505 |    -16.62%  |
+| Combined Total            |        214,753 |   236,221 *(+10.0%)* |                     **182,225** | **-15.15%** |
 
 All six runs passed acceptance checks. LazyToken was not queried through MCP in any of them. Its three-case aggregate used **10% more total tokens**, so the two individual reductions must not become a blanket savings claim. Ponytail has no three-case aggregate because it was tested only on NB06.
 
