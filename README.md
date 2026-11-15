@@ -282,7 +282,18 @@ Evaluated across 8 dynamic retrieval scenarios via `python benchmark/retrieval_a
 | **Forbidden Path Leakage**       |      **0%**      | Zero stale or deleted files returned after rename/removal events              |
 | **Mean Context Payload**         | **177.6 tokens** | Compact, bounded JSON payload delivery                                        |
 
-Full traces, hashes, and methodology are available in [docs/BENCHMARK_PILOT.md](docs/BENCHMARK_PILOT.md) and [docs/RETRIEVAL_ASSESSMENT.md](docs/RETRIEVAL_ASSESSMENT.md).
+### 4. Graph Ablation Benchmark (Lexical vs Memory vs Graph vs Full Pipeline)
+
+Evaluated across 4 multi-component scenarios via `python benchmark/graph_ablation.py`:
+
+| Scenario   | Task Description                 |    Mode A (Lexical Alone)    | Mode B (Lexical + Memory) |  Mode C (AST Graph)   | Mode D (Full Pipeline) | Net Savings vs Raw Repo |
+| :--------- | :------------------------------- | :--------------------------: | :-----------------------: | :-------------------: | :--------------------: | :---------------------: |
+| **ABL-01** | Core TokenStore Refactor         |       Caller Missed ❌       |     Caller Missed ❌      | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-44.8%**        |
+| **ABL-02** | Disambiguating Duplicate Methods | False Matches (66% noise) ❌ |     False Matches ❌      | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-38.7%**        |
+| **ABL-03** | Nested Function Attribution      |    Outer Contaminated ❌     |   Outer Contaminated ❌   | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-55.4%**        |
+| **ABL-04** | Cross-Module Session Validation  |       Caller Missed ❌       |     Caller Missed ❌      | Caller Found ✅ (low) | Full Coverage 🟢 (low) |       **-37.7%**        |
+
+Full traces, hashes, and methodology are available in [docs/BENCHMARK_PILOT.md](docs/BENCHMARK_PILOT.md), [docs/RETRIEVAL_ASSESSMENT.md](docs/RETRIEVAL_ASSESSMENT.md), and [docs/GRAPH_ABLATION_ASSESSMENT.md](docs/GRAPH_ABLATION_ASSESSMENT.md).
 
 ---
 
@@ -332,7 +343,7 @@ lazytoken dashboard
 LazyToken is thoroughly tested across multiple acceptance tiers:
 
 ```powershell
-# 1. Run the core unit, security, and hardening suite (159 tests)
+# 1. Run the core unit, security, and hardening suite (162 tests)
 python -m unittest discover -s tests -p "test_*.py"
 
 # 2. Run the end-to-end opaque-box test runner (184 tests)
@@ -343,7 +354,7 @@ python -m black --check .
 npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css tests/workspace.test.cjs
 ```
 
-- **Core Unit Suite**: **159 discovered tests** (157 passing, 2 platform/environment skips).
+- **Core Unit Suite**: **162 discovered tests** (160 passing, 2 platform/environment skips).
 - **End-to-End Suite**: **184 passing tests** across 4 tiers (80 feature coverage, 80 boundary, 16 cross-feature, 8 workload).
 - **Format Verification**: 100% compliant with `black` and `prettier`.
 

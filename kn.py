@@ -168,9 +168,10 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
       CREATE TABLE IF NOT EXISTS asset_link_evidence(source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, relation TEXT NOT NULL, scope TEXT NOT NULL, weight REAL NOT NULL, evidence TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(source_id,target_id,relation,scope));
       CREATE TABLE IF NOT EXISTS retrievals(at INTEGER NOT NULL, project_id TEXT NOT NULL DEFAULT '', query_chars INTEGER NOT NULL, result_chars INTEGER NOT NULL, estimated_tokens INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS task_measurements(id INTEGER PRIMARY KEY, task TEXT NOT NULL, baseline_tokens INTEGER NOT NULL, network_tokens INTEGER NOT NULL, indexing_tokens INTEGER NOT NULL, measured_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,line));
+      CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, receiver TEXT NOT NULL DEFAULT '', resolved_callee TEXT NOT NULL DEFAULT '', confidence TEXT NOT NULL DEFAULT 'provisional', line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,receiver,line));
       CREATE TABLE IF NOT EXISTS index_skipped_files(project_id TEXT NOT NULL, path TEXT NOT NULL, reason TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY(project_id,path));
       CREATE INDEX IF NOT EXISTS symbol_calls_callee_idx ON symbol_calls(project_id, callee_name);
+      CREATE INDEX IF NOT EXISTS symbol_calls_resolved_idx ON symbol_calls(project_id, resolved_callee);
       CREATE INDEX IF NOT EXISTS symbol_name_idx ON symbols(name);
       CREATE INDEX IF NOT EXISTS asset_name_idx ON assets(name);
       CREATE INDEX IF NOT EXISTS asset_link_source_idx ON asset_links(source_id);
@@ -187,6 +188,15 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
         conn.execute("ALTER TABLE assets ADD COLUMN scope TEXT NOT NULL DEFAULT 'global'")
     if "project_id" not in cols:
         conn.execute("ALTER TABLE assets ADD COLUMN project_id TEXT NOT NULL DEFAULT ''")
+    call_cols = {r["name"] for r in conn.execute("PRAGMA table_info(symbol_calls)")}
+    if "receiver" not in call_cols:
+        conn.execute("ALTER TABLE symbol_calls ADD COLUMN receiver TEXT NOT NULL DEFAULT ''")
+    if "resolved_callee" not in call_cols:
+        conn.execute("ALTER TABLE symbol_calls ADD COLUMN resolved_callee TEXT NOT NULL DEFAULT ''")
+    if "confidence" not in call_cols:
+        conn.execute(
+            "ALTER TABLE symbol_calls ADD COLUMN confidence TEXT NOT NULL DEFAULT 'provisional'"
+        )
     # Upgrade pre-scope links by attributing them to the project that uses both endpoints.
     conn.execute(
         """INSERT OR IGNORE INTO asset_link_evidence(source_id,target_id,relation,scope,weight,evidence,updated_at)
@@ -405,6 +415,22 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
     changed_paths: list[str] = []
     removed_paths: list[str] = []
     for rel in list_files(root):
+        norm_rel = rel.replace("\\", "/").strip().lower()
+        if any(
+            re.search(pat, norm_rel)
+            for pat in (
+                r"(^|/)\.env(\.|$)",
+                r"\.(key|pem|pkcs12|pfx|p12)$",
+                r"(^|/)id_(rsa|dsa|ecdsa|ed25519)($|\.)",
+                r"(^|/)(credentials|secrets|token|master\.key)(\.json|\.ya?ml|\.txt)?$",
+            )
+        ):
+            present.discard(rel)
+            conn.execute(
+                "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)",
+                (project, rel, "sensitive_credential_path", 0),
+            )
+            continue
         path = root / rel
         present.add(rel)
         try:
@@ -422,7 +448,6 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                     "INSERT OR REPLACE INTO index_skipped_files VALUES(?,?,?,?)",
                     (project, rel, reason, len(raw)),
                 )
-                skipped.append({"path": rel, "reason": reason, "bytes": len(raw)})
                 continue
             conn.execute(
                 "DELETE FROM index_skipped_files WHERE project_id=? AND path=?", (project, rel)
@@ -465,12 +490,23 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
                                 "INSERT OR IGNORE INTO symbols VALUES(?,?,?,?)",
                                 (project, rel, m.group(1), n),
                             )
+                call_rows = []
+                for c in python_calls(body):
+                    call_rows.append(
+                        (
+                            project,
+                            rel,
+                            c["caller_symbol"],
+                            c["callee_name"],
+                            c.get("receiver", ""),
+                            c.get("resolved_callee", c["callee_name"]),
+                            c.get("confidence", "provisional"),
+                            c["line"],
+                        )
+                    )
                 conn.executemany(
-                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?)",
-                    [
-                        (project, rel, caller, callee, lineno)
-                        for caller, callee, lineno in python_calls(body)
-                    ],
+                    "INSERT OR IGNORE INTO symbol_calls VALUES(?,?,?,?,?,?,?,?)",
+                    call_rows,
                 )
                 conn.executemany(
                     "INSERT OR IGNORE INTO imports VALUES(?,?,?)",
@@ -536,14 +572,21 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
 
     frameworks.update(conn, project)
     conn.commit()
+    all_skipped = [
+        {"path": r[0], "reason": r[1], "bytes": r[2]}
+        for r in conn.execute(
+            "SELECT path, reason, bytes FROM index_skipped_files WHERE project_id=? ORDER BY path",
+            (project,),
+        ).fetchall()
+    ]
     return {
         "added": added,
         "changed": changed,
         "removed": removed,
         "unchanged": max(0, len(present) - added - changed - len(errors)),
         "files": len(present),
-        "skipped": skipped,
-        "skipped_count": len(skipped),
+        "skipped": all_skipped,
+        "skipped_count": len(all_skipped),
         "error_count": len(errors),
         "error_paths": errors,
     }

@@ -912,6 +912,7 @@ def impact_analysis(kn, args, conn):
     )
 
     inbound_callers = []
+    provisional_candidates = []
     outbound_callees = []
     affected_files = set()
 
@@ -926,8 +927,9 @@ def impact_analysis(kn, args, conn):
         for sym in file_symbols:
             short_sym = sym.split(".")[-1]
             rows = conn.execute(
-                "SELECT caller_path, caller_symbol, line FROM symbol_calls WHERE project_id=? AND (callee_name=? OR callee_name=?)",
-                (project, sym, short_sym),
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "FROM symbol_calls WHERE project_id=? AND (resolved_callee=? OR (callee_name=? AND confidence='exact'))",
+                (project, sym, sym),
             ).fetchall()
             for r in rows:
                 if r["caller_path"] != norm_path:
@@ -936,46 +938,109 @@ def impact_analysis(kn, args, conn):
                             "caller_file": r["caller_path"],
                             "caller_symbol": r["caller_symbol"],
                             "callee": sym,
+                            "confidence": r["confidence"],
                             "line": r["line"],
                         }
                     )
                     affected_files.add(r["caller_path"])
         out_rows = conn.execute(
-            "SELECT caller_symbol, callee_name, line FROM symbol_calls WHERE project_id=? AND caller_path=?",
+            "SELECT caller_symbol, callee_name, receiver, resolved_callee, confidence, line FROM symbol_calls WHERE project_id=? AND caller_path=?",
             (project, norm_path),
         ).fetchall()
         for r in out_rows:
             outbound_callees.append(
                 {
                     "caller_symbol": r["caller_symbol"],
-                    "callee": r["callee_name"],
+                    "callee": r["resolved_callee"] or r["callee_name"],
+                    "confidence": r["confidence"],
                     "line": r["line"],
                 }
             )
     else:
         short_sym = target.split(".")[-1]
-        in_rows = conn.execute(
-            "SELECT caller_path, caller_symbol, line FROM symbol_calls WHERE project_id=? AND (callee_name=? OR callee_name=?)",
-            (project, target, short_sym),
-        ).fetchall()
-        for r in in_rows:
-            inbound_callers.append(
-                {
-                    "caller_file": r["caller_path"],
-                    "caller_symbol": r["caller_symbol"],
-                    "line": r["line"],
-                }
-            )
-            affected_files.add(r["caller_path"])
+        is_qualified = "." in target
+
+        if is_qualified:
+            # Qualified target (e.g. UserService.delete or RequestHandler.handle.sanitize)
+            parent_scope = ".".join(target.split(".")[:-1])
+            exact_rows = conn.execute(
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "FROM symbol_calls WHERE project_id=? AND (resolved_callee=? OR (callee_name=? AND caller_symbol=? AND receiver=''))",
+                (project, target, short_sym, parent_scope),
+            ).fetchall()
+            for r in exact_rows:
+                inbound_callers.append(
+                    {
+                        "caller_file": r["caller_path"],
+                        "caller_symbol": r["caller_symbol"],
+                        "callee": target,
+                        "confidence": r["confidence"],
+                        "line": r["line"],
+                    }
+                )
+                affected_files.add(r["caller_path"])
+
+            # Find provisional / ambiguous calls where method matches but receiver is untyped
+            prov_rows = conn.execute(
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "FROM symbol_calls WHERE project_id=? AND callee_name=? AND confidence='provisional' AND resolved_callee!=?",
+                (project, short_sym, target),
+            ).fetchall()
+            for r in prov_rows:
+                provisional_candidates.append(
+                    {
+                        "caller_file": r["caller_path"],
+                        "caller_symbol": r["caller_symbol"],
+                        "receiver": r["receiver"],
+                        "callee": r["callee_name"],
+                        "confidence": "provisional",
+                        "status": f"unresolved receiver '{r['receiver']}.{short_sym}'",
+                        "line": r["line"],
+                    }
+                )
+        else:
+            # Unqualified target (e.g. bare function 'save_data')
+            rows = conn.execute(
+                "SELECT caller_path, caller_symbol, callee_name, receiver, resolved_callee, confidence, line "
+                "FROM symbol_calls WHERE project_id=? AND (resolved_callee=? OR callee_name=?)",
+                (project, target, target),
+            ).fetchall()
+            for r in rows:
+                if r["confidence"] == "exact" or r["resolved_callee"] == target:
+                    inbound_callers.append(
+                        {
+                            "caller_file": r["caller_path"],
+                            "caller_symbol": r["caller_symbol"],
+                            "callee": target,
+                            "confidence": r["confidence"],
+                            "line": r["line"],
+                        }
+                    )
+                    affected_files.add(r["caller_path"])
+                else:
+                    provisional_candidates.append(
+                        {
+                            "caller_file": r["caller_path"],
+                            "caller_symbol": r["caller_symbol"],
+                            "receiver": r["receiver"],
+                            "callee": r["callee_name"],
+                            "confidence": "provisional",
+                            "status": f"unresolved receiver '{r['receiver']}.{r['callee_name']}'",
+                            "line": r["line"],
+                        }
+                    )
+
         out_rows = conn.execute(
-            "SELECT caller_path, callee_name, line FROM symbol_calls WHERE project_id=? AND (caller_symbol=? OR caller_symbol=?)",
+            "SELECT caller_path, callee_name, receiver, resolved_callee, confidence, line "
+            "FROM symbol_calls WHERE project_id=? AND (caller_symbol=? OR caller_symbol=?)",
             (project, target, short_sym),
         ).fetchall()
         for r in out_rows:
             outbound_callees.append(
                 {
                     "caller_file": r["caller_path"],
-                    "callee": r["callee_name"],
+                    "callee": r["resolved_callee"] or r["callee_name"],
+                    "confidence": r["confidence"],
                     "line": r["line"],
                 }
             )
@@ -992,22 +1057,28 @@ def impact_analysis(kn, args, conn):
     if call_count >= 5:
         blast_radius = "high"
         advice = (
-            f"HIGH BLAST RADIUS ({call_count} inbound call sites across {len(affected_files)} files). "
+            f"HIGH BLAST RADIUS ({call_count} confirmed inbound call sites across {len(affected_files)} files). "
             "Ponytail Senior Dev Rule: Do not modify existing function signature or return contract. "
             "Make minimal surgical changes or introduce optional parameters to avoid cascading regressions."
         )
     elif call_count >= 2:
         blast_radius = "medium"
         advice = (
-            f"MEDIUM BLAST RADIUS ({call_count} inbound call sites across {len(affected_files)} files). "
+            f"MEDIUM BLAST RADIUS ({call_count} confirmed inbound call sites across {len(affected_files)} files). "
             "Ponytail Senior Dev Rule: Ensure callers are tested before changing behaviour."
         )
     elif call_count == 1:
         blast_radius = "low"
-        advice = f"LOW BLAST RADIUS (1 call site). Verify caller at {unique_callers[0]['caller_file']}:{unique_callers[0]['line']}."
+        advice = f"LOW BLAST RADIUS (1 confirmed call site). Verify caller at {unique_callers[0]['caller_file']}:{unique_callers[0]['line']}."
     else:
-        blast_radius = "isolated"
-        advice = "ISOLATED (0 inbound call sites detected). Safe to refactor or remove if not dynamically invoked."
+        blast_radius = "no_static_callers_detected"
+        advice = (
+            "NO STATIC CALLERS DETECTED: Static analysis found 0 inbound call sites in indexed files. "
+            "WARNING: Absence of static evidence is NOT evidence of safe removal. "
+            "Target may be invoked dynamically (getattr/eval), registered as a framework route/hook/event handler, "
+            "consumed by external packages, or called in unindexed tests/scripts. "
+            "Verify runtime references before deleting or deprecating."
+        )
 
     return {
         "project": project,
@@ -1015,16 +1086,19 @@ def impact_analysis(kn, args, conn):
         "target_type": "file" if is_file else "symbol",
         "blast_radius": blast_radius,
         "inbound_call_count": call_count,
+        "provisional_candidate_count": len(provisional_candidates),
         "affected_files_count": len(affected_files),
         "affected_files": sorted(affected_files),
         "inbound_callers": unique_callers[:25],
+        "provisional_candidates": provisional_candidates[:25],
         "outbound_calls": outbound_callees[:25],
         "ponytail_guidance": advice,
         "decision_ladder": [
             "1. YAGNI: The best code is the code you never wrote.",
             "2. Reuse: Check if an existing function in affected_files already solves this.",
             "3. Minimal surgical change: Keep diffs bounded to the single target.",
-            "4. Verify: Run unit tests covering the inbound call sites.",
+            "4. Dynamic dispatch check: Verify route handlers, getattr, hooks, and external API consumers before removal.",
+            "5. Verify: Run unit tests covering the inbound call sites.",
         ],
     }
 
