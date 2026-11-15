@@ -43,6 +43,17 @@ class WatcherTests(unittest.TestCase):
         expected = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         self.assertEqual(run.call_args.kwargs["creationflags"], expected)
 
+    def test_invalid_interval_reports_readable_bounds(self):
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, str(Path(kn.__file__)), "watch", "start", "--interval", "0"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("interval must be 0.25 to 300 seconds", result.stderr)
+
     def test_changes_are_debounced_and_memory_stales_without_trust_promotion(self):
         proposal = features.propose(
             kn,

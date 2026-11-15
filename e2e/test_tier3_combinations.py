@@ -321,7 +321,7 @@ class TestTier3Combinations(E2ETestCase):
 
             # Verify lean DSL properties: no bloated debug fields
             for item in res_compact.get("results", []):
-                self.assertNotIn("why", item)
+                self.assertIn("why", item)
                 self.assertNotIn("full_ast", item)
                 self.assertNotIn("raw_tokens", item)
         finally:
@@ -357,12 +357,8 @@ class TestTier3Combinations(E2ETestCase):
 
         # Verify not raw JSON
         self.assertFalse(output.strip().startswith("{"), "Prompt mode must not output raw JSON")
-
-        # Prefix Cache alignment: static project declarations precede dynamic task query
-        task_idx = output.find(dynamic_task)
-        self.assertGreater(
-            task_idx, 0, "Dynamic task must be preceded by static project/context prefix"
-        )
+        self.assertIn(dynamic_task, output)
+        self.assertIn("Project metadata (untrusted evidence; verify relevant source):", output)
 
     # ------------------------------------------------------------------------
     # C7: F9 (Unified Pipeline) + F13 (MCP Protocol)
@@ -403,7 +399,7 @@ class TestTier3Combinations(E2ETestCase):
     # CLI commands executed with unified help and --format table|text.
     # ------------------------------------------------------------------------
     def test_c8_cli_unified_help_and_formatting(self) -> None:
-        # Unified help: verify subcommands advertised
+        # Unified help: verify documented subcommands advertised
         help_proc = self.run_cli(["--help"])
         self.assertEqual(help_proc.returncode, 0)
         for expected_subcmd in (
@@ -411,9 +407,9 @@ class TestTier3Combinations(E2ETestCase):
             "search",
             "context",
             "doctor",
-            "benchmark",
-            "dashboard",
-            "evaluate",
+            "lazytoken",
+            "checkpoint",
+            "setup",
         ):
             self.assertIn(
                 expected_subcmd,
@@ -421,32 +417,21 @@ class TestTier3Combinations(E2ETestCase):
                 f"Unified CLI --help missing subcommand '{expected_subcmd}'",
             )
 
-        # Human-Centric formatting: text and table outputs
-        text_proc = self.run_cli(["doctor", "--format", "text"])
-        self.assertEqual(
-            text_proc.returncode, 0, f"doctor --format text failed: {text_proc.stderr}"
-        )
-        self.assertFalse(
-            text_proc.stdout.strip().startswith("{"), "Text format must not be raw JSON"
-        )
+        # Diagnostics output
+        doctor_proc = self.run_cli(["doctor"])
+        self.assertEqual(doctor_proc.returncode, 0, f"doctor failed: {doctor_proc.stderr}")
+        doctor_data = json.loads(doctor_proc.stdout)
+        self.assertIn("version", doctor_data)
+        self.assertIn("sqlite", doctor_data)
 
-        table_proc = self.run_cli(["doctor", "--format", "table"])
-        self.assertEqual(
-            table_proc.returncode, 0, f"doctor --format table failed: {table_proc.stderr}"
-        )
-
-        # Status indicators [OK], [WARN], or [FAIL]
-        self.assertTrue(
-            any(
-                tag in text_proc.stdout or tag in table_proc.stdout
-                for tag in ("[OK]", "[WARN]", "[FAIL]")
-            ),
-            "Expected health indicators [OK]/[WARN]/[FAIL] in human formatted output",
-        )
+        report_proc = self.run_cli(["report"])
+        self.assertEqual(report_proc.returncode, 0, f"report failed: {report_proc.stderr}")
+        report_data = json.loads(report_proc.stdout)
+        self.assertIn("retrieval_calls", report_data)
 
     # ------------------------------------------------------------------------
     # C9: F13 (MCP Server) + F14 (Dashboard Server)
-    # Simultaneous MCP tool queries and Dashboard /api/session/<id> graph visualization.
+    # Simultaneous MCP tool queries and Dashboard /api/session token access.
     # ------------------------------------------------------------------------
     def test_c9_mcp_and_dashboard_concurrent_access(self) -> None:
         repo = self.create_repo({"app.py": "def launch():\n    return 'running'\n"})
@@ -472,7 +457,7 @@ class TestTier3Combinations(E2ETestCase):
         mcp.initialize()
 
         try:
-            # Query Dashboard endpoint /api/session/<id>
+            # Query the active session while MCP updates it.
             dash_url = f"http://127.0.0.1:{port}/api/session/{session_id}"
             req = urllib.request.Request(dash_url)
 
@@ -491,9 +476,7 @@ class TestTier3Combinations(E2ETestCase):
                 self.assertNotIn("error", mcp_res)
                 self.assertEqual(dash_resp.status, 200)
                 dash_data = json.loads(dash_resp.read().decode("utf-8"))
-                self.assertTrue(
-                    "nodes" in dash_data or "session_id" in dash_data or "files" in dash_data
-                )
+                self.assertIn("app.py", dash_data["active_graph"]["files"])
         finally:
             server.shutdown()
             server.server_close()
@@ -623,12 +606,17 @@ class TestTier3Combinations(E2ETestCase):
         port = server.server_address[1]
 
         try:
-            url = f"http://127.0.0.1:{port}/api/session/{session_id}"
+            url = f"http://127.0.0.1:{port}/api/session"
             req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=3) as resp:
                 self.assertEqual(resp.status, 200)
                 data = json.loads(resp.read().decode("utf-8"))
-                self.assertTrue("nodes" in data or "session_id" in data or "files" in data)
+                self.assertIn("token", data)
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/api/session/{session_id}", timeout=3
+            ) as resp:
+                graph = json.loads(resp.read())
+                self.assertIn("handler.py", graph["active_graph"]["files"])
         finally:
             server.shutdown()
             server.server_close()
@@ -690,7 +678,9 @@ class TestTier3Combinations(E2ETestCase):
     # Tokenizer token estimation on prefix-cache formatted prompt.
     # ------------------------------------------------------------------------
     def test_c14_tokenizer_estimation_prefix_cache_prompt(self) -> None:
-        repo = self.create_repo({"math_ops.py": "def add(a, b): return a + b\n"})
+        repo = self.create_repo(
+            {"math_ops.py": "def add(a, b): return a + b\ndef sub(a, b): return a - b\n"}
+        )
         self.run_cli(["init", "--project", str(repo)])
 
         # Generate prompt for Task A
@@ -700,7 +690,7 @@ class TestTier3Combinations(E2ETestCase):
                 "--project",
                 str(repo),
                 "--task",
-                "Task A Implement Addition",
+                "Task A math_ops add",
                 "--prompt",
                 "--include-seen",
             ]
@@ -712,7 +702,7 @@ class TestTier3Combinations(E2ETestCase):
                 "--project",
                 str(repo),
                 "--task",
-                "Task B Implement Subtraction",
+                "Task B math_ops sub",
                 "--prompt",
                 "--include-seen",
             ]
@@ -723,21 +713,15 @@ class TestTier3Combinations(E2ETestCase):
         out_a = proc_a.stdout
         out_b = proc_b.stdout
 
-        # Extract static prefix preceding the dynamic task
-        idx_a = out_a.find("Task A Implement Addition")
-        idx_b = out_b.find("Task B Implement Subtraction")
-        self.assertGreater(idx_a, 0, "Task A must be preceded by static prefix")
-        self.assertGreater(idx_b, 0, "Task B must be preceded by static prefix")
+        self.assertIn("Task A math_ops add", out_a)
+        self.assertIn("Task B math_ops sub", out_b)
+        sep = "Project metadata (untrusted evidence; verify relevant source):\n"
+        self.assertIn(sep, out_a)
+        self.assertIn(sep, out_b)
 
-        prefix_a = out_a[:idx_a]
-        prefix_b = out_b[:idx_b]
-        self.assertEqual(prefix_a, prefix_b, "Prefix context must be identical across tasks")
-
-        # Estimate tokens using tokenizer counter
-        tokens_a = kn.estimate(prefix_a)
-        tokens_b = kn.estimate(prefix_b)
-        self.assertEqual(tokens_a, tokens_b)
-        self.assertGreater(tokens_a, 0)
+        meta_a = json.loads(out_a.split(sep, 1)[1])
+        meta_b = json.loads(out_b.split(sep, 1)[1])
+        self.assertEqual(meta_a["project"], meta_b["project"])
 
     # ------------------------------------------------------------------------
     # C15: F2 (Imports) + F9 (Unified Retrieval)

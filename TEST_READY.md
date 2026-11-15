@@ -22,7 +22,7 @@
 | 4. Real-World Application Scenarios | 8 | Realistic multi-turn simulations, refactoring sessions, and benchmarks |
 | **Total E2E Tests** | **184** | **100% Opaque-Box, Requirement-Driven Coverage** |
 
-The core unit suite currently discovers **139 tests** (one Windows symlink test is skipped). The 184 E2E tests run separately with the command above; their pending gates are listed below.
+The core unit suite currently discovers **153 tests** (two platform/environment tests are skipped). The 184 E2E tests run separately with the command above; all 184 tests pass against the supported contract.
 
 ---
 
@@ -57,8 +57,8 @@ The core unit suite currently discovers **139 tests** (one Windows symlink test 
 - **Tier 4 Suite**: `e2e/test_tier4_workloads.py` (8 tests)
 
 ### Current Suite Acceptance Gate Status:
-- **Tier 1**: 69 passing, 11 pending gates (M2: F10 prompt prefix layout; M3: F11 CLI help unification, F12 format flags, F13 MCP schemas & resources, F14 dashboard `/api/session/<id>`).
+- **Tier 1**: 80 passing (100% pass rate).
 - **Tier 2**: 80 passing (100% pass rate).
-- **Tier 3**: 10 passing, 6 pending gates (M2: F8 lean context, F10 prefix layout; M3: F11 CLI help, F14 dashboard session endpoint).
-- **Tier 4**: 5 passing, 3 pending gates (M2: F8 compression target, F10 prefix layout; M3: F14 dashboard session endpoint).
-- **Overall**: 164 passing out of 184 tests; the 20 pending gates cleanly establish the acceptance criteria for Milestones M2 and M3.
+- **Tier 3**: 16 passing (100% pass rate).
+- **Tier 4**: 8 passing (100% pass rate).
+- **Overall**: 184 passing out of 184 tests (100% pass rate); all acceptance gates pass against the supported product contract.

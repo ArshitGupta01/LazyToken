@@ -9,6 +9,7 @@ import sys
 import tempfile
 import uuid
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -120,6 +121,11 @@ class E2ETestCase(unittest.TestCase):
             "KN_HOME": str(self.temp_dir),
             "LAZYTOKEN_DISABLE_AUTOWATCH": "1",
         }
+        environment = patch.dict(
+            os.environ, {"KN_HOME": str(self.temp_dir), "LAZYTOKEN_DISABLE_AUTOWATCH": "1"}
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
         self._subprocesses: list[subprocess.Popen] = []
         self._mcp_clients: list[McpClient] = []
 

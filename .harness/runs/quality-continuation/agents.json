@@ -1,0 +1,17 @@
+{
+  "run_id": "quality-continuation",
+  "agents": {
+    "/root/preflight": {
+      "state": "idle",
+      "task_id": "dashboard-review",
+      "evidence": "Reviewer returned final findings.",
+      "updated_at": "2026-11-15T15:02:51.734730+00:00"
+    },
+    "/root/cli_review": {
+      "state": "idle",
+      "task_id": "acceptance-review",
+      "evidence": "Reviewer returned final findings.",
+      "updated_at": "2026-11-15T15:02:52.033245+00:00"
+    }
+  }
+}

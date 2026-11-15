@@ -1,0 +1,25 @@
+{
+  "objective": "Review the current session dashboard implementation and the changed end-to-end acceptance checks before integrating further quality fixes.",
+  "tasks": [
+    {
+      "id": "dashboard-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "inputs": ["dashboard.py", "broker.py", "tests/test_dashboard_review.py"],
+      "context": {"decisions": ["Review project isolation, read-only behavior, failure cases and tests."], "skill_paths": []},
+      "acceptance": ["Report reproducible issues and evidence, or explicitly state none found."],
+      "required": true
+    },
+    {
+      "id": "acceptance-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "inputs": ["TEST_READY.md", "TEST_INFRA.md", "e2e/test_tier1_features.py", "e2e/test_tier3_combinations.py", "e2e/test_tier4_workloads.py"],
+      "context": {"decisions": ["Distinguish previously requested acceptance gates from the documented current contract; do not modify files."], "skill_paths": []},
+      "acceptance": ["Identify weakened checks and recommend how to preserve unmet requirements without obscuring failures."],
+      "required": true
+    }
+  ]
+}

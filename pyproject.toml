@@ -1,4 +1,4 @@
 [tool.black]
 line-length = 100
 target-version = ['py311']
-extend-exclude = '/(build|release|vendor)/'
+extend-exclude = '/(build|release|vendor|\.agents|\.codex|\.harness|_workspace)/'

@@ -1,6 +1,8 @@
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import tomllib
 import unittest
@@ -76,6 +78,24 @@ class SetupTests(unittest.TestCase):
         result = onboarding.connection_test(kn)
         self.assertTrue(result["mcp_initialize"])
         self.assertGreater(result["tools_available"], 0)
+
+    @unittest.skipUnless(shutil.which("codex"), "Codex CLI is not installed")
+    def test_codex_cli_reads_generated_registration_in_isolated_profile(self):
+        plan = onboarding.preview(kn, str(self.project), ["codex"], self.profile)
+        onboarding.apply(kn, plan)
+        env = {**os.environ, "CODEX_HOME": str(self.profile / ".codex")}
+        result = subprocess.run(
+            ["codex", "mcp", "get", "--json", "lazytoken"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        transport = json.loads(result.stdout)["transport"]
+        self.assertEqual(transport["command"], plan["server"]["command"])
+        self.assertEqual(transport["args"], plan["server"]["args"])
+        self.assertEqual(transport["env"]["KN_HOME"], plan["server"]["env"]["KN_HOME"])
 
     def test_connection_test_reports_missing_launcher(self):
         with patch(
@@ -183,6 +203,7 @@ class SetupTests(unittest.TestCase):
         path.write_bytes(before)
         plan = onboarding.preview(kn, str(self.project), ["antigravity"], self.profile)
         self.assertEqual(plan["changes"][0]["status"], "existing_entry_preserved")
+        self.assertFalse(plan["changes"][0]["matches_suggested_entry"])
         with patch("onboarding.Path.home", return_value=self.profile):
             status = next(
                 item
@@ -192,6 +213,16 @@ class SetupTests(unittest.TestCase):
         self.assertTrue(status["registered"])
         self.assertTrue(status["configuration_valid"])
         self.assertEqual(path.read_bytes(), before)
+
+    def test_preview_reports_whether_existing_entry_matches_suggested_setup(self):
+        path = onboarding.configuration_path("antigravity", self.profile)
+        path.parent.mkdir(parents=True)
+        original = json.dumps({"mcpServers": {"lazytoken": onboarding.entry(kn)}}).encode()
+        path.write_bytes(original)
+        plan = onboarding.preview(kn, str(self.project), ["antigravity", "codex"], self.profile)
+        self.assertTrue(plan["changes"][0]["matches_suggested_entry"])
+        self.assertIsNone(plan["changes"][1]["matches_suggested_entry"])
+        self.assertEqual(path.read_bytes(), original)
 
     def test_repeated_client_selection_is_idempotent_and_can_roll_back(self):
         plan = onboarding.preview(

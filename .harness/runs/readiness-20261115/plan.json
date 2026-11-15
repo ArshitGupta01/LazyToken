@@ -1,0 +1,135 @@
+{
+  "schema_version": 2,
+  "run_id": "readiness-20261115",
+  "previous_run_id": null,
+  "project_root": "D:\\LazyToken",
+  "objective": "Improve retrieval evaluation, first-run setup and release readiness for the attached review.",
+  "created_at": "2026-11-15T15:18:02.742615+00:00",
+  "tasks": [
+    {
+      "id": "retrieval",
+      "role": "lazytoken_worker",
+      "dependencies": [],
+      "ownership": [
+        "benchmark/retrieval_cases.json",
+        "benchmark/retrieval_assessment.py",
+        "tests/test_retrieval_assessment.py",
+        "docs/RETRIEVAL_ASSESSMENT.md"
+      ],
+      "acceptance": [
+        "Deliver reproducible actual retrieval evaluation with clearly identified evidence and meaningful tests, or explain limitations."
+      ],
+      "required": true,
+      "inputs": [
+        "retrieval_eval.py",
+        "benchmark/fixture_sessions",
+        "benchmark/fixture_notebook",
+        "task.md"
+      ],
+      "context": {
+        "decisions": [
+          "Do not claim agent-authored labels are independently human-reviewed or representative; measure actual retrieval including changed, renamed and removed files."
+        ],
+        "skill_paths": []
+      },
+      "max_attempts": 2,
+      "status": "completed",
+      "attempts": 1,
+      "agent_id": "/root/preflight",
+      "input_fingerprints": {
+        "benchmark/fixture_notebook": "sha256:29de810c515ebdf125d7fb060c66b3c390f0b456910b8ed355c72d58a76f7f21",
+        "benchmark/fixture_sessions": "sha256:1812ebe27f09a074cc125ed48298f0c7e51a4cfa7c7f625770ab8aee96ee2f7b",
+        "retrieval_eval.py": "sha256:ec81671a208901ab517ae44a18b075f63010cf21a8e74842027d1663346b2061",
+        "task.md": "sha256:cd277d1462b30d9d52835f0257deeb581bff572f12d23af9dcbe9ab7f8679805"
+      },
+      "dependency_fingerprints": {},
+      "contract_fingerprint": "sha256:3a4dcebb506d2448cd3182bf98ce2e7a14bc420ca3ae9fff030c2425cb3ecb3e",
+      "started_at": "2026-11-15T15:18:03.068571+00:00",
+      "artifact_fingerprints": {
+        "benchmark/retrieval_assessment.py": "sha256:a8b5cd8833f28e16665d1a2d40f97da9e7fc1627f16e2f5ce4e867ff87ddb585",
+        "benchmark/retrieval_cases.json": "sha256:9814f64edc96340b33848d554d0557b5377ad3e8f7024ba20120bf3629eaae04",
+        "docs/RETRIEVAL_ASSESSMENT.md": "sha256:a167b0cbfdae000d571e831cf4125855b2b6d3fff964a485301f041b190812e8",
+        "tests/test_retrieval_assessment.py": "sha256:2bd66be8c5715faa2a818d78eef6ac1a93d98928f3b8776cd98e4f530adddd28"
+      },
+      "finished_at": "2026-11-15T15:21:03.997978+00:00"
+    },
+    {
+      "id": "onboarding",
+      "role": "lazytoken_worker",
+      "dependencies": [],
+      "ownership": [
+        "onboarding.py",
+        "tests/test_onboarding.py"
+      ],
+      "acceptance": [
+        "Identify and implement a concrete first-run usability improvement with meaningful checks, or report evidence why none is safe."
+      ],
+      "required": true,
+      "inputs": [
+        "docs/CLI.md",
+        "kn.py"
+      ],
+      "context": {
+        "decisions": [
+          "Preserve opt-in configuration, rollback safety, existing user changes and JSON callers."
+        ],
+        "skill_paths": []
+      },
+      "max_attempts": 2,
+      "status": "completed",
+      "attempts": 1,
+      "agent_id": "/root/cli_review",
+      "input_fingerprints": {
+        "docs/CLI.md": "sha256:875c84f0f93ddc3af817ae7a6d5ceb4cf88706c0aa9d121ff05be4d173644d04",
+        "kn.py": "sha256:5563fc3c736835bb01ba89d6f8b88b2254b5703e0fb71e44b3d0272d4c3debbe"
+      },
+      "dependency_fingerprints": {},
+      "contract_fingerprint": "sha256:44a6e9c5076351df2cc35bc6b279212988a20b44bddf6f0b413c408f364612a9",
+      "started_at": "2026-11-15T15:18:03.354694+00:00",
+      "artifact_fingerprints": {
+        "onboarding.py": "sha256:edf51aaf113397e6c4944a4428b70add7f1042d2fa2ae8178446aee57382bedf",
+        "tests/test_onboarding.py": "sha256:b29e6dac919766a170f75769538fd4d719cb33b54bea791a552f66745a1cd2b0"
+      },
+      "finished_at": "2026-11-15T15:21:04.378523+00:00"
+    },
+    {
+      "id": "release-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "acceptance": [
+        "Report reproducible release and dependency gaps with the smallest fixes and safe verification commands."
+      ],
+      "required": true,
+      "inputs": [
+        "RELEASING.md",
+        "build_release.ps1",
+        "install.ps1",
+        "manage_install.ps1",
+        "THIRD_PARTY_NOTICES.md"
+      ],
+      "context": {
+        "decisions": [
+          "Distinguish locally verifiable release work from external gates; do not publish or alter user data."
+        ],
+        "skill_paths": []
+      },
+      "max_attempts": 2,
+      "status": "completed",
+      "attempts": 1,
+      "agent_id": "/root/readiness_release",
+      "input_fingerprints": {
+        "RELEASING.md": "sha256:26db8cc5d13a423cbf8d91b40e3b3afda2499b9ca0cd6c2b1f62e8b6f99a4ae3",
+        "THIRD_PARTY_NOTICES.md": "sha256:5331f827bee53fba96919a174d7c0e1e42e41690701d86f2f78e9a1d954790ff",
+        "build_release.ps1": "sha256:b8c6a5034d2c297c080584a3bbf3b73b1746324cd28d8c1a9fb0c8a839ba97a9",
+        "install.ps1": "sha256:89f429e86e35950dfad6b3e2abdba66a7313f0f7a32151559e27ca590cfb1644",
+        "manage_install.ps1": "sha256:01bf526cc700000f11b869cb6472800b4eeaadfd9d2d9a3884e0787f72f8d642"
+      },
+      "dependency_fingerprints": {},
+      "contract_fingerprint": "sha256:f7cacd8cb051ba835d11dbe38fed0b5a0ce50e9627a6ff66dbc80b27f6e51fa3",
+      "started_at": "2026-11-15T15:18:03.610995+00:00",
+      "artifact_fingerprints": {},
+      "finished_at": "2026-11-15T15:21:04.765944+00:00"
+    }
+  ]
+}

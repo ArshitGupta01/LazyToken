@@ -118,6 +118,63 @@ class StorageAndCommands(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "nt", "Windows release installation")
 class InstallerSecurity(unittest.TestCase):
+    def test_release_build_rejects_unsupported_openssl(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "python.cmd").write_text(
+                '@if exist "%~dp0first" exit /b 1\r\n@type nul > "%~dp0first"\r\n@exit /b 0\r\n',
+                encoding="ascii",
+            )
+            output = root / "package"
+            env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"]}
+            shell = (
+                Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+            )
+            result = subprocess.run(
+                [
+                    str(shell),
+                    "-NoProfile",
+                    "-File",
+                    str(ROOT / "build_release.ps1"),
+                    "-Output",
+                    str(output),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("requires OpenSSL 3.5.9", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_release_build_rejects_unsupported_python_before_writing_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "python.cmd").write_text("@exit /b 1\r\n", encoding="ascii")
+            output = root / "package"
+            env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"]}
+            shell = (
+                Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+            )
+            result = subprocess.run(
+                [
+                    str(shell),
+                    "-NoProfile",
+                    "-File",
+                    str(ROOT / "build_release.ps1"),
+                    "-Output",
+                    str(output),
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("64-bit Windows Python 3.14.10", result.stderr)
+            self.assertFalse(output.exists())
+
     def command(self, script, *args):
         return subprocess.run(
             ["powershell", "-NoProfile", "-File", str(ROOT / script), *map(str, args)],

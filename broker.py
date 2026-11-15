@@ -606,6 +606,18 @@ def task_context(kn, args, conn):
                     crumb.pop(field, None)
                 response["truncated"] = True
                 expanded = False
+        if (
+            not expanded
+            and raw["type"] == "asset"
+            and raw.get("verification_state") == "verified"
+            and raw.get("freshness") == "current"
+        ):
+            crumb["summary"] = raw["summary"]
+            response["results"].append(crumb)
+            if used(response) > budget:
+                crumb.pop("summary")
+                response["truncated"] = True
+            response["results"].pop()
         key = _key(crumb) + (":expanded" if expanded else "")
         fingerprint_data = {"crumb": crumb}
         if raw.get("path"):
@@ -676,7 +688,7 @@ def task_context(kn, args, conn):
                 "UPDATE context_session_items SET updated_at=? WHERE project_id=? AND session_id=? AND item_key=?",
                 [(now, project, session, k) for k in touched_suppressed],
             )
-        response.pop("reason", None)
+        response["reason"] = "Results already supplied in this session."
         recap_items = [
             {
                 "key": item["key"],
@@ -838,8 +850,10 @@ def build_session_graph(kn, conn, project, recent_keys):
     if active_asset_ids and conn:
         placeholders = ",".join("?" for _ in active_asset_ids)
         for row in conn.execute(
-            f"SELECT id, name, summary FROM assets WHERE id IN ({placeholders}) AND scope IN ('project', 'global')",
-            tuple(active_asset_ids),
+            f"SELECT id, name, summary FROM assets WHERE id IN ({placeholders}) "
+            "AND (scope='global' OR (scope='project' AND project_id=?)) "
+            "AND NOT EXISTS (SELECT 1 FROM memory_proposals m WHERE m.asset_id=assets.id AND m.status='superseded')",
+            (*active_asset_ids, project),
         ):
             active_lessons.append({"id": row["id"], "name": row["name"], "summary": row["summary"]})
             for ev in conn.execute(

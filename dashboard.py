@@ -12,7 +12,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import kn
 
@@ -90,6 +90,53 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/session":
             return self._json({"token": self.server.review_token})
+        if parsed.path.startswith("/api/session/"):
+            session = unquote(parsed.path[len("/api/session/") :])
+            if not session.strip() or len(session) > 120:
+                return self._json({"error": "Invalid session ID"}, 400)
+            path = database_path()
+            if not path.is_file():
+                return self._json({"error": "Session not found"}, 404)
+            conn = sqlite3.connect(
+                f"file:{quote(path.as_posix(), safe='/:')}?mode=ro", uri=True, timeout=2
+            )
+            conn.row_factory = sqlite3.Row
+            try:
+                params = parse_qs(parsed.query, keep_blank_values=True)
+                requested_values = params.get("project", [])
+                if requested_values and (
+                    len(requested_values) != 1 or not requested_values[0].strip()
+                ):
+                    return self._json({"error": "Invalid project"}, 400)
+                requested = requested_values[0] if requested_values else ""
+                project = kn.resolve_project(requested, conn) if requested else ""
+                if requested and not project:
+                    return self._json({"error": "Session not found"}, 404)
+                projects = [
+                    row[0]
+                    for row in conn.execute(
+                        "SELECT DISTINCT project_id FROM context_session_items WHERE session_id=? AND (?='' OR project_id=?) LIMIT 2",
+                        (session, project, project),
+                    )
+                ]
+                if len(projects) != 1:
+                    return self._json(
+                        {
+                            "error": (
+                                "Session not found" if not projects else "Session ID is ambiguous"
+                            )
+                        },
+                        404 if not projects else 409,
+                    )
+                import broker
+
+                return self._json(
+                    broker.session_checkpoint(
+                        kn, {"project": projects[0], "session_id": session}, conn
+                    )
+                )
+            finally:
+                conn.close()
         if parsed.path == "/api/lazytoken":
             params = parse_qs(parsed.query)
             action = params.get("action", [""])[0]

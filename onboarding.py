@@ -111,6 +111,7 @@ def preview(kn, project, clients=(), profile=None):
                 "client": client,
                 "path": str(path),
                 "status": "existing_entry_preserved" if existing is not None else "add",
+                "matches_suggested_entry": existing == server if existing is not None else None,
                 "before": before,
                 "after": after,
             }

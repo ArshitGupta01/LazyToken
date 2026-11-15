@@ -75,7 +75,8 @@ try {
             }
         }
     } finally {$Archive.Dispose()}
-    foreach ($Required in @('install.ps1','LazyToken\release-manifest.json','LazyToken\LazyToken.exe','LazyToken\_internal\python311.dll','LazyToken\_internal\index.html','LazyToken\_internal\vendor\three.module.js')) {if (-not (Test-Path -LiteralPath (Join-Path $Extract $Required) -PathType Leaf)) {throw "Incomplete artifact: $Required"}}
+    foreach ($Required in @('install.ps1','LazyToken\release-manifest.json','LazyToken\LazyToken.exe','LazyToken\_internal\index.html','LazyToken\_internal\vendor\three.module.js')) {if (-not (Test-Path -LiteralPath (Join-Path $Extract $Required) -PathType Leaf)) {throw "Incomplete artifact: $Required"}}
+    if (-not ((Test-Path -LiteralPath (Join-Path $Extract 'LazyToken\_internal\python311.dll') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $Extract 'LazyToken\_internal\python314.dll') -PathType Leaf))) {throw 'Incomplete artifact: supported Python runtime DLL missing'}
     if ($PublisherThumbprint) {
         if (-not (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue)) {throw 'Authenticode verification unavailable; refusing the publisher-pinned install.'}
         foreach ($SignedFile in @('install.ps1','LazyToken\LazyToken.exe')) {

@@ -16,6 +16,8 @@ def smoke(package):
     executable = package / "LazyToken" / "LazyToken.exe"
     installer = package / "install.ps1"
     shell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    assert (package / "LazyToken" / "_internal" / "vendor" / "PYTHON-LICENSE.txt").is_file()
+    assert (package / "LazyToken" / "_internal" / "docs" / "CLIENT_COMPATIBILITY.md").is_file()
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
         project = root / "project"

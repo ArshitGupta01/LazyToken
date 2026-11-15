@@ -143,7 +143,7 @@ class AuditRegressions(unittest.TestCase):
             item for item in first["results"] if item.get("id") == unverified["asset_id"]
         )
         self.assertEqual(hypothesis_crumb["verification_state"], "hypothesis")
-        self.assertNotIn("summary", memory)
+        self.assertIn("Reuse the existing Auth class", memory["summary"])
         self.assertTrue(any(item.get("path") == "Auth.py" for item in first["results"]))
         inspected = kn.call(
             "inspect_source_range",
@@ -159,6 +159,7 @@ class AuditRegressions(unittest.TestCase):
         changed = kn.call("get_task_context", args, self.db)
         stale = next(item for item in changed["results"] if item.get("id") == approved["asset_id"])
         self.assertEqual(stale["freshness"], "stale")
+        self.assertNotIn("summary", stale)
         self.assertEqual(stale["evidence_paths"], ["Auth.py"])
         self.assertIn("revalidate", stale["why"])
         before = self.db.execute("SELECT count(*) FROM assets").fetchone()[0]
@@ -216,6 +217,22 @@ class AuditRegressions(unittest.TestCase):
         memory = next(r for r in result["results"] if r.get("name") == "Auth unavailable")
         self.assertEqual(memory["freshness"], "unverified")
         self.assertIn("verify before reuse", memory["why"])
+
+    def test_compact_context_includes_current_verified_lesson_when_it_fits(self):
+        proposal = self.proposal(summary="Reuse Auth for account login.")
+        approved = kn.feature_call(
+            "review",
+            {"project": self.project, "id": proposal["id"], "action": "approve", "verified": True},
+            self.db,
+        )
+        result = kn.call(
+            "get_task_context",
+            {"project": self.project, "task": "Auth account login", "budget": 250},
+            self.db,
+        )
+        memory = next(item for item in result["results"] if item.get("id") == approved["asset_id"])
+        self.assertEqual(memory["summary"], "Reuse Auth for account login.")
+        self.assertLessEqual(result["used_tokens"], 250)
 
     def test_direct_stale_memory_is_not_hidden_by_confidence_penalty(self):
         proposal = self.proposal(name="AmberGiraffe", summary="AmberGiraffe lesson")

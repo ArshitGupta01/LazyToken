@@ -1,0 +1,25 @@
+{
+  "objective": "Improve LazyToken quality using evidence from current implementation and failing end-to-end checks.",
+  "tasks": [
+    {
+      "id": "dashboard-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "inputs": ["dashboard.py", "e2e/test_tier1_features.py", "e2e/test_tier3_combinations.py", "e2e/test_tier4_workloads.py"],
+      "context": {"decisions": ["Identify the intended session dashboard contract and concrete security constraints before implementation."], "skill_paths": []},
+      "acceptance": ["Report the missing behavior, affected callers, smallest safe implementation, and checks."],
+      "required": true
+    },
+    {
+      "id": "cli-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "inputs": ["kn.py", "docs/CLI.md", "e2e/test_tier1_features.py"],
+      "context": {"decisions": ["Distinguish supported CLI behavior from unfinished acceptance gates."], "skill_paths": []},
+      "acceptance": ["Report actionable CLI gaps and relevant evidence."],
+      "required": true
+    }
+  ]
+}

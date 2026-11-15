@@ -1,4 +1,5 @@
 import sqlite3
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,6 +13,29 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SessionFixtureTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("git"), "Git required to reproduce parent ignore rules")
+    def test_preparation_isolated_from_parent_gitignore(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+            (root / ".gitignore").write_text("ignored/\n", encoding="utf-8")
+            dest = root / "ignored" / "trial"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "benchmark/prepare_sessions.py"),
+                    str(dest),
+                    "--follow-up",
+                    "--memory",
+                    "current",
+                ],
+                check=True,
+                capture_output=True,
+            )
+            with closing(sqlite3.connect(dest / "network.sqlite3")) as db:
+                paths = {row[0] for row in db.execute("SELECT path FROM files")}
+            self.assertTrue({"auth.py", "handlers.py", "store.py"}.issubset(paths))
+
     def test_preparation_and_acceptance(self):
         with tempfile.TemporaryDirectory() as temp:
             for variant in ("none", "current", "stale"):

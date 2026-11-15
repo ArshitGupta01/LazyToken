@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,6 +25,8 @@ def main():
     destination.mkdir(parents=True)
     project = destination / "project"
     shutil.copytree(ROOT / "benchmark" / "fixture_sessions", project)
+    if shutil.which("git"):
+        subprocess.run(["git", "init", "--quiet", str(project)], check=True)
     if args.follow_up:
         auth = project / "auth.py"
         text = auth.read_text(encoding="utf-8")
@@ -34,7 +37,9 @@ def main():
         auth.write_text(text, encoding="utf-8")
     db = kn.connect(destination / "network.sqlite3")
     try:
-        kn.sync(project, db)
+        indexed = kn.sync(project, db)
+        if indexed.get("error") or indexed.get("error_count") or not indexed.get("files"):
+            raise RuntimeError(f"Fixture indexing failed: {indexed}")
         if args.memory != "none":
             project_id = str(project.resolve())
             proposal = kn.feature_call(

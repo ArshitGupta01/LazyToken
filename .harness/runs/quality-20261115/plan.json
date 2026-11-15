@@ -1,0 +1,78 @@
+{
+  "schema_version": 2,
+  "run_id": "quality-20261115",
+  "previous_run_id": null,
+  "project_root": "D:\\LazyToken",
+  "objective": "Improve LazyToken quality using evidence from current implementation and failing end-to-end checks.",
+  "created_at": "2026-11-15T14:55:13.801897+00:00",
+  "tasks": [
+    {
+      "id": "dashboard-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "acceptance": [
+        "Report the missing behavior, affected callers, smallest safe implementation, and checks."
+      ],
+      "required": true,
+      "inputs": [
+        "dashboard.py",
+        "e2e/test_tier1_features.py",
+        "e2e/test_tier3_combinations.py",
+        "e2e/test_tier4_workloads.py"
+      ],
+      "context": {
+        "decisions": [
+          "Identify the intended session dashboard contract and concrete security constraints before implementation."
+        ],
+        "skill_paths": []
+      },
+      "max_attempts": 2,
+      "status": "running",
+      "attempts": 1,
+      "agent_id": "/root/preflight",
+      "input_fingerprints": {
+        "dashboard.py": "sha256:4ec2a51918200f134535abcde7a228ac09f3c278435eda5453e84b2487d8aaa1",
+        "e2e/test_tier1_features.py": "sha256:1d58fa8041ba591d0e76d8f7dc2fba22ad730037fe63877c91886952a213ff15",
+        "e2e/test_tier3_combinations.py": "sha256:4298d127b8920a7746158ebc8ff1181c0a9975b2181a3ac6f495ee622abc1b81",
+        "e2e/test_tier4_workloads.py": "sha256:14ac2ee8087278e6703ddfabc6168a73816886eb04597644840ae55c71825eac"
+      },
+      "dependency_fingerprints": {},
+      "contract_fingerprint": "sha256:3429dbac0312062a7c47571905e87fd9bb2899ca988fb2e3da2373124ebab93f",
+      "started_at": "2026-11-15T14:55:21.762555+00:00"
+    },
+    {
+      "id": "cli-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "acceptance": [
+        "Report actionable CLI gaps and relevant evidence."
+      ],
+      "required": true,
+      "inputs": [
+        "kn.py",
+        "docs/CLI.md",
+        "e2e/test_tier1_features.py"
+      ],
+      "context": {
+        "decisions": [
+          "Distinguish supported CLI behavior from unfinished acceptance gates."
+        ],
+        "skill_paths": []
+      },
+      "max_attempts": 2,
+      "status": "running",
+      "attempts": 1,
+      "agent_id": "/root/cli_review",
+      "input_fingerprints": {
+        "docs/CLI.md": "sha256:d24c400fae527c62df65e49cd84c630b1ffb1e6223aaad560933e1a3ef11398a",
+        "e2e/test_tier1_features.py": "sha256:1d58fa8041ba591d0e76d8f7dc2fba22ad730037fe63877c91886952a213ff15",
+        "kn.py": "sha256:93c721ea6817905efc9fadb0c1de7487626f7420363cd8e0b1aaf71b0bb73064"
+      },
+      "dependency_fingerprints": {},
+      "contract_fingerprint": "sha256:33a78aeffafdfa574e35ced0cd575eec7c47d568a4fa0f4cc290f439085ff338",
+      "started_at": "2026-11-15T14:55:34.399087+00:00"
+    }
+  ]
+}

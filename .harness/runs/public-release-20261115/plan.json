@@ -1,0 +1,87 @@
+{
+  "schema_version": 2,
+  "run_id": "public-release-20261115",
+  "previous_run_id": null,
+  "project_root": "D:\\LazyToken",
+  "objective": "Prepare a public Hugging Face MCP Space for public GitHub repositories and a distributable CLI.",
+  "created_at": "2026-11-15T15:42:56.049028+00:00",
+  "tasks": [
+    {
+      "id": "space",
+      "role": "lazytoken_worker",
+      "dependencies": [],
+      "ownership": [
+        "hf_space/",
+        "tests/test_hf_space.py"
+      ],
+      "acceptance": [
+        "Deliver Space source and staging procedure with meaningful isolated tests and report remaining security or hosting limits."
+      ],
+      "required": true,
+      "inputs": [
+        "kn.py",
+        "broker.py",
+        "features.py",
+        "frameworks.py",
+        "source_index.py"
+      ],
+      "context": {
+        "decisions": [
+          "The user chose a public remote Space for public GitHub repositories only. Never expose arbitrary filesystem or existing local MCP operations. Each request must use isolated temporary data; validate repository identifiers, restrict outbound hosts and redirects, cap download and extraction resources, avoid running repository code, and prevent cross-request leakage. Follow Gradio MCP Space conventions, implement useful retrieval using existing LazyToken, and make the staged Space self-contained."
+        ],
+        "skill_paths": []
+      },
+      "max_attempts": 2,
+      "status": "running",
+      "attempts": 1,
+      "agent_id": "/root/preflight",
+      "input_fingerprints": {
+        "broker.py": "sha256:8bb1cb4ab63f42573081f4ffe087ef4d5de2ca8912aa4484c0a5f583b6ce126b",
+        "features.py": "sha256:725771480f6a4e78f9fa41d0c05ea616ba124213d31f9cbd36914d5a9f948dc6",
+        "frameworks.py": "sha256:3906f673094e4906e6e49e739eeac10a229f9ceb779e89c1b593edf85e0fbc37",
+        "kn.py": "sha256:5563fc3c736835bb01ba89d6f8b88b2254b5703e0fb71e44b3d0272d4c3debbe",
+        "source_index.py": "sha256:dab5d5eee328fe1bded13dbcd077ddb43d7bd94d58b50bbee936b79370dc62e5"
+      },
+      "dependency_fingerprints": {},
+      "contract_fingerprint": "sha256:fb453f4324c184212375ff10bb1cb5be88845e092e9d51cef3e1a6095c0493e9",
+      "started_at": "2026-11-15T15:42:56.354567+00:00"
+    },
+    {
+      "id": "release-review",
+      "role": "lazytoken_reviewer",
+      "dependencies": [],
+      "ownership": [],
+      "acceptance": [
+        "Report reproducible findings and exact release artifacts, commands and remaining risks."
+      ],
+      "required": true,
+      "inputs": [
+        "build_release.ps1",
+        "install.ps1",
+        "manage_install.ps1",
+        "RELEASING.md",
+        "README.md"
+      ],
+      "context": {
+        "decisions": [
+          "User authorized public CLI availability. Identify concrete packaging/publication blockers and upgrade compatibility, including existing uncommitted changes; do not publish or modify files."
+        ],
+        "skill_paths": []
+      },
+      "max_attempts": 2,
+      "status": "running",
+      "attempts": 1,
+      "agent_id": "/root/readiness_release",
+      "input_fingerprints": {
+        "README.md": "sha256:f1ce1a98efc305cb17889fbbd28e9f424f29da5f2b1e1327966dc8b24be8b4a4",
+        "RELEASING.md": "sha256:dcd14024e56020b9fb9f37735bf27014baf556b83ca6e43319db43a2acd38394",
+        "build_release.ps1": "sha256:8b76f2d84794bfd599b8d859700a72df0b792836bde05f8aad974317f49e6631",
+        "install.ps1": "sha256:4a6cda6e0f0245f4237b0506c195eb2a9b2cd8f7717aadc210db2421de249cc6",
+        "manage_install.ps1": "sha256:01bf526cc700000f11b869cb6472800b4eeaadfd9d2d9a3884e0787f72f8d642"
+      },
+      "dependency_fingerprints": {},
+      "contract_fingerprint": "sha256:175512ccbbf19b01906a99e2e04ae853ee9f814373894b651f824156f8010a49",
+      "started_at": "2026-11-15T15:42:56.603365+00:00"
+    }
+  ]
+}

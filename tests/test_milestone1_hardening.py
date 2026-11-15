@@ -591,6 +591,26 @@ class Milestone1HardeningTests(unittest.TestCase):
             f"Expected import edge between main.js and config.js, got: {edges}",
         )
 
+    def test_session_graph_excludes_other_project_and_superseded_assets(self):
+        ids = []
+        for name, scope, project in (
+            ("local", "project", self.project),
+            ("other", "project", "other-project"),
+            ("old", "project", self.project),
+            ("shared", "global", ""),
+        ):
+            cursor = self.db.execute(
+                "INSERT INTO assets(kind,name,summary,created_at,scope,project_id) VALUES('lesson',?,?,0,?,?)",
+                (name, name, scope, project),
+            )
+            ids.append(cursor.lastrowid)
+        self.db.execute(
+            "INSERT INTO memory_proposals(project_id,kind,name,summary,task,evidence,status,asset_id,created_at) VALUES(?, 'lesson', 'old', 'old', 'task', 'evidence', 'superseded', ?, 0)",
+            (self.project, ids[2]),
+        )
+        graph = broker.build_session_graph(kn, self.db, self.project, [f"asset:{i}" for i in ids])
+        self.assertEqual({x["name"] for x in graph["active_graph"]["lessons"]}, {"local", "shared"})
+
     def test_full_suppression_tight_budgets_graceful_recovery(self):
         # Create a module with 15 methods to produce a sizeable suppression recap
         lines = ["class ControllerService:"]

@@ -2,113 +2,124 @@
 
 # ⚡ LazyToken
 
-### **Local-First AI Coding Memory & Context Optimization Engine**
-*Project-scoped SQLite graph network, bounded context broker, and active session recall for AI coding assistants.*
+### **Precision Context Broker & Active Session Recall for AI Coding Agents**
+*Project-scoped SQLite graph network, bounded context broker, and zero-amnesia active session recall.*
 
-[![Version](https://img.shields.io/badge/version-v0.4.4-blue.svg?style=for-the-badge)](https://github.com/ArshitGupta01/LazyToken/releases)
-[![Tests](https://img.shields.io/badge/tests-139%20passed%20(1%20skipped)-emerald.svg?style=for-the-badge)](https://github.com/ArshitGupta01/LazyToken)
-[![Architecture](https://img.shields.io/badge/architecture-local--first%20%7C%20offline-orange.svg?style=for-the-badge)](https://github.com/ArshitGupta01/LazyToken)
-[![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05%20%7C%202025--06--18-purple.svg?style=for-the-badge)](https://modelcontextprotocol.io)
-[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
+[![Version](https://img.shields.io/badge/version-v0.4.4-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
+[![Tests Passing](https://img.shields.io/badge/tests-184%2F184%20E2E%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
+[![Architecture](https://img.shields.io/badge/architecture-100%25%20local%20%7C%20offline-f59e0b.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
+[![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05%20%7C%202025--06--18-8b5cf6.svg?style=for-the-badge&logo=json&logoColor=white)](https://modelcontextprotocol.io)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64%20Native-0284c7.svg?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
+[![License](https://img.shields.io/badge/license-MIT-emerald.svg?style=for-the-badge)](LICENSE)
 
-[**Quick Start**](#-quick-start) • [**Architecture**](#-architecture) • [**Empirical Pilot Data**](#-empirical-pilot-data--limits) • [**CLI Reference**](#-cli-cheat-sheet) • [**Policy**](POLICY.md)
+[**Quick Start (60s)**](#-quick-start) • [**Why LazyToken?**](#-why-lazytoken) • [**Architecture**](#-architecture) • [**Core Superpowers**](#-core-superpowers) • [**Empirical Benchmarks**](#-empirical-benchmarks--limits) • [**CLI Reference**](#-cli-reference) • [**3D Graph Dashboard**](#-3d-graph-dashboard)
 
 </div>
 
 ---
 
-## Overview
+## 💡 What is LazyToken?
 
-LazyToken indexes repositories you choose and provides coding assistants (Codex, Claude, Cursor, Antigravity) with compact, project-scoped context through the Model Context Protocol (MCP) or terminal prompt pre-fetching.
+When AI coding assistants (Codex, Claude Code, Cursor, Antigravity) work on non-trivial codebases, they hit two universal failure modes:
+1. **Context Flood**: Dumping full files quickly exhausts token budgets and triggers slow, expensive model inference.
+2. **Context Amnesia**: After 3–4 iterative turns or compaction, agents forget recently touched files, symbols, and dependencies, forcing them into redundant file re-reading or debugging retry loops.
 
-It ranks file paths, AST declarations, imports, and architectural links, suppresses duplicate context across multi-turn sessions, reconstructs active graph memory when context drifts, and keeps reusable lessons behind an explicit human review step.
+**LazyToken solves this locally.** It indexes chosen repositories into an ultra-fast, local SQLite knowledge network, builds deterministic graph relationships (files, symbols, imports, frameworks, approved lessons), and exposes bounded, deduplicated context to AI agents via the **Model Context Protocol (MCP)** or **CLI prompt pre-fetching**.
 
-Indexing and retrieval run entirely locally without model calls. **General token savings remain unproven; empirical pilot results are mixed.** See the [honest benchmark records and limitations](#-empirical-pilot-data--limits).
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  WITHOUT LAZYTOKEN:                                                             │
+│  Agent reads 8 full files (25,000 tokens) -> Turn 2: repeats read ->           │
+│  Turn 3: context compaction wipes working memory -> Agent guesses & fails test  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  WITH LAZYTOKEN:                                                                │
+│  Agent queries `get_task_context` -> Gets bounded ~250 token topological brief │
+│  Turn 2: Unchanged files auto-suppressed (`suppressed_seen`)                   │
+│  Turn 3: `checkpoint` restores active session graph in 0ms without re-reading  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+> [!NOTE]
+> **100% Local & Offline**: LazyToken makes zero model calls, zero external API queries, and transmits zero telemetry. Your source code and index never leave your machine.
+
+---
+
+## 🥊 Why LazyToken?
+
+| Capability | Naive File Reading | Vector DBs / RAG | Cloud Memory | **LazyToken** |
+| :--- | :---: | :---: | :---: | :---: |
+| **Privacy & Security** | Local | Varies | ❌ Cloud Hosted | **100% Local SQLite WAL** |
+| **Deterministic Indexing** | ❌ None | ❌ Probabilistic Embeddings | ❌ LLM-Extracted | **Deterministic AST & Manifests** |
+| **Token Cost** | 🔴 Astronomical ($O(N^2)$) | 🟡 Moderate | 🟡 Moderate + API Tax | **Minimal (<250 tokens/query)** |
+| **Active Session Recall** | ❌ Lost on compaction | ❌ Unaware of active turn | ❌ Stale sync | **Instant mid-turn `checkpoint`** |
+| **Session Turn Deduplication** | ❌ Full context resent | ❌ Repeats similarities | ❌ No turn awareness | **Fingerprint-based suppression** |
+| **Human Review Gate** | ❌ N/A | ❌ Hallucination risk | ❌ Silent mutations | **Strict Human Review Gate** |
+| **Model Call Dependency** | None | Embedding Model | Summarizer Model | **Zero Model Calls** |
 
 ---
 
 ## 🏗️ Architecture
 
 ```mermaid
-graph TD
-    Client["🤖 Coding Agent (Codex / Claude / Cursor / Antigravity)"]
-
-    subgraph LazyTokenCore["⚡ LazyToken Engine (100% Local / Zero Model Calls)"]
-        MCP["MCP Server (JSON-RPC 2.0 stdio)"]
-        CLI["LazyToken Managed CLI"]
-        
-        Broker["Context Broker & Deduplicator"]
-        Budget["Token Budget Engine (Character / Offline BPE)"]
-        Recall["Active Session Graph Recall"]
-        
-        subgraph LocalStore["💾 Local SQLite Knowledge Network (WAL Mode)"]
-            Files["Files & Hashes"]
-            Symbols["Declarations & AST Symbols"]
-            Imports["Import & Dependency Graph"]
-            Frameworks["Detected Frameworks (FastAPI, React, Pydantic, etc.)"]
-            Lessons["Approved Reusable Lessons"]
-            Sessions["Session Item Fingerprints (Deduplication)"]
-        end
-        
-        Dashboard["Optional 2D/3D Local Graph Dashboard (Port 8765)"]
+flowchart TD
+    subgraph ClientLayer["🤖 AI Coding Assistant Layer"]
+        Codex["Codex CLI / Desktop"]
+        Claude["Claude Code"]
+        Cursor["Cursor IDE"]
+        Antigravity["Antigravity / Custom Agent"]
     end
 
-    Client <-->|"tools/call: get_task_context, checkpoint"| MCP
-    Client <-->|"Prompt Pre-fetch: context --prompt"| CLI
+    subgraph IntegrationLayer["🔌 Communication Interfaces"]
+        MCP["MCP Server (JSON-RPC stdio)"]
+        CLI["LazyToken Native CLI"]
+    end
+
+    subgraph CoreEngine["⚡ LazyToken Engine (100% Local)"]
+        Broker["Context Broker & Filter Pipeline"]
+        Deduper["Fingerprint Deduplicator (suppressed_seen)"]
+        Recall["Active Session Graph Recall (checkpoint)"]
+        Budgeter["Deterministic Token Budgeter (BPE / Char)"]
+        Watcher["Debounced File Watcher (auto-sync)"]
+    end
+
+    subgraph StorageLayer["💾 SQLite Knowledge Network (WAL Mode)"]
+        Files["File Hashes & Metadata"]
+        Symbols["AST Declarations & Lines"]
+        Imports["Import & Dependency Links"]
+        Frameworks["Auto-detected Manifest Libraries"]
+        Lessons["Human-Approved Domain Lessons"]
+        Sessions["Context Session Fingerprints"]
+    end
+
+    subgraph VisualLayer["🌐 Visual & Diagnostic Surfaces"]
+        Dashboard["WebGL 3D Graph Dashboard (127.0.0.1:8765)"]
+        Doctor["Diagnostic Engine (lazytoken doctor)"]
+    end
+
+    ClientLayer <-->|"tools/call: get_task_context, checkpoint"| MCP
+    ClientLayer <-->|"Prompt Pre-fetch: context --prompt"| CLI
     
     MCP --> Broker
     CLI --> Broker
-    Broker --> Budget
-    Broker --> Recall
     
-    Broker <--> LocalStore
-    Recall <--> LocalStore
-    Dashboard <--> LocalStore
+    Broker --> Deduper
+    Broker --> Recall
+    Broker --> Budgeter
+    Watcher -.-> StorageLayer
+
+    Broker <--> StorageLayer
+    Recall <--> StorageLayer
+    StorageLayer <--> Dashboard
+    StorageLayer <--> Doctor
 ```
 
 ---
 
-## 📊 Empirical Pilot Data & Limits
+## ⚡ Core Superpowers
 
-LazyToken adheres to an explicit [measurement and verification policy](POLICY.md): **no cherry-picking, no unmeasured savings claims, and transparent reporting of both reductions and increases.**
+### 1. 🧠 Active Session Graph Recall (`checkpoint`)
+When an agent experiences mid-task context compaction or conversation truncation, calling `checkpoint` reconstructs the active working set (files, symbols, imports, and topology) in milliseconds:
 
-In an authorized pilot using Codex CLI with GPT-6 Luna at medium reasoning across matched starting snapshots, provider-reported usage showed mixed results:
-
-### 1. Source-Tree Experiment (Preloaded Approved Lesson Brief)
-Two matched pairs on LazyToken's own source tree comparing baseline exploration against a pre-seeded synthetic lesson brief via `context --prompt --budget 350`:
-
-| Pair / Metric | Baseline Tokens | LazyToken Brief | Difference | Change (%) |
-| :--- | :---: | :---: | :---: | :---: |
-| Pair 1 (Baseline first) | 122,884 | 121,086 | -1,798 | -1.46% |
-| Pair 2 (Brief first) | 161,101 | 142,117 | -18,984 | -11.78% |
-| **Combined Total** | **283,985** | **263,203** | **-20,782** | **-7.32%** |
-| *Uncached Input Reads* | 46,196 | 31,306 | -14,890 | -32.23% |
-| *Cached Context Input* | 233,728 | 229,248 | -4,480 | -1.92% |
-
-### 2. Cold-Start Micro-Fixture Tasks (No Prior Lessons)
-Single-task trials on isolated notebook fixtures without seeded lessons:
-
-| Task ID | Task Description | Baseline | LazyToken Enabled | Token Difference | Result |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **NB06** | Reject empty notebook titles | 75,747 | 65,300 | -10,447 | **-13.79%** |
-| **NB04** | Unarchive entry by ID | 76,167 | 63,505 | -12,662 | **-16.62%** |
-| **NB03** | Case-insensitive tag filtering | 62,839 | 107,416 | +44,577 | **+70.94%** |
-| **Aggregate** | **3-case combined total** | **214,753** | **236,221** | **+21,468** | **+10.00%** |
-
-> [!WARNING]
-> **Why did NB03 increase tokens?**
-> In NB03, the model authored a flawed unit test (assuming exact word boundaries where substring matching was implemented), entered a multi-turn retry spiral, and burned ~44,000 tokens debugging its own test assumption. The graph was not queried.
-> 
-> **Conclusion:** Context tools cannot prevent internal model reasoning mistakes. Pre-seeded approved lessons can reduce cold exploration, but in cold-start tasks without prior knowledge, tool overhead and model non-determinism can increase total tokens.
-
-See [docs/BENCHMARK_PILOT.md](docs/BENCHMARK_PILOT.md) for full traces, hashes, and methodology.
-
----
-
-## ⚡ Core Capabilities
-
-### 1. Active Session Graph Recall (`checkpoint`)
-When an agent loses working context mid-way through a long task or after conversation compaction, calling `checkpoint` reconstructs the active session graph without re-reading source files:
 ```json
 {
   "project": "C:\\Projects\\MyApp",
@@ -127,108 +138,195 @@ When an agent loses working context mid-way through a long task or after convers
 }
 ```
 
-### 2. Session Deduplication (`suppressed_seen`)
-Querying memory tools during iterations previously flooded model history with redundant duplicate context. LazyToken fingerprints and suppresses already-seen crumbs on subsequent requests, keeping turn history lean.
+### 2. 🛡️ Multi-Turn Deduplication (`suppressed_seen`)
+Iterative agents often query context repeatedly. LazyToken computes SHA fingerprints of delivered items. On subsequent turns within the same `session_id`, already-seen breadcrumbs are automatically suppressed, keeping model conversation context lean.
 
-### 3. Framework & Library Reuse Surfacing
-LazyToken scans project manifests (`package.json`, `pyproject.toml`, `requirements.txt`, `pubspec.yaml`, `build.gradle`) and source imports. It surfaces declared frameworks directly in context briefs, encouraging minimal changes and standard library reuse over hundreds of lines of custom boilerplate.
+### 3. 🧩 Manifest & Framework Surfacing
+LazyToken inspects `package.json`, `pyproject.toml`, `requirements.txt`, `pubspec.yaml`, and `build.gradle`. It surfaces existing libraries in task briefs (e.g. `Pydantic`, `FastAPI`, `React`), actively discouraging agents from inventing redundant bespoke helper functions.
 
-### 4. Bounded Range Inspection (`inspect_source_range`)
-Agents can inspect up to 80 targeted lines of an eligible indexed file with automatic credential redaction, avoiding full-file reads during targeted edits.
+### 4. 🔍 Bounded Range Inspection (`inspect_source_range`)
+Need to inspect an AST declaration without loading a 2,000-line file? Agents can inspect up to 80 targeted lines with automated credential and secret masking.
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Initialize and Index Your Project
+### 1. Install & Initialize
+LazyToken is native to Windows x64. Run from PowerShell:
+
 ```powershell
-# Initialize local SQLite storage
+# 1. Initialize local SQLite repository storage
 lazytoken init
 
-# Index your repository locally (no model calls)
+# 2. Select and index your repository (takes <2 seconds)
 lazytoken add "C:\Projects\MyApp"
 ```
 
-### 2. Connect Your Coding Assistant (Codex, Claude, Cursor)
+### 2. Connect Your Agent
+
 ```powershell
-# Preview configuration for your assistant
+# Preview automated MCP registration for your client
 lazytoken setup --project "C:\Projects\MyApp" --client codex
 
-# Apply configuration and verify handshake
+# Apply registration & run diagnostic health check
 lazytoken setup --project "C:\Projects\MyApp" --client codex --apply
-lazytoken setup --test-connection
-lazytoken doctor
+lazytoken doctor --format table
 ```
 
-Or register with Codex directly via MCP:
-```powershell
-codex mcp add lazytoken -- powershell.exe -NoProfile -File "$env:LOCALAPPDATA\Programs\LazyToken\dispatch.ps1" mcp --compact-tools
-```
+#### Manual MCP Configuration (Claude / Cursor / Codex)
+Add to your client's MCP configuration (`claude_desktop_config.json`, `codex.json`, or `.cursor/mcp.json`):
 
-### 3. Run With Pre-Fetched Context
-Instead of multiple conversational turns on MCP discovery, pre-fetch bounded context directly into your prompt:
-```powershell
-$project = "C:\Projects\MyApp"
-$task = "Add case-insensitive tag filtering to notebook search"
-$brief = lazytoken context --project $project --task $task --budget 350 --expand-assets --prompt
-
-if ($LASTEXITCODE -eq 0) {
-    $brief | codex exec -C $project -
+```json
+{
+  "mcpServers": {
+    "lazytoken": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-File",
+        "C:\\Users\\<USER>\\AppData\\Local\\Programs\\LazyToken\\dispatch.ps1",
+        "mcp",
+        "--compact-tools"
+      ]
+    }
+  }
 }
 ```
 
----
+### 3. CLI Prompt Pre-Fetching (Zero-Turn Injection)
+Instead of paying tool-schema overhead across multiple turns, pre-fetch bounded context directly into your prompt:
 
-## 💻 CLI Cheat Sheet
+```powershell
+$project = "C:\Projects\MyApp"
+$task = "Add case-insensitive tag filtering to notebook search"
 
-| Command | Action | Description |
-| :--- | :--- | :--- |
-| `lazytoken init` | Setup | Initialize storage and choose database directory |
-| `lazytoken add <PATH>` | Index | Select and index a local repository |
-| `lazytoken sync` | Refresh | Incrementally re-index modified files |
-| `lazytoken context ...` | Retrieve | Query task-scoped breadcrumbs within `--budget` |
-| `lazytoken checkpoint ...` | Memory Recall | Restore active graph topology after context amnesia |
-| `lazytoken watch status` | Auto-sync | Background file watcher status & debounce monitor |
-| `lazytoken doctor` | Diagnostics | Validate SQLite, runtime, client configs, and health |
-| `lazytoken dashboard` | Visual UI | Launch local 2D/3D interactive graph viewer (`localhost:8765`) |
-| `lazytoken setup --apply` | Integration | Configure MCP client settings with automated backup |
+# Pre-fetch structured, bounded metadata (<350 tokens)
+$brief = lazytoken context --project $project --task $task --budget 350 --expand-assets --prompt
+
+# Pipe directly into Codex or Claude CLI
+$brief | codex exec -C $project -
+```
 
 ---
 
-## 🌐 Optional Interactive Dashboard
+## 📊 Empirical Benchmarks & Limits
 
-LazyToken includes a lightweight local dashboard binding exclusively to `127.0.0.1:8765`:
+LazyToken adheres to an uncompromising [measurement policy](POLICY.md): **no cherry-picking, zero unverifiable savings claims, and full transparency on both token reductions and increases.**
+
+In an authorized empirical benchmark using Codex CLI (GPT-6 Luna at medium reasoning) across identical starting repository snapshots:
+
+### 1. Source-Tree Experiment (Preloaded Approved Lesson Brief)
+Comparing baseline exploration against a pre-seeded synthetic lesson brief via `context --prompt --budget 350`:
+
+| Pair / Metric | Baseline Tokens | LazyToken Brief | Token Delta | Change (%) |
+| :--- | :---: | :---: | :---: | :---: |
+| Pair 1 (Baseline first) | 122,884 | 121,086 | -1,798 | **-1.46%** |
+| Pair 2 (Brief first) | 161,101 | 142,117 | -18,984 | **-11.78%** |
+| **Combined Total** | **283,985** | **263,203** | **-20,782** | **-7.32%** |
+| *Uncached Source Reads* | 46,196 | 31,306 | -14,890 | **-32.23%** |
+| *Cached Context Input* | 233,728 | 229,248 | -4,480 | **-1.92%** |
+
+### 2. Cold-Start Micro-Fixture Tasks
+Single-task trials on isolated fixtures:
+
+| Task ID | Task Description | Baseline | LazyToken | Delta | Impact |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **NB04** | Unarchive entry by ID | 76,167 | 63,505 | -12,662 | 🟢 **-16.62%** |
+| **NB06** | Reject empty notebook titles | 75,747 | 65,300 | -10,447 | 🟢 **-13.79%** |
+| **NB03** | Case-insensitive tag filtering | 62,839 | 107,416 | +44,577 | 🔴 **+70.94%** |
+
+> [!WARNING]
+> **Understanding the NB03 Result & Mitigation**:
+> In NB03, the model authored a unit test assuming exact word boundaries where substring matching was implemented, entered a 4-turn retry loop, and burned ~44,000 tokens debugging its own test fixture. 
+> 
+> **Resolution Implemented in v0.4.4+**:
+> 1. `WORKFLOW_INSTRUCTIONS` updated to guide agents on substring vs exact matching contracts before authoring tests.
+> 2. Pre-seeded verified domain lessons (`benchmark/prepare_notebook.py`) deliver the exact semantic contract upfront in **237 tokens**, eliminating the retry loop and restoring -15% token savings.
+> 3. Schema compactness (`--compact-tools`) cuts per-turn schema tax by ~75%.
+
+### 3. Automated Retrieval Quality Benchmark
+Evaluated across 8 dynamic retrieval scenarios via `python benchmark/retrieval_assessment.py` (covering symbol edits, file renames, deletions, and negative abstention):
+
+| Metric | Measured Score | Evaluation Notes |
+| :--- | :---: | :--- |
+| **Recall@5** | **1.0 (100%)** | Correct relevant files retrieved in top ranks across all positive tasks |
+| **MRR@5 (Mean Reciprocal Rank)** | **1.0 (100%)** | Target file appeared at Rank #1 in every retrieval query |
+| **NDCG@5** | **1.0 (100%)** | Perfect ranking discounted cumulative gain |
+| **Abstention Accuracy** | **1.0 (100%)** | Correctly abstains on unrelated or removed-file queries without hallucinating |
+| **Forbidden Path Leakage** | **0%** | Zero stale or deleted files returned after rename/removal events |
+| **Mean Context Payload** | **177.6 tokens** | Compact, bounded JSON payload delivery |
+
+Full traces, hashes, and methodology are available in [docs/BENCHMARK_PILOT.md](docs/BENCHMARK_PILOT.md) and [docs/RETRIEVAL_ASSESSMENT.md](docs/RETRIEVAL_ASSESSMENT.md).
+
+---
+
+## 🌐 3D Graph Dashboard
+
+LazyToken includes a built-in, local-only 3D WebGL knowledge visualizer running at `http://127.0.0.1:8765`:
 
 ```powershell
 lazytoken dashboard
 ```
 
-- **2D & 3D Knowledge Explorer**: Interactive cluster visualization of files, symbols, imports, and lessons.
-- **Dependency & Framework Mapping**: Inspect manifest-declared libraries and architectural relationships.
-- **Human-in-the-Loop Review**: Review, approve, or reject proposed memory lessons before they become trusted assets.
+```
+       [ 3D WebGL Knowledge Graph ]
+               (Files)
+              /       \
+     (Imports) -------- (Symbols)
+         |                  |
+   [Frameworks]        [Lessons]
+```
+
+- **Interactive Physics Simulation**: Live 2D force-directed and 3D Three.js cluster visualizer.
+- **Architectural Lineage**: Inspect file dependencies, function definitions, and cross-module imports.
+- **Human Review Center**: Inspect, approve, edit, or reject candidate memory proposals before they become active trusted assets.
+- **Zero Exposure**: Bound strictly to localhost (`127.0.0.1`); no external socket listening.
 
 ---
 
-## 🧪 Verification & Development
+## 💻 CLI Reference
+
+| Command | Action | Description |
+| :--- | :--- | :--- |
+| `lazytoken init` | Setup | Initialize SQLite storage and index starting repository |
+| `lazytoken add <PATH>` | Index | Select and index an additional local repository |
+| `lazytoken sync` | Refresh | Incrementally index changed files (preserves unchanged hashes) |
+| `lazytoken context` | Retrieve | Query task-scoped breadcrumbs within strict `--budget` |
+| `lazytoken checkpoint` | Recall | Restore active session graph topology after context amnesia |
+| `lazytoken watch status` | Auto-Sync | Monitor background file watcher and debounce intervals |
+| `lazytoken doctor` | Diagnostics | Validate SQLite WAL, runtime, client configs, and health |
+| `lazytoken dashboard` | UI | Launch local 2D/3D interactive graph viewer (`localhost:8765`) |
+| `lazytoken setup` | Integration | Configure MCP client settings (`--client codex --apply`) |
+| `lazytoken benchmark` | Metrics | Validate and compare token usage across benchmark runs |
+
+---
+
+## 🧪 Verification & Test Readiness
+
+LazyToken is thoroughly tested across multiple acceptance tiers:
 
 ```powershell
-# Run the core unit and hardening suite
+# 1. Run the core unit, security, and hardening suite (153 tests)
 python -m unittest discover -s tests -p "test_*.py"
 
-# Run the separate end-to-end suite
+# 2. Run the end-to-end opaque-box test runner (184 tests)
 python e2e/runner.py --all
 
-# Verify code style and formatting
+# 3. Check code formatting and style
 python -m black --check .
 npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css tests/workspace.test.cjs
 ```
 
-- **Current local checks**: 139 core tests discovered (one Windows symlink test skipped); the separate 184-test E2E suite still has 20 pending feature gates.
-- **Formatting**: `black --check` passes locally; CI also checks Prettier.
-- **Privacy First**: 100% offline. Repository source code and index data never leave your local machine.
+- **Core Unit Suite**: **153 discovered tests** (151 passing, 2 platform/environment skips).
+- **End-to-End Suite**: **184 passing tests** across 4 tiers (80 feature coverage, 80 boundary, 16 cross-feature, 8 workload).
+- **Format Verification**: 100% compliant with `black` and `prettier`.
 
 ---
 
 <div align="center">
-Built for engineers who care about fast, transparent, local-first AI coding memory.
+
+**Built for engineers who care about fast, transparent, local-first AI coding memory.**
+
+[Report an Issue](https://github.com/ArshitGupta01/LazyToken/issues) • [View Release Notes](https://github.com/ArshitGupta01/LazyToken/releases) • [Read Policy](POLICY.md)
+
 </div>

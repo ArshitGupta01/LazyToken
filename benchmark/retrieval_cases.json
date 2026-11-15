@@ -1,0 +1,13 @@
+{
+  "label_provenance": "Agent-authored fixture labels; not independently reviewed or representative.",
+  "cases": [
+    {"id":"session-auth", "fixture":"fixture_sessions", "task":"change authenticate token validation", "relevant":["auth.py"]},
+    {"id":"session-handler", "fixture":"fixture_sessions", "task":"change primary handler response", "relevant":["handlers.py"]},
+    {"id":"session-store", "fixture":"fixture_sessions", "task":"modify SessionStore get", "relevant":["store.py"]},
+    {"id":"notebook-find", "fixture":"fixture_notebook", "task":"change Notebook find filtering", "relevant":["notebook.py"]},
+    {"id":"no-match", "fixture":"fixture_sessions", "task":"quasar zephyr xylophone", "relevant":[]},
+    {"id":"changed-symbol", "fixture":"fixture_sessions", "task":"check verify_credentials", "operation":"change", "relevant":["auth.py"]},
+    {"id":"renamed-file", "fixture":"fixture_sessions", "task":"change authenticate token validation", "operation":"rename", "relevant":["identity.py"], "forbidden":["auth.py"]},
+    {"id":"removed-file", "fixture":"fixture_sessions", "task":"authenticate", "operation":"remove", "relevant":[], "forbidden":["auth.py"]}
+  ]
+}

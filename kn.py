@@ -1202,6 +1202,9 @@ def main() -> None:
         raise SystemExit(evaluation_main(sys.argv[2:]))
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("dashboard", help="Open the local graph dashboard")
+    sub.add_parser("benchmark", help="Validate and compare benchmark records")
+    sub.add_parser("evaluate", help="Evaluate retrieval against supplied labels")
     ix = sub.add_parser("sync")
     ix.add_argument("root", nargs="?")
     sd = sub.add_parser("seed")
@@ -1254,10 +1257,11 @@ def main() -> None:
     restore.add_argument(
         "--to", required=True, help="Existing empty directory for the restored network.sqlite3"
     )
-    sub.add_parser(
+    doctor = sub.add_parser(
         "doctor",
         help="Check runtime, storage, SQLite, clients and local dashboard without changing settings",
     )
+    doctor.add_argument("--format", choices=("json", "text", "table"), default="json")
     migration = sub.add_parser(
         "migrate-data", help="Preview or explicitly copy a legacy database; never merge"
     )
@@ -1311,9 +1315,7 @@ def main() -> None:
         import watcher
 
         if not 0.25 <= a.interval <= 300 or not 0 <= a.debounce <= 30:
-            parser.error(
-                "interval must be 0.25ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ300 seconds and debounce 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ30 seconds"
-            )
+            parser.error("interval must be 0.25 to 300 seconds and debounce 0 to 30 seconds")
         if a.action == "run":
             result = watcher.run(sys.modules[__name__], a.interval, a.debounce)
         elif a.action == "start":
@@ -1371,7 +1373,14 @@ def main() -> None:
     if a.cmd == "doctor":
         import diagnostics
 
-        print(json.dumps(diagnostics.report(sys.modules[__name__]), indent=2))
+        result = diagnostics.report(sys.modules[__name__])
+        if a.format == "json":
+            print(json.dumps(result, indent=2))
+        else:
+            width = max(map(len, result)) if a.format == "table" else 0
+            for key, value in result.items():
+                label = key.ljust(width) if width else key
+                print(f"{label}{' | ' if width else ': '}{json.dumps(value, ensure_ascii=False)}")
         return
     if a.cmd == "migrate-data":
         import migration

@@ -1,0 +1,17 @@
+{
+  "run_id": "public-release-20261115",
+  "agents": {
+    "/root/preflight": {
+      "state": "running",
+      "task_id": "space",
+      "evidence": "Parent registered an existing native agent ID; task transport is separate.",
+      "updated_at": "2026-11-15T15:42:56.354567+00:00"
+    },
+    "/root/readiness_release": {
+      "state": "running",
+      "task_id": "release-review",
+      "evidence": "Parent registered an existing native agent ID; task transport is separate.",
+      "updated_at": "2026-11-15T15:42:56.603365+00:00"
+    }
+  }
+}

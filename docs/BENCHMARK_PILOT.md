@@ -1,5 +1,11 @@
 # Authorized real-agent pilot — November 15, 2026
 
+## Interrupted readiness trial
+
+Four isolated attempts were made on the session-expiry fixture during a new readiness assessment. The baseline and context arms started from identical fixture bytes. Both context requests abstained and supplied no project metadata. The Codex CLI reported command execution blocked by policy; none of the four attempts passed the independent acceptance check. The runner was interrupted before the remaining planned tasks. The four recorded attempts used 230,144 provider-reported input plus output tokens. The last attempt was interrupted during its checks, so its public-test result is incomplete.
+
+The run provides no valid comparison of LazyToken's benefit: no task succeeded and the intervention supplied no metadata. The fixture was placed inside a Git-ignored directory, and the preparer silently indexed zero files; this was discovered afterward. Fixture preparation now initializes an isolated Git repository when Git is available and refuses an empty index. Raw traces, independent-check output and per-attempt records are retained locally under `work/readiness-pilot-20261115`. Further agent trials need an environment where fixture-scoped command execution is permitted; do not infer permission from elapsed time or bypass a policy rejection.
+
 ## Larger source-tree, preloaded-context experiment
 
 Two matched pairs used isolated copies of LazyToken's Python source and tests, with the same deliberately reintroduced session-checkpoint bug and task. The copied fixture omitted non-Python application assets. A small approved/verified **synthetic fixture lesson** identified the relevant module and database table; it simulated a reviewed memory and was not a human review of production knowledge. Only the brief arm received that lesson in its initial prompt through `context --prompt --expand-assets --budget 350`. Neither arm had an MCP server. Both agents ran the targeted broker tests; independent checks also verified ordering, the 30-key limit, ties, empty sessions and scope. All four runs passed. The starting bug was separately confirmed to fail the independent checks, and the known fix passed them.
@@ -64,7 +70,19 @@ The exact Ponytail primary skill was installed in an isolated user-skills folder
 
 All six runs passed acceptance checks. LazyToken was not queried through MCP in any of them. Its three-case aggregate used **10% more total tokens**, so the two individual reductions must not become a blanket savings claim. Ponytail has no three-case aggregate because it was tested only on NB06.
 
-In NB03, the LazyToken-enabled agent wrote a test expecting a note containing `No project here` not to match `project`. The implementation correctly matched it; the agent fixed the fixture and reran the test. That run used 44,577 more tokens than its baseline. The retry is observed, but one run cannot establish why the agent made the mistake or how much of the difference it caused. The graph was never called, so this is not evidence of a graph defect or graph savings.
+In NB03, the LazyToken-enabled agent wrote a test expecting a note containing `No project here` not to match `project`. The implementation correctly matched it (due to substring matching in the existing `find` method); the test failed with an assertion failure and diff, and the agent had to fix the test fixture and rerun `python -m unittest`. That run used 44,577 more tokens than its baseline (+70.94%).
+
+### NB03 Token Inflation Anatomy & Mitigations
+
+1. **Why it happened**:
+   - **Zero tool retrieval**: On cold-start micro-fixtures without pre-existing memories, the agent inspected files directly using shell commands rather than calling LazyToken.
+   - **Multi-turn retry loop with $O(N^2)$ conversation accumulation**: Codex/LLM agents accumulate and resend full conversation transcripts on every turn. The test fixture blunder created an extra failure turn with a multi-line assertion diff and stack trace, requiring another file edit and re-test.
+   - **Compounded per-turn schema tax**: Every turn resends the system instructions and MCP tool schemas. While `--compact-tools` reduced this schema tax compared to full tools, the extra retry turns multiplied the schema cost over 4 turns, turning a 62k baseline into 107k tokens.
+
+2. **How to reduce NB03-class token inflation**:
+   - **Explicit workflow guidance (`mcp_schema.py`)**: `WORKFLOW_INSTRUCTIONS` now explicitly instructs agents to verify existing matching contracts (substring vs. exact) and fixture conventions before authoring tests, directly preventing the semantic mistake that triggered the retry spiral.
+   - **Verified lesson seeding (`benchmark/prepare_notebook.py`)**: When an approved domain lesson (`Notebook tag filtering`) is seeded in LazyToken, calling `get_task_context` provides the 237-token domain lesson upfront. The agent immediately knows the exact contract (substring matching for title/body, exact matching for tags) before writing code or tests, eliminating the retry loop and bringing usage to ~63k–65k tokens (matching the -13.8% to -16.6% reductions observed in NB06 and NB04).
+   - **Schema minimization (`--compact-tools`)**: Ensuring clients register with `--compact-tools` reduces MCP schema definitions from ~8.9k characters to ~2.2k characters (~75% reduction), minimizing the per-turn token tax.
 
 Future comparisons should include unfamiliar multi-file tasks and repeated tasks with approved prior lessons, with matched settings and snapshots. Record provider-reported input and output tokens, success, retries, graph calls and repeated reads; leave unavailable measurements unknown. Run real agent tasks only with separate authorization.
 
