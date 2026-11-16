@@ -163,6 +163,42 @@
   // --- Initialize ---
   document.addEventListener('DOMContentLoaded', () => {
     setupCopyButtons();
+
+    const launchBtn = document.getElementById('launch-btn');
+    const statusTip = document.getElementById('status-tip');
+
+    if (launchBtn) {
+      launchBtn.addEventListener('click', async (e) => {
+        if (isConnected) return;
+
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 700);
+          const res = await fetch(`http://127.0.0.1:${DEFAULT_PORT}/api/health`, {
+            signal: controller.signal,
+            mode: 'cors',
+            cache: 'no-store'
+          });
+          clearTimeout(tid);
+          if (res.ok) {
+            handleServerFound(`http://127.0.0.1:${DEFAULT_PORT}/`);
+            return;
+          }
+        } catch {
+          e.preventDefault();
+          if (statusTip) {
+            statusTip.textContent =
+              '⚠️ Local server not running yet. Run "npx lazytoken@latest serve" in your terminal first.';
+            statusTip.classList.add('error');
+            setTimeout(() => {
+              statusTip.textContent = '';
+              statusTip.classList.remove('error');
+            }, 4000);
+          }
+        }
+      });
+    }
+
     // Start initial check immediately, then periodically
     checkServer();
     pollTimer = setInterval(checkServer, POLL_INTERVAL);

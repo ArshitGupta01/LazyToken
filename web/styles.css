@@ -501,6 +501,19 @@ body {
   transform: translateY(-1px);
 }
 
+.status-tip {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  min-height: 16px;
+  transition: all 0.2s ease;
+}
+
+.status-tip.error {
+  color: #f87171;
+}
+
 /* Footer */
 .card-footer {
   margin-top: 32px;
