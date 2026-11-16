@@ -28,8 +28,12 @@ const entryPath = existsSync(join(__dirname, "runtime", "app_entry.py"))
   ? join(__dirname, "runtime", "app_entry.py")
   : join(__dirname, "..", "app_entry.py");
 
+const rawArgs = process.argv.slice(2);
+// Map 'serve' alias to 'dashboard' for seamless compatibility across all runtime builds
+const cliArgs = rawArgs.map((arg, idx) => (idx === 0 && arg === "serve" ? "dashboard" : arg));
+
 const [command, ...prefix] = python;
-const result = spawnSync(command, [...prefix, entryPath, ...process.argv.slice(2)], {
+const result = spawnSync(command, [...prefix, entryPath, ...cliArgs], {
   stdio: "inherit",
   windowsHide: true,
 });
