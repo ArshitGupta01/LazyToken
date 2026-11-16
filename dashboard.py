@@ -44,12 +44,15 @@ def read_projects() -> list[dict]:
     conn = sqlite3.connect(f"file:{quote(path.as_posix(), safe='/:')}?mode=ro", uri=True, timeout=2)
     conn.row_factory = sqlite3.Row
     try:
-        return [
+        rows = [
             dict(row)
             for row in conn.execute(
                 "SELECT p.id,p.root,count(f.path) AS files,p.updated_at FROM projects p LEFT JOIN files f ON f.project_id=p.id GROUP BY p.id ORDER BY p.root"
             )
         ]
+        # Filter out deleted temporary folders (e.g. test artifacts) from the visualizer
+        existing = [r for r in rows if Path(r["root"]).is_dir()]
+        return existing if existing else rows
     finally:
         conn.close()
 

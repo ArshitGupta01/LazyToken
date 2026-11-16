@@ -15,4 +15,8 @@ release/
 work/
 _workspace/
 .harness/
+*report.json
+tier*_report.json
+task.md
+*.log
 

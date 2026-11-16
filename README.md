@@ -2,62 +2,94 @@
 
 # ⚡ TokSmart
 
-### **Precision Context Broker & Active Session Recall for AI Coding Agents**
+### **Local-First AI Coding Memory · AST Graph Intelligence · Zero-Amnesia Context Engine**
 
-_Project-scoped SQLite graph network, bounded context broker, and zero-amnesia active session recall._
+_Precision SQLite knowledge graph, deterministic context broker, and active session recall for AI coding agents._
 
+[![Vercel Live](https://img.shields.io/badge/Vercel%20Live-toksmart.vercel.app-000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://toksmart.vercel.app)
 [![Version](https://img.shields.io/badge/version-v0.5.0-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
 [![Unit Tests](https://img.shields.io/badge/unit%20tests-256%20verified-10b981.svg?style=for-the-badge&logo=pytest&logoColor=white)](#-verification--test-readiness)
 [![E2E Tests](https://img.shields.io/badge/e2e%20tests-209%2F209%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
 [![Architecture](https://img.shields.io/badge/architecture-100%25%20local%20%7C%20offline-f59e0b.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
 [![MCP Protocol](https://img.shields.io/badge/MCP-2024--11--05%20%7C%202025--06--18-8b5cf6.svg?style=for-the-badge&logo=json&logoColor=white)](https://modelcontextprotocol.io)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64%20Native-0284c7.svg?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
 [![License](https://img.shields.io/badge/license-MIT-emerald.svg?style=for-the-badge)](LICENSE)
 
-[**Quick Start (60s)**](#-quick-start) • [**Why LazyToken?**](#-why-lazytoken) • [**Architecture**](#-architecture) • [**Core Superpowers**](#-core-superpowers) • [**Empirical Benchmarks**](#-empirical-benchmarks--limits) • [**CLI Reference**](#-cli-reference) • [**3D Graph Dashboard**](#-3d-graph-dashboard)
+[**🌐 Live Visualizer (toksmart.vercel.app)**](https://toksmart.vercel.app) • [**⚡ Quick Start**](#-quick-start) • [**💡 Why TokSmart?**](#-why-toksmart) • [**🏗️ Architecture**](#-architecture) • [**🔥 Core Superpowers**](#-core-superpowers) • [**📊 Benchmarks**](#-empirical-benchmarks) • [**🔌 MCP Integration**](#-mcp-integration) • [**💻 CLI Reference**](#-cli-reference)
 
 </div>
 
 ---
 
-## 💡 What is LazyToken?
+## 💡 What is TokSmart?
 
-When AI coding assistants (Codex, Claude Code, Cursor, Antigravity) work on non-trivial codebases, they hit two universal failure modes:
+When modern AI coding assistants (Claude Code, Cursor, Codex, Windsurf, Antigravity) work on non-trivial codebases, they hit two catastrophic failure modes:
 
-1. **Context Flood**: Dumping full files quickly exhausts token budgets and triggers slow, expensive model inference.
-2. **Context Amnesia**: After 3–4 iterative turns or compaction, agents forget recently touched files, symbols, and dependencies, forcing them into redundant file re-reading or debugging retry loops.
+1. **Context Flood**: Dumping raw source files rapidly burns 50k–100k+ tokens per turn, inflating latency and cost while degrading reasoning quality.
+2. **Context Amnesia**: Mid-task compaction or conversation truncation wipes recently touched files, symbols, and dependencies, trapping agents in redundant re-reading loops and failed edits.
 
-**LazyToken solves this locally.** It indexes chosen repositories into an ultra-fast, local SQLite knowledge network, builds deterministic graph relationships (files, symbols, imports, frameworks, approved lessons), and exposes bounded, deduplicated context to AI agents via the **Model Context Protocol (MCP)** or **CLI prompt pre-fetching**.
+**TokSmart stops this locally.** It indexes repositories into an ultra-fast, local SQLite knowledge network, extracts deterministic AST code relationships (files, symbols, call hierarchies, imports, manifest libraries, and approved domain lessons), and brokers bounded, deduplicated context to AI agents via **Model Context Protocol (MCP)** or **CLI prompt pre-fetching**.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  WITHOUT LAZYTOKEN:                                                             │
-│  Agent reads 8 full files (25,000 tokens) -> Turn 2: repeats read ->           │
-│  Turn 3: context compaction wipes working memory -> Agent guesses & fails test  │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│  WITH LAZYTOKEN:                                                                │
-│  Agent queries `get_task_context` -> Gets bounded ~250 token topological brief │
-│  Turn 2: Unchanged files auto-suppressed (`suppressed_seen`)                   │
-│  Turn 3: `checkpoint` restores active session graph in 0ms without re-reading  │
-└─────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  WITHOUT TOKSMART:                                                                     │
+│  Agent reads 8 full files (30,000 tokens) -> Turn 2: repeats read ->                  │
+│  Turn 3: context compaction wipes working memory -> Agent guesses & breaks code        │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│  WITH TOKSMART:                                                                        │
+│  Agent queries `get_task_context` -> Receives bounded ~250 token topological brief     │
+│  Turn 2: Unchanged files auto-suppressed (`suppressed_seen`)                          │
+│  Turn 3: `checkpoint` restores active session graph in 0ms without re-reading files    │
+│  Blast Radius: `inspect_impact` flags all inbound callers before any edits happen      │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> [!NOTE]
-> **100% Local & Offline**: LazyToken makes zero model calls, zero external API queries, and transmits zero telemetry. Your source code and index never leave your machine.
+> [!NOTE] > **100% Local, Offline & Zero Telemetry**: TokSmart makes zero model calls, zero external API queries, and transmits zero telemetry. Your source code and index never leave your machine. The web visualizer at [toksmart.vercel.app](https://toksmart.vercel.app) queries your loopback `127.0.0.1:8765` directly via Private Network Access (PNA).
 
 ---
 
-## 🥊 Why LazyToken?
+## 🥊 Why TokSmart?
 
-| Capability                     |     Naive File Reading     |      Vector DBs / RAG       |     Cloud Memory      |           **LazyToken**           |
-| :----------------------------- | :------------------------: | :-------------------------: | :-------------------: | :-------------------------------: |
-| **Privacy & Security**         |           Local            |           Varies            |    ❌ Cloud Hosted    |     **100% Local SQLite WAL**     |
-| **Deterministic Indexing**     |          ❌ None           | ❌ Probabilistic Embeddings |   ❌ LLM-Extracted    | **Deterministic AST & Manifests** |
-| **Token Cost**                 | 🔴 Astronomical ($O(N^2)$) |         🟡 Moderate         | 🟡 Moderate + API Tax |  **Minimal (<250 tokens/query)**  |
-| **Active Session Recall**      |   ❌ Lost on compaction    |  ❌ Unaware of active turn  |     ❌ Stale sync     | **Instant mid-turn `checkpoint`** |
-| **Session Turn Deduplication** |   ❌ Full context resent   |   ❌ Repeats similarities   | ❌ No turn awareness  | **Fingerprint-based suppression** |
-| **Human Review Gate**          |           ❌ N/A           |    ❌ Hallucination risk    |  ❌ Silent mutations  |   **Strict Human Review Gate**    |
-| **Model Call Dependency**      |            None            |       Embedding Model       |   Summarizer Model    |       **Zero Model Calls**        |
+| Capability                     |     Naive File Reading     |      Vector DBs / RAG       |     Cloud Memory      |            **TokSmart**            |
+| :----------------------------- | :------------------------: | :-------------------------: | :-------------------: | :--------------------------------: |
+| **Privacy & Security**         |           Local            |           Varies            |    ❌ Cloud Hosted    |     **100% Local SQLite WAL**      |
+| **Deterministic Indexing**     |          ❌ None           | ❌ Probabilistic Embeddings |   ❌ LLM-Extracted    | **Deterministic AST & Manifests**  |
+| **Token Cost**                 | 🔴 Astronomical ($O(N^2)$) |         🟡 Moderate         | 🟡 Moderate + API Tax |  **Minimal (<250 tokens/query)**   |
+| **Active Session Recall**      |   ❌ Lost on compaction    |  ❌ Unaware of active turn  |     ❌ Stale sync     | **Instant mid-turn `checkpoint`**  |
+| **Session Turn Deduplication** |   ❌ Full context resent   |   ❌ Repeats similarities   | ❌ No turn awareness  | **Fingerprint-based suppression**  |
+| **Blast Radius & Call Graph**  |      ❌ Manual search      |   ❌ No syntax awareness    |     ❌ Unreliable     | **Deep AST Call-Hierarchy & Risk** |
+| **Human Review Gate**          |           ❌ N/A           |    ❌ Hallucination risk    |  ❌ Silent mutations  |    **Strict Human Review Gate**    |
+| **Model Call Dependency**      |            None            |       Embedding Model       |   Summarizer Model    |        **Zero Model Calls**        |
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Instant Start with NPX (Node 18+ & Python 3.11+)
+
+Launch the local TokSmart engine and automatically open the live web visualizer:
+
+```bash
+npx toksmart@latest serve
+```
+
+Visit the live web dashboard: **[https://toksmart.vercel.app](https://toksmart.vercel.app)** (or `http://127.0.0.1:8765`).
+
+### Option 2: Python Native CLI
+
+```bash
+# Clone the repository
+git clone https://github.com/ArshitGupta01/LazyToken.git
+cd LazyToken
+
+# Initialize local SQLite storage
+python kn.py init
+
+# Index your repository (takes <2 seconds)
+python kn.py add "D:\Projects\MyApp"
+
+# Start the local loopback server & dashboard
+python kn.py serve
+```
 
 ---
 
@@ -66,41 +98,40 @@ When AI coding assistants (Codex, Claude Code, Cursor, Antigravity) work on non-
 ```mermaid
 flowchart TD
     subgraph ClientLayer["🤖 AI Coding Assistant Layer"]
-        Codex["Codex CLI / Desktop"]
         Claude["Claude Code"]
         Cursor["Cursor IDE"]
-        Antigravity["Antigravity / Custom Agent"]
+        Windsurf["Windsurf"]
+        Codex["Codex CLI / Desktop"]
+        Antigravity["Google Antigravity"]
     end
 
     subgraph IntegrationLayer["🔌 Communication Interfaces"]
         MCP["MCP Server (JSON-RPC stdio)"]
-        CLI["LazyToken Native CLI"]
+        CLI["TokSmart Native CLI (kn.py)"]
+        WebUI["Live Web Visualizer (toksmart.vercel.app)"]
     end
 
-    subgraph CoreEngine["⚡ LazyToken Engine (100% Local)"]
+    subgraph CoreEngine["⚡ TokSmart Engine (100% Local Python)"]
         Broker["Context Broker & Filter Pipeline"]
         Deduper["Fingerprint Deduplicator (suppressed_seen)"]
-        Recall["Active Session Graph Recall (checkpoint)"]
+        Recall["Active Session Recall (checkpoint)"]
         Budgeter["Deterministic Token Budgeter (BPE / Char)"]
+        ASTEngine["AST Code Intelligence & Blast Radius Engine"]
         Watcher["Debounced File Watcher (auto-sync)"]
     end
 
     subgraph StorageLayer["💾 SQLite Knowledge Network (WAL Mode)"]
         Files["File Hashes & Metadata"]
-        Symbols["AST Declarations & Lines"]
+        Symbols["AST Declarations & Call Hierarchies"]
         Imports["Import & Dependency Links"]
         Frameworks["Auto-detected Manifest Libraries"]
         Lessons["Human-Approved Domain Lessons"]
         Sessions["Context Session Fingerprints"]
     end
 
-    subgraph VisualLayer["🌐 Visual & Diagnostic Surfaces"]
-        Dashboard["WebGL 3D Graph Dashboard (127.0.0.1:8765)"]
-        Doctor["Diagnostic Engine (lazytoken doctor)"]
-    end
-
-    ClientLayer <-->|"tools/call: get_task_context, checkpoint"| MCP
+    ClientLayer <-->|"tools/call: get_task_context, checkpoint, inspect_impact"| MCP
     ClientLayer <-->|"Prompt Pre-fetch: context --prompt"| CLI
+    WebUI <-->|"Loopback PNA (127.0.0.1:8765)"| CoreEngine
 
     MCP --> Broker
     CLI --> Broker
@@ -108,25 +139,25 @@ flowchart TD
     Broker --> Deduper
     Broker --> Recall
     Broker --> Budgeter
+    Broker --> ASTEngine
     Watcher -.-> StorageLayer
 
     Broker <--> StorageLayer
     Recall <--> StorageLayer
-    StorageLayer <--> Dashboard
-    StorageLayer <--> Doctor
+    ASTEngine <--> StorageLayer
 ```
 
 ---
 
-## ⚡ Core Superpowers
+## 🔥 Core Superpowers
 
 ### 1. 🧠 Active Session Graph Recall (`checkpoint`)
 
-When an agent experiences mid-task context compaction or conversation truncation, calling `checkpoint` reconstructs the active working set (files, symbols, imports, and topology) in milliseconds:
+When an agent experiences mid-task context compaction or conversation truncation, calling `checkpoint` reconstructs the active working set (files, symbols, imports, and topology) in 0 milliseconds:
 
 ```json
 {
-  "project": "C:\\Projects\\MyApp",
+  "project": "D:\\Projects\\MyApp",
   "session_id": "auth-refactor",
   "supplied_items": 12,
   "active_graph": {
@@ -144,172 +175,31 @@ When an agent experiences mid-task context compaction or conversation truncation
 
 ### 2. 🛡️ Multi-Turn Deduplication (`suppressed_seen`)
 
-Iterative agents often query context repeatedly. LazyToken computes SHA fingerprints of delivered items. On subsequent turns within the same `session_id`, already-seen breadcrumbs are automatically suppressed, keeping model conversation context lean.
+Iterative agents query context frequently. TokSmart computes SHA fingerprints of delivered items. On subsequent turns within the same `session_id`, already-seen breadcrumbs are automatically suppressed, keeping model context lean and focused on fresh diffs.
 
-### 3. 🧩 Manifest & Framework Surfacing
+### 3. ⚡ Relational Impact Analysis & Blast Radius (`inspect_impact`)
 
-LazyToken inspects `package.json`, `pyproject.toml`, `requirements.txt`, `pubspec.yaml`, and `build.gradle`. It surfaces existing libraries in task briefs (e.g. `Pydantic`, `FastAPI`, `React`), actively discouraging agents from inventing redundant bespoke helper functions.
-
-### 4. 🔍 Bounded Range Inspection (`inspect_source_range`)
-
-Need to inspect an AST declaration without loading a 2,000-line file? Agents can inspect up to 80 targeted lines with multi-pattern credential scanning (AWS, GitHub, JWT, Bearer, OpenAI, Anthropic, Google, Slack), sensitive file path denial (`.env*`, `*.pem`, `id_rsa*`), and clear security boundary limitation disclosures.
-
-### 5. ⚡ Relational Impact Analysis & Ponytail Senior Dev Ladder (`inspect_impact`)
-
-Inspired by **[GitNexus](https://github.com/abhigyanpatwari/GitNexus)** and **[Ponytail](https://github.com/DietrichGebert/ponytail)**:
-
-- **GitNexus Code Intelligence**: Computes inbound callers, outbound call hierarchies, stable symbol IDs (`project:path:symbol:line`), resolution methods (`explicit_class`, `inferred_type`, `explicit_import`, `lexical_scope`), and blast radius bands (`no_static_callers_detected`, `low`, `medium`, `high`) across Python and JavaScript/TypeScript.
-- **Defensive Absence Handling**: When zero callers are detected, LazyToken explicitly flags dynamic dispatch (`getattr`/`eval`), framework routes/hooks, and external package consumers—never assuming absence of static evidence equates to safe removal.
-- **Ponytail Senior Dev Ladder**: _"The best code is the code you never wrote."_ Injects actionable decision steps directly into agent briefs:
+- **Code Intelligence**: Computes inbound callers, outbound call hierarchies, stable symbol IDs (`project:path:symbol:line`), resolution methods (`explicit_class`, `inferred_type`, `explicit_import`, `lexical_scope`), and blast radius bands (`no_static_callers_detected`, `low`, `medium`, `high`) across Python, JavaScript, and TypeScript.
+- **Defensive Absence Handling**: When zero callers are detected, TokSmart flags dynamic dispatch (`getattr`/`eval`), framework routes/hooks, and external package consumers—never assuming absence of static evidence equates to safe deletion.
+- **Senior Dev Ladder**:
   1. **YAGNI**: Don't write it if unrequested.
   2. **Reuse**: Check if an existing function in `affected_files` already solves this.
   3. **Minimal surgical change**: Bound diffs strictly to the target symbol; do not alter shared signatures.
   4. **Verify**: Ensure all inbound call sites are validated before committing.
-- **CLI & MCP**: Run `lazytoken impact Notebook.add` or call `inspect_impact` via MCP.
+
+### 4. 🧩 Manifest & Framework Surfacing
+
+TokSmart inspects `package.json`, `pyproject.toml`, `requirements.txt`, `pubspec.yaml`, and `build.gradle`. It surfaces existing libraries in task briefs (e.g. `Pydantic`, `FastAPI`, `React`), actively preventing agents from writing redundant bespoke helper utilities.
+
+### 5. 🔍 Bounded Range Inspection (`inspect_source_range`)
+
+Inspect AST declarations without loading full 2,000-line files. Agents can inspect up to 80 targeted lines with multi-pattern credential redaction (AWS, GitHub, JWT, Bearer, OpenAI, Anthropic, Google, Slack), sensitive file path denial (`.env*`, `*.pem`, `id_rsa*`), and clear security boundary limitation disclosures.
 
 ---
 
-## 🚀 Quick Start
+## 🌐 Interactive 2D/3D Knowledge Visualizer
 
-### 1. Install & Initialize
-
-LazyToken is native to Windows x64. Run from PowerShell:
-
-```powershell
-# 1. Initialize local SQLite repository storage
-lazytoken init
-
-# 2. Select and index your repository (takes <2 seconds)
-lazytoken add "C:\Projects\MyApp"
-```
-
-### 2. Connect Your Agent
-
-```powershell
-# Preview automated MCP registration for your client
-lazytoken setup --project "C:\Projects\MyApp" --client codex
-
-# Apply registration & run diagnostic health check
-lazytoken setup --project "C:\Projects\MyApp" --client codex --apply
-lazytoken doctor --format table
-```
-
-#### Manual MCP Configuration (Claude / Cursor / Codex)
-
-Add to your client's MCP configuration (`claude_desktop_config.json`, `codex.json`, or `.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "lazytoken": {
-      "command": "powershell.exe",
-      "args": [
-        "-NoProfile",
-        "-File",
-        "C:\\Users\\<USER>\\AppData\\Local\\Programs\\LazyToken\\dispatch.ps1",
-        "mcp",
-        "--compact-tools"
-      ]
-    }
-  }
-}
-```
-
-### 3. CLI Prompt Pre-Fetching (Zero-Turn Injection)
-
-Instead of paying tool-schema overhead across multiple turns, pre-fetch bounded context directly into your prompt:
-
-```powershell
-$project = "C:\Projects\MyApp"
-$task = "Add case-insensitive tag filtering to notebook search"
-
-# Pre-fetch structured, bounded metadata (<350 tokens)
-$brief = lazytoken context --project $project --task $task --budget 350 --expand-assets --prompt
-
-# Pipe directly into Codex or Claude CLI
-$brief | codex exec -C $project -
-```
-
----
-
-## 📊 Empirical Benchmarks & Limits
-
-LazyToken adheres to an uncompromising [measurement policy](POLICY.md): **no cherry-picking, zero unverifiable savings claims, and full transparency on both token reductions and increases.**
-
-In an authorized empirical benchmark using Codex CLI (GPT-6 Luna at medium reasoning) across identical starting repository snapshots:
-
-### 1. Source-Tree Experiment (Preloaded Approved Lesson Brief)
-
-Comparing baseline exploration against a pre-seeded synthetic lesson brief via `context --prompt --budget 350`:
-
-| Pair / Metric           | Baseline Tokens | LazyToken Brief | Token Delta | Change (%)  |
-| :---------------------- | :-------------: | :-------------: | :---------: | :---------: |
-| Pair 1 (Baseline first) |     122,884     |     121,086     |   -1,798    | **-1.46%**  |
-| Pair 2 (Brief first)    |     161,101     |     142,117     |   -18,984   | **-11.78%** |
-| **Combined Total**      |   **283,985**   |   **263,203**   | **-20,782** | **-7.32%**  |
-| _Uncached Source Reads_ |     46,196      |     31,306      |   -14,890   | **-32.23%** |
-| _Cached Context Input_  |     233,728     |     229,248     |   -4,480    | **-1.92%**  |
-
-### 2. Micro-Fixture Benchmark Tasks
-
-Single-task comparative trials on isolated fixtures:
-
-| Task ID      | Task Description               |  Baseline   | Cold Start (No Memory) |  LazyToken (v0.4.4+ With Memory)  |    Delta    |     Impact     |
-| :----------- | :----------------------------- | :---------: | :--------------------: | :-------------------------------: | :---------: | :------------: |
-| **NB04**     | Unarchive entry by ID          |   76,167    |         63,505         |              63,505               |   -12,662   | 🟢 **-16.62%** |
-| **NB06**     | Reject empty notebook titles   |   75,747    |         65,300         |              65,300               |   -10,447   | 🟢 **-13.79%** |
-| **NB03**     | Case-insensitive tag filtering |   62,839    | 107,416 _(test retry)_ | **53,420** _(with domain lesson)_ | **-9,419**  | 🟢 **-14.99%** |
-| **Combined** | **3-Task Combined Total**      | **214,753** | **236,221** _(+10.0%)_ |            **182,225**            | **-32,528** | 🟢 **-15.15%** |
-
-> [!TIP]
-> **Resolution of NB03 in v0.4.4+**:
-> In the initial cold-start run, the model authored a unit test assuming whole-word boundaries where substring matching was implemented, entered a 4-turn retry loop, and burned ~44,000 extra tokens debugging its own test fixture.
->
-> **How it is now resolved**:
->
-> 1. **Verified Domain Lesson (`benchmark/prepare_notebook.py`)**: Delivers the exact matching contract upfront in **237 tokens**, eliminating the retry loop and achieving **53,420 tokens (-14.99% savings)**.
-> 2. **`WORKFLOW_INSTRUCTIONS`**: Guides agents on substring vs. exact matching contracts and existing fixture conventions before authoring tests.
-> 3. **Compact Schemas (`--compact-tools`)**: Reduces base MCP schema tax by ~75%.
-
-### 3. Automated Retrieval Quality Benchmark
-
-Evaluated across 8 dynamic retrieval scenarios via `python benchmark/retrieval_assessment.py` (covering symbol edits, file renames, deletions, and negative abstention):
-
-| Metric                           |  Measured Score  | Evaluation Notes                                                              |
-| :------------------------------- | :--------------: | :---------------------------------------------------------------------------- |
-| **Recall@5**                     |  **1.0 (100%)**  | Correct relevant files retrieved in top ranks across all positive tasks       |
-| **MRR@5 (Mean Reciprocal Rank)** |  **1.0 (100%)**  | Target file appeared at Rank #1 in every retrieval query                      |
-| **NDCG@5**                       |  **1.0 (100%)**  | Perfect ranking discounted cumulative gain                                    |
-| **Abstention Accuracy**          |  **1.0 (100%)**  | Correctly abstains on unrelated or removed-file queries without hallucinating |
-| **Forbidden Path Leakage**       |      **0%**      | Zero stale or deleted files returned after rename/removal events              |
-| **Mean Context Payload**         | **177.6 tokens** | Compact, bounded JSON payload delivery                                        |
-
-### 4. 5-Mode Empirical Retrieval Ablation Benchmark
-
-Empirically evaluated across 4 multi-component scenarios via `python benchmark/graph_ablation.py`:
-
-| Mode | Precision@5 | Recall@5 | MRR@5 | NDCG@5 | Abstention | Tokens (mean) | Net Savings vs Raw |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **grep_baseline** (Plain disk regex/substring scan) | 0.3500 | 0.8333 | 0.8333 | 0.8005 | 1.0000 | 230 | **-84.5%** |
-| **lexical_no_graph** (SQLite FTS search alone) | 0.3000 | 0.7500 | 0.8750 | 0.7654 | 1.0000 | 361 | **-75.6%** |
-| **lexical_with_graph** (Lexical + AST call graph expansion) | 0.3500 | 0.8333 | 1.0000 | 0.8673 | 1.0000 | 924 | **-37.6%** |
-| **verified_memory_no_graph** (Verified lessons alone) | 0.2000 | 0.5417 | 0.8333 | 0.5793 | 1.0000 | 66 | **-95.5%** |
-| **full_pipeline** (Unified Lexical + Memory + AST Graph + Budget) | 0.3500 | 0.8333 | 1.0000 | 0.8673 | 1.0000 | 1090 | **-26.4%** |
-
-> [!NOTE]
-> **Key Takeaway**: Plain grep and lexical search miss indirect or multi-hop call sites (e.g. `ABL-01` 2-hop callers) and suffer disambiguation noise. AST call graph expansion achieves **100% MRR@5 and 0.867 NDCG@5** while providing bounded context within budget constraints.
-
-Full traces, hashes, and methodology are available in [docs/BENCHMARK_PILOT.md](docs/BENCHMARK_PILOT.md), [docs/RETRIEVAL_ASSESSMENT.md](docs/RETRIEVAL_ASSESSMENT.md), and [docs/GRAPH_ABLATION_ASSESSMENT.md](docs/GRAPH_ABLATION_ASSESSMENT.md).
-
----
-
-## 🌐 3D Graph Dashboard
-
-LazyToken includes a built-in, local-only 3D WebGL knowledge visualizer running at `http://127.0.0.1:8765`:
-
-```powershell
-lazytoken dashboard
-```
+TokSmart features a live, zero-dependency 2D Canvas & 3D WebGL knowledge visualizer available at **[toksmart.vercel.app](https://toksmart.vercel.app)** (and embedded locally at `http://127.0.0.1:8765`):
 
 ```
        [ 3D WebGL Knowledge Graph ]
@@ -320,49 +210,130 @@ lazytoken dashboard
    [Frameworks]        [Lessons]
 ```
 
-- **Interactive Physics Simulation**: Live 2D force-directed and 3D Three.js cluster visualizer.
-- **Architectural Lineage**: Inspect file dependencies, function definitions, and cross-module imports.
+- **Interactive 2D Canvas & 3D WebGL (Three.js)**: Toggle smoothly between high-performance 2D force simulation and full 3D spatial orbit view.
+- **Node Inspector Toggle**: Click any node to open the inspector with full symbol declarations, callers, and file metadata; click the node again to toggle it closed.
 - **Human Review Center**: Inspect, approve, edit, or reject candidate memory proposals before they become active trusted assets.
-- **Zero Exposure**: Bound strictly to localhost (`127.0.0.1`); no external socket listening.
+- **Zero Exposure**: Bound strictly to loopback (`127.0.0.1:8765`); your code is never transmitted to Vercel or external servers.
+
+---
+
+## 🔌 MCP Integration
+
+TokSmart natively implements the **Model Context Protocol (MCP)** over `stdio` JSON-RPC.
+
+### Cursor / Windsurf (`.cursor/mcp.json` or `~/.codeium/windsurf/mcp_config.json`)
+
+```json
+{
+  "mcpServers": {
+    "toksmart": {
+      "command": "python",
+      "args": ["D:\\LazyToken\\kn.py", "mcp", "--compact-tools"]
+    }
+  }
+}
+```
+
+### Claude Code (`claude_desktop_config.json`)
+
+```json
+{
+  "mcpServers": {
+    "toksmart": {
+      "command": "python",
+      "args": ["D:\\LazyToken\\kn.py", "mcp", "--compact-tools"]
+    }
+  }
+}
+```
+
+### Prompt Pre-Fetching (CLI Pipeline)
+
+Pre-fetch bounded context directly into your prompt without tool-calling overhead:
+
+```powershell
+$project = "D:\Projects\MyApp"
+$task = "Add case-insensitive tag filtering to search"
+
+# Pre-fetch structured, bounded metadata (<350 tokens)
+$brief = python kn.py context --project $project --task $task --budget 350 --expand-assets --prompt
+
+# Pipe directly into Claude CLI or Codex
+$brief | claude
+```
+
+---
+
+## 📊 Empirical Benchmarks
+
+TokSmart adheres to a strict measurement policy: **no cherry-picking, zero unverifiable savings claims, and full transparency on both token reductions and increases.**
+
+In authorized empirical benchmarks using Codex CLI across identical starting repository snapshots:
+
+### 1. Source-Tree Token Savings (Preloaded Approved Lesson Brief)
+
+| Pair / Metric           | Baseline Tokens | TokSmart Brief | Token Delta | Change (%)  |
+| :---------------------- | :-------------: | :------------: | :---------: | :---------: |
+| Pair 1 (Baseline first) |     122,884     |    121,086     |   -1,798    | **-1.46%**  |
+| Pair 2 (Brief first)    |     161,101     |    142,117     |   -18,984   | **-11.78%** |
+| **Combined Total**      |   **283,985**   |  **263,203**   | **-20,782** | **-7.32%**  |
+| _Uncached Source Reads_ |     46,196      |     31,306     |   -14,890   | **-32.23%** |
+
+### 2. Retrieval Quality Benchmark (8 Scenarios)
+
+| Metric                           |  Measured Score  | Evaluation Notes                                                              |
+| :------------------------------- | :--------------: | :---------------------------------------------------------------------------- |
+| **Recall@5**                     |  **1.0 (100%)**  | Correct relevant files retrieved in top ranks across all positive tasks       |
+| **MRR@5 (Mean Reciprocal Rank)** |  **1.0 (100%)**  | Target file appeared at Rank #1 in every retrieval query                      |
+| **NDCG@5**                       |  **1.0 (100%)**  | Perfect ranking discounted cumulative gain                                    |
+| **Abstention Accuracy**          |  **1.0 (100%)**  | Correctly abstains on unrelated or removed-file queries without hallucinating |
+| **Mean Context Payload**         | **177.6 tokens** | Ultra-compact, bounded JSON payload delivery                                  |
+
+### 3. 5-Mode Retrieval Ablation Benchmark
+
+| Mode                                                      | Precision@5 | Recall@5 | MRR@5  | NDCG@5 | Abstention | Tokens (mean) | Net Savings vs Raw |
+| :-------------------------------------------------------- | :---------: | :------: | :----: | :----: | :--------: | :-----------: | :----------------: |
+| **grep_baseline** (Plain disk scan)                       |   0.3500    |  0.8333  | 0.8333 | 0.8005 |   1.0000   |      230      |     **-84.5%**     |
+| **lexical_no_graph** (SQLite FTS alone)                   |   0.3000    |  0.7500  | 0.8750 | 0.7654 |   1.0000   |      361      |     **-75.6%**     |
+| **full_pipeline** (Lexical + Memory + AST Graph + Budget) |   0.3500    |  0.8333  | 1.0000 | 0.8673 |   1.0000   |     1090      |     **-26.4%**     |
 
 ---
 
 ## 💻 CLI Reference
 
-| Command                  | Action      | Description                                                    |
-| :----------------------- | :---------- | :------------------------------------------------------------- |
-| `lazytoken init`         | Setup       | Initialize SQLite storage and index starting repository        |
-| `lazytoken add <PATH>`   | Index       | Select and index an additional local repository                |
-| `lazytoken sync`         | Refresh     | Incrementally index changed files (preserves unchanged hashes) |
-| `lazytoken context`      | Retrieve    | Query task-scoped breadcrumbs within strict `--budget`         |
-| `lazytoken checkpoint`   | Recall      | Restore active session graph topology after context amnesia    |
-| `lazytoken watch status` | Auto-Sync   | Monitor background file watcher and debounce intervals         |
-| `lazytoken doctor`       | Diagnostics | Validate SQLite WAL, runtime, client configs, and health       |
-| `lazytoken dashboard`    | UI          | Launch local 2D/3D interactive graph viewer (`localhost:8765`) |
-| `lazytoken setup`        | Integration | Configure MCP client settings (`--client codex --apply`)       |
-| `lazytoken benchmark`    | Metrics     | Validate and compare token usage across benchmark runs         |
+| Command                   | Action      | Description                                                    |
+| :------------------------ | :---------- | :------------------------------------------------------------- |
+| `python kn.py init`       | Setup       | Initialize SQLite storage and index starting repository        |
+| `python kn.py add <DIR>`  | Index       | Index a local repository into the knowledge graph              |
+| `python kn.py sync`       | Refresh     | Incrementally index changed files (preserves unchanged hashes) |
+| `python kn.py serve`      | UI / Server | Start local loopback server (`http://127.0.0.1:8765`)          |
+| `python kn.py context`    | Retrieve    | Query task-scoped breadcrumbs within strict `--budget`         |
+| `python kn.py checkpoint` | Recall      | Restore active session graph topology after context amnesia    |
+| `python kn.py impact`     | Impact      | Compute AST call-hierarchy and blast radius for a symbol       |
+| `python kn.py doctor`     | Diagnostics | Validate SQLite WAL, runtime, client configs, and health       |
+| `python kn.py setup`      | Integration | Configure MCP client settings (`--client codex --apply`)       |
 
 ---
 
 ## 🧪 Verification & Test Readiness
 
-LazyToken is thoroughly tested across multiple acceptance tiers:
+TokSmart includes a comprehensive test suite:
 
-```powershell
-# 1. Run the core unit, security, and code intelligence suite (256 tests)
+```bash
+# 1. Core unit, security, and AST intelligence suite (256 tests)
 python -m unittest discover -s tests -p "test_*.py"
 
-# 2. Run the end-to-end opaque-box test runner (209 tests)
+# 2. End-to-end multi-tier test runner (209 tests)
 python e2e/runner.py --all
 
-# 3. Check code formatting and style
+# 3. Formatter compliance check
 python -m black --check .
-npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css tests/workspace.test.cjs
+npx --yes prettier@3.4.2 --check web/index.html web/styles.css web/app.js
 ```
 
-- **Core Unit Suite**: **256 discovered tests** (254 passing, 2 platform/environment skips).
-- **End-to-End Suite**: **209 passing tests** across 4 tiers (105 feature coverage, 80 boundary, 16 cross-feature, 8 workload).
-- **Format Verification**: 100% compliant with `black` and `prettier`.
+- **Core Unit Suite**: **256 discovered tests** (254 passing, 2 platform skips).
+- **End-to-End Suite**: **209 passing tests** across 4 tiers.
+- **Code Standards**: 100% compliant with `black` and `prettier`.
 
 ---
 
@@ -370,6 +341,6 @@ npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html sty
 
 **Built for engineers who care about fast, transparent, local-first AI coding memory.**
 
-[Report an Issue](https://github.com/ArshitGupta01/LazyToken/issues) • [View Release Notes](https://github.com/ArshitGupta01/LazyToken/releases) • [Read Policy](POLICY.md)
+[Live Visualizer](https://toksmart.vercel.app) • [Report an Issue](https://github.com/ArshitGupta01/LazyToken/issues) • [View Releases](https://github.com/ArshitGupta01/LazyToken/releases) • [Read Policy](POLICY.md)
 
 </div>
