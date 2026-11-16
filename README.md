@@ -5,6 +5,7 @@
 ### **Local-First AI Coding Memory · AST Graph Intelligence · Zero-Amnesia Context Engine**
 
 _Precision SQLite knowledge graph, deterministic context broker, and active session recall for AI coding agents._
+
 [![Version](https://img.shields.io/badge/version-v0.5.0-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
 [![Unit Tests](https://img.shields.io/badge/unit%20tests-256%20verified-10b981.svg?style=for-the-badge&logo=pytest&logoColor=white)](#-verification--test-readiness)
 [![E2E Tests](https://img.shields.io/badge/e2e%20tests-209%2F209%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
