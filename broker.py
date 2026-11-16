@@ -586,15 +586,16 @@ def task_context(kn, args, conn):
         response["rehydrated"] = True
     if fallback:
         response["tokenizer_fallback"] = fallback
-    response["budget_scope"] = (
-        "compact sorted JSON payload; excludes MCP envelope and provider chat framing"
-    )
-    response["token_accounting"] = token_budget.token_accounting(
-        payload_tokens=0,
-        compact_mcp=compact_mcp,
-        model=args.get("model"),
-        is_approx=is_approx,
-    )
+    if not session or args.get("include_accounting", False):
+        response["budget_scope"] = (
+            "compact sorted JSON payload; excludes MCP envelope and provider chat framing"
+        )
+        response["token_accounting"] = token_budget.token_accounting(
+            payload_tokens=0,
+            compact_mcp=compact_mcp,
+            model=args.get("model"),
+            is_approx=is_approx,
+        )
     if skip:
         if used(response) > budget:
             response.pop("budget_scope", None)
@@ -784,7 +785,8 @@ def task_context(kn, args, conn):
                         if field in raw
                     }
                 )
-                expanded_data = {**fingerprint_data, "crumb": full}
+                full_hash = {k: v for k, v in full.items() if k != "why_this_context"}
+                expanded_data = {**fingerprint_data, "crumb": full_hash}
                 expanded_fingerprint = hashlib.sha256(
                     _encoded(expanded_data).encode("utf-8")
                 ).hexdigest()
@@ -1076,7 +1078,7 @@ def session_checkpoint(kn, args, conn):
     try:
         if sess_row is None:
             conn.execute(
-                "INSERT INTO task_sessions(session_id, project_id, goal, status, source_digest, created_at, updated_at) VALUES(?, ?, ?, 'active', ?, ?, ?)",
+                "INSERT INTO task_sessions(session_id, project_id, goal, status, source_digest, created_at, updated_at) VALUES(?, ?, ?, 'active', ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET updated_at=excluded.updated_at",
                 (session, project, goal, current_source_digest, now, now),
             )
             stored_source_digest = current_source_digest

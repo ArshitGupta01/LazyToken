@@ -214,13 +214,13 @@ class TestTier4Workloads(E2ETestCase):
                 "Turn 1 core/config.py evicted from session",
             )
 
-            # Verification 5: Token compression ratio (>40% reduction vs unoptimized raw source reading)
+            # Verification 5: Token compression ratio (>50% reduction vs unoptimized raw source reading)
             total_session_tokens = sum(r.get("used_tokens", 0) for r in turn_results[:9])
             raw_source_per_turn = kn.estimate("".join(files.values()))
             unoptimized_raw_tokens = raw_source_per_turn * 9
             compression = (unoptimized_raw_tokens - total_session_tokens) / unoptimized_raw_tokens
             self.assertGreaterEqual(
-                compression, 0.40, f"Expected >40% token compression, got: {compression:.2%}"
+                compression, 0.50, f"Expected >50% token compression, got: {compression:.2%}"
             )
 
             # Verification 6: Turn 10 checkpoint graph reconstruction
