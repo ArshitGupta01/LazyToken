@@ -5,6 +5,7 @@
   const DEFAULT_PORT = 8765;
   const POLL_INTERVAL = 3000;
   const STORAGE_KEY = 'lazytoken_connected';
+  const DISCONNECT_KEY = 'lazytoken_disconnected';
 
   function getApiBase() {
     const isLocal =
@@ -23,6 +24,11 @@
   ];
 
   let isConnected = false;
+  let isManuallyDisconnected = false;
+  try {
+    isManuallyDisconnected = localStorage.getItem(DISCONNECT_KEY) === 'true';
+  } catch (e) {}
+
   let consecutiveFailures = 0;
   let pollTimer = null;
   let toastEl = null;
@@ -110,8 +116,100 @@
     });
   }
 
+  function updateConnectCardServerReady(serverAlive) {
+    const step2Indicator = document.getElementById('step-2-indicator');
+    const step2Title = document.getElementById('step-2-title');
+    const listeningBox = document.getElementById('listening-box');
+    const listeningPrimary = document.getElementById('listening-primary');
+    const listeningSecondary = document.getElementById('listening-secondary');
+    const manualBtn = document.getElementById('manual-connect-btn');
+    const step3Row = document.getElementById('step-3');
+    const step3Indicator = document.getElementById('step-3-indicator');
+    const step3Title = document.getElementById('step-3-title');
+    const step3Desc = document.getElementById('step-3-description');
+
+    if (serverAlive) {
+      if (step2Indicator) {
+        step2Indicator.classList.remove('badge-purple');
+        step2Indicator.classList.add('badge-green', 'checked');
+      }
+      if (step2Title) {
+        step2Title.textContent = 'Server available on port ' + DEFAULT_PORT;
+        step2Title.classList.remove('text-white');
+        step2Title.classList.add('text-green');
+      }
+      if (listeningBox) listeningBox.classList.add('connected');
+      if (listeningPrimary) listeningPrimary.textContent = 'Server ready (Disconnected)';
+      if (listeningSecondary)
+        listeningSecondary.textContent = 'Click below to reconnect to your dashboard';
+
+      if (manualBtn) manualBtn.style.display = 'inline-flex';
+
+      if (step3Row) {
+        step3Row.classList.remove('step-muted');
+        step3Row.classList.add('step-connected');
+      }
+      if (step3Indicator) {
+        step3Indicator.classList.remove('badge-muted');
+        step3Indicator.classList.add('badge-purple', 'checked');
+      }
+      if (step3Title) {
+        step3Title.textContent = 'Ready to open graph';
+        step3Title.classList.remove('text-muted');
+        step3Title.classList.add('text-white');
+      }
+      if (step3Desc) {
+        step3Desc.textContent = 'Click "Connect to Dashboard" to view your knowledge graph.';
+      }
+    } else {
+      if (step2Indicator) {
+        step2Indicator.classList.add('badge-purple');
+        step2Indicator.classList.remove('badge-green', 'checked');
+      }
+      if (step2Title) {
+        step2Title.textContent = 'Waiting for server to start';
+        step2Title.classList.add('text-white');
+        step2Title.classList.remove('text-green');
+      }
+      if (listeningBox) listeningBox.classList.remove('connected');
+      if (listeningPrimary) listeningPrimary.textContent = 'Listening for server ...';
+      if (listeningSecondary)
+        listeningSecondary.textContent = 'Will auto-connect when detected on port ' + DEFAULT_PORT;
+
+      if (manualBtn) manualBtn.style.display = 'none';
+
+      if (step3Row) {
+        step3Row.classList.add('step-muted');
+        step3Row.classList.remove('step-connected');
+      }
+      if (step3Indicator) {
+        step3Indicator.classList.add('badge-muted');
+        step3Indicator.classList.remove('badge-green', 'badge-purple', 'checked');
+      }
+      if (step3Title) {
+        step3Title.textContent = 'Opens directly on this website';
+        step3Title.classList.add('text-muted');
+        step3Title.classList.remove('text-white', 'text-green');
+      }
+      if (step3Desc) {
+        step3Desc.textContent =
+          'No new tab or raw localhost needed — the graph visualizer renders right here.';
+      }
+    }
+  }
+
   // --- Server Health Polling ---
-  async function checkServer() {
+  async function checkServer(force = false) {
+    if (isManuallyDisconnected && !force) {
+      try {
+        await Promise.any(ENDPOINTS.map((url) => pingEndpoint(url)));
+        updateConnectCardServerReady(true);
+      } catch {
+        updateConnectCardServerReady(false);
+      }
+      return;
+    }
+
     try {
       const winningUrl = await Promise.any(ENDPOINTS.map((url) => pingEndpoint(url)));
       consecutiveFailures = 0;
@@ -120,15 +218,17 @@
     } catch {
       consecutiveFailures++;
       if (isConnected && consecutiveFailures >= 3) {
-        showToast('Local server disconnected. Reconnecting...');
+        showToast('Local server disconnected. Checking connection...');
       }
     }
   }
 
   function handleServerFound(url) {
     isConnected = true;
+    isManuallyDisconnected = false;
     try {
       localStorage.setItem(STORAGE_KEY, 'true');
+      localStorage.removeItem(DISCONNECT_KEY);
       localStorage.setItem('lazytoken_last_seen', Date.now().toString());
     } catch (e) {}
 
@@ -154,7 +254,7 @@
     }
     if (listeningBox) listeningBox.classList.add('connected');
     if (listeningPrimary) listeningPrimary.textContent = 'Connected to local server';
-    if (listeningSecondary) listeningSecondary.textContent = 'Detected on port 8765';
+    if (listeningSecondary) listeningSecondary.textContent = 'Detected on port ' + DEFAULT_PORT;
 
     const step3Row = document.getElementById('step-3');
     const step3Indicator = document.getElementById('step-3-indicator');
@@ -184,78 +284,68 @@
   }
 
   function handleDisconnect() {
+    isManuallyDisconnected = true;
     isConnected = false;
     try {
+      localStorage.setItem(DISCONNECT_KEY, 'true');
       localStorage.removeItem(STORAGE_KEY);
     } catch (e) {}
 
     document.documentElement.classList.remove('server-connected');
     document.body.classList.remove('server-connected');
 
-    const step2Indicator = document.getElementById('step-2-indicator');
-    const step2Title = document.getElementById('step-2-title');
-    const listeningBox = document.getElementById('listening-box');
-    const listeningPrimary = document.getElementById('listening-primary');
-    const listeningSecondary = document.getElementById('listening-secondary');
-
-    if (step2Indicator) {
-      step2Indicator.classList.add('badge-purple');
-      step2Indicator.classList.remove('badge-green', 'checked');
-    }
-    if (step2Title) {
-      step2Title.textContent = 'Waiting for server to start';
-      step2Title.classList.add('text-white');
-      step2Title.classList.remove('text-green');
-    }
-    if (listeningBox) listeningBox.classList.remove('connected');
-    if (listeningPrimary) listeningPrimary.textContent = 'Listening for server ...';
-    if (listeningSecondary)
-      listeningSecondary.textContent = 'Will auto-connect when detected on port 8765';
-
-    const step3Row = document.getElementById('step-3');
-    const step3Indicator = document.getElementById('step-3-indicator');
-    const step3Title = document.getElementById('step-3-title');
-    const step3Desc = document.getElementById('step-3-description');
-
-    if (step3Row) {
-      step3Row.classList.add('step-muted');
-      step3Row.classList.remove('step-connected');
-    }
-    if (step3Indicator) {
-      step3Indicator.classList.add('badge-muted');
-      step3Indicator.classList.remove('badge-green', 'badge-purple', 'checked');
-    }
-    if (step3Title) {
-      step3Title.textContent = 'Opens directly on this website';
-      step3Title.classList.add('text-muted');
-      step3Title.classList.remove('text-white', 'text-green');
-    }
-    if (step3Desc) {
-      step3Desc.textContent =
-        'No new tab or raw localhost needed — the graph visualizer renders right here.';
-    }
+    updateConnectCardServerReady(true);
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  function handleManualConnect() {
+    isManuallyDisconnected = false;
+    try {
+      localStorage.removeItem(DISCONNECT_KEY);
+      localStorage.setItem(STORAGE_KEY, 'true');
+    } catch (e) {}
+    checkServer(true);
+  }
+
+  function bootstrap() {
     setupCopyButtons();
 
-    const disconnectBtn = document.getElementById('disconnect-btn');
-    if (disconnectBtn) {
-      disconnectBtn.addEventListener('click', handleDisconnect);
-    }
+    // Event delegation on document guarantees button clicks work 100% of the time
+    document.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!target) return;
+      if (target.id === 'disconnect-btn' || target.closest('#disconnect-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleDisconnect();
+      } else if (target.id === 'manual-connect-btn' || target.closest('#manual-connect-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleManualConnect();
+      }
+    });
 
     let wasConnected = false;
     try {
-      wasConnected = localStorage.getItem(STORAGE_KEY) === 'true';
+      wasConnected =
+        localStorage.getItem(STORAGE_KEY) === 'true' &&
+        localStorage.getItem(DISCONNECT_KEY) !== 'true';
     } catch (e) {}
 
     if (wasConnected) {
       handleServerFound('http://127.0.0.1:' + DEFAULT_PORT + '/api/health');
+    } else if (isManuallyDisconnected) {
+      updateConnectCardServerReady(true);
     }
 
     checkServer();
     pollTimer = setInterval(checkServer, POLL_INTERVAL);
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  } else {
+    bootstrap();
+  }
 })();
 
 // --- Interactive Knowledge Graph & Visualizer Dashboard ---
@@ -269,11 +359,16 @@
     runDashboardCode();
   };
 
-  // If already connected on script execution, start immediately
-  if (
-    document.documentElement.classList.contains('server-connected') ||
-    localStorage.getItem('lazytoken_connected') === 'true'
-  ) {
+  // If already connected on script execution and not manually disconnected, start immediately
+  let canAutoStart = false;
+  try {
+    canAutoStart =
+      (document.documentElement.classList.contains('server-connected') ||
+        localStorage.getItem('lazytoken_connected') === 'true') &&
+      localStorage.getItem('lazytoken_disconnected') !== 'true';
+  } catch (e) {}
+
+  if (canAutoStart) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => window.startDashboard());
     } else {
