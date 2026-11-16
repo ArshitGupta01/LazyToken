@@ -27,7 +27,7 @@ from source_index import (
     language_for_file,
 )
 
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 EXTENSIONS = {
     ".kt",
     ".kts",
