@@ -2,6 +2,9 @@ name: Publish TokSmart to npm
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -9,7 +12,7 @@ permissions:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -25,5 +28,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: python e2e/runner.py --all
       - run: node --test tests/workspace.test.cjs
+      - if: github.ref_type == 'tag'
+        run: node -e "if (process.env.GITHUB_REF_NAME !== 'v' + require('./npm/package.json').version) process.exit(1)"
       - run: node npm/stage.cjs "$RUNNER_TEMP/toksmart-package"
       - run: npm publish "$RUNNER_TEMP/toksmart-package" --access public
