@@ -2,6 +2,7 @@ import http.client
 import json
 import sqlite3
 import os
+import shutil
 import tempfile
 import threading
 import unittest
@@ -17,6 +18,20 @@ import kn
 
 
 class LocalReviewTests(unittest.TestCase):
+    def test_deleted_project_is_not_listed_when_it_was_the_only_project(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"KN_HOME": temp}):
+            root = Path(temp) / "project"
+            root.mkdir()
+            (root / "sample.py").write_text("pass\n", encoding="utf-8")
+            db = kn.connect()
+            try:
+                kn.sync(root, db)
+            finally:
+                db.close()
+            self.assertEqual(len(dashboard.read_projects()), 1)
+            shutil.rmtree(root)
+            self.assertEqual(dashboard.read_projects(), [])
+
     def test_client_disconnect_is_quiet_but_server_errors_still_surface(self):
         handler = dashboard.Handler.__new__(dashboard.Handler)
         with patch.object(

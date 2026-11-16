@@ -58,7 +58,7 @@ def read_projects() -> list[dict]:
         ]
         # Filter out deleted temporary folders (e.g. test artifacts) from the visualizer
         existing = [r for r in rows if Path(r["root"]).is_dir()]
-        return existing if existing else rows
+        return existing
     finally:
         conn.close()
 
