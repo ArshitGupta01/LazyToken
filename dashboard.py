@@ -286,7 +286,21 @@ def main() -> None:
             import watcher
 
             watcher.start(kn)
-    server = LocalServer(("127.0.0.1", args.port), Handler)
+    try:
+        server = LocalServer(("127.0.0.1", args.port), Handler)
+    except OSError as err:
+        if (
+            getattr(err, "winerror", None) == 10048
+            or getattr(err, "errno", None) in (48, 98, 10048)
+            or "10048" in str(err)
+        ):
+            url = f"http://127.0.0.1:{args.port}"
+            print(f"LazyToken server is already running on port {args.port}!", flush=True)
+            print(f"Dashboard: {url} (loopback only)", flush=True)
+            if not args.no_browser:
+                threading.Timer(0.2, lambda: webbrowser.open(url)).start()
+            return
+        raise
     url = f"http://127.0.0.1:{server.server_address[1]}"
     print(f"LazyToken dashboard: {url} (loopback only; Ctrl+C to stop)", flush=True)
     if not args.no_browser:
