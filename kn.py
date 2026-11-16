@@ -27,7 +27,7 @@ from source_index import (
     language_for_file,
 )
 
-VERSION = "0.5.3"
+VERSION = "0.5.4"
 EXTENSIONS = {
     ".kt",
     ".kts",
@@ -1677,6 +1677,7 @@ def main() -> None:
     sub.add_parser("evaluate", help="Evaluate retrieval against supplied labels")
     ix = sub.add_parser("sync")
     ix.add_argument("root", nargs="?")
+    sub.add_parser("projects", help="List indexed repositories without changing them")
     sd = sub.add_parser("seed")
     sd.add_argument("root")
     watch = sub.add_parser(
@@ -2075,6 +2076,32 @@ def main() -> None:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         if "error" in result:
             raise SystemExit(1)
+    elif a.cmd == "projects":
+        rows = db.execute(
+            "SELECT p.root,p.updated_at,"
+            "(SELECT count(*) FROM files WHERE project_id=p.id) AS files,"
+            "(SELECT count(*) FROM symbols WHERE project_id=p.id) AS symbols,"
+            "(SELECT count(*) FROM index_errors WHERE project_id=p.id) AS errors "
+            "FROM projects p ORDER BY p.root"
+        ).fetchall()
+        print(
+            json.dumps(
+                {
+                    "projects": [
+                        {
+                            "root": row["root"],
+                            "available": Path(row["root"]).is_dir(),
+                            "files": row["files"],
+                            "symbols": row["symbols"],
+                            "index_errors": row["errors"],
+                            "updated_at": row["updated_at"],
+                        }
+                        for row in rows
+                    ]
+                },
+                indent=2,
+            )
+        )
     elif a.cmd == "sync":
         roots = (
             [Path(a.root)]

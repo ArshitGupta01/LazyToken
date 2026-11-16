@@ -1,6 +1,6 @@
 {
   "name": "toksmart",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Local-first AI coding memory, AST graph intelligence, and zero-amnesia context engine",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/ArshitGupta01/TokSmart.git" },

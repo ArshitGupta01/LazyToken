@@ -9,6 +9,6 @@ node npm/stage.cjs C:\path\to\new-package-directory
 npm pack C:\path\to\new-package-directory
 ```
 
-After the package is published, `npx toksmart serve` (or `npx toksmart dashboard`) starts the local server and connects the browser visualizer at `https://toksmart.vercel.app`, and `npx toksmart --help` lists commands.
+After the package is published, `npx toksmart serve` (or `npx toksmart dashboard`) starts the local server and connects the browser visualizer at `https://toksmart.vercel.app`. Use `npx toksmart add ABSOLUTE_PATH` to index a repository, `npx toksmart projects` to inspect indexed repositories, and `npx toksmart --help` for other commands.
 
 For durable MCP setup, prefer installing a pinned package locally or globally: `npx` can remove its temporary package cache, which would invalidate a configured server path.

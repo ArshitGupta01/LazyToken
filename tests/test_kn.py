@@ -1,3 +1,6 @@
+import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,6 +58,26 @@ class KnowledgeNetworkTests(unittest.TestCase):
         found = kn.search("lookupAccount", self.db)
         self.assertEqual(found["results"][0]["name"], "lookupAccount")
         self.assertNotIn("API_KEY", str(kn.context(str(self.root), self.db)))
+
+    def test_projects_command_lists_only_indexed_repositories(self):
+        with tempfile.TemporaryDirectory() as home:
+            db = kn.connect(Path(home) / "network.sqlite3")
+            try:
+                kn.sync(self.root, db)
+            finally:
+                db.close()
+            result = subprocess.run(
+                [sys.executable, str(Path(kn.__file__)), "projects"],
+                env={**os.environ, "KN_HOME": home},
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            projects = json.loads(result.stdout)["projects"]
+            self.assertEqual(len(projects), 1)
+            self.assertEqual(projects[0]["root"], str(self.root.resolve()))
+            self.assertEqual(projects[0]["files"], 2)
+            self.assertTrue(projects[0]["available"])
 
     def test_updates_and_deletions_are_incremental(self):
         kn.sync(self.root, self.db)

@@ -4,27 +4,28 @@ Commands below use the installed `toksmart` launcher. For source development, us
 
 ## Projects, context and dashboard
 
-| Command                                                                  | Behavior                                                                                                     |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `init [--project ABSOLUTE_PATH]`                                         | Initialize storage and discover clients read-only. Index only an explicitly supplied project. Safe to rerun. |
-| `add ABSOLUTE_PATH`                                                      | Index one explicitly selected existing repository.                                                           |
-| `sync [PATH]`                                                            | Sync one repository, or all previously selected repositories. Missing repositories preserve their indexes.   |
-| `watch [start\|stop\|status\|run]`                                       | Control automatic synchronization. Defaults to status.                                                       |
-| `watch run [--interval SECONDS] [--debounce SECONDS]`                    | Run the worker in the terminal; defaults are 2 seconds and 1 second.                                         |
-| `search QUERY --project PATH`                                            | Search indexed metadata.                                                                                     |
-| `context --project PATH --task TEXT [--budget N] [--session-id ID]`      | Retrieve ranked task context with bounded payload and optional session deduplication.                        |
+| Command                                                                  | Behavior                                                                                                                 |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `init [--project ABSOLUTE_PATH]`                                         | Initialize storage and discover clients read-only. Index only an explicitly supplied project. Safe to rerun.             |
+| `add ABSOLUTE_PATH`                                                      | Index one explicitly selected existing repository.                                                                       |
+| `sync [PATH]`                                                            | Sync one repository, or all previously selected repositories. Missing repositories preserve their indexes.               |
+| `projects`                                                               | List indexed repositories, file and symbol counts, index errors, and folder availability without modifying data.         |
+| `watch [start\|stop\|status\|run]`                                       | Control automatic synchronization. Defaults to status.                                                                   |
+| `watch run [--interval SECONDS] [--debounce SECONDS]`                    | Run the worker in the terminal; defaults are 2 seconds and 1 second.                                                     |
+| `search QUERY --project PATH`                                            | Search indexed metadata.                                                                                                 |
+| `context --project PATH --task TEXT [--budget N] [--session-id ID]`      | Retrieve ranked task context with bounded payload and optional session deduplication.                                    |
 | `context ... --expand-assets`                                            | Include full memory summaries and provenance within the budget; current verified summaries already appear when they fit. |
-| `context ... --model NAME --strict-budget`                               | Require a matching configured offline tokenizer; refuse estimation fallback.                                 |
-| `checkpoint --project PATH --session-id ID`                              | Return a compact reference to the context already supplied.                                                  |
-| `checkpoint --project PATH --session-id ID --acknowledge-source`         | Accept the current indexed source as the session baseline after syncing and reviewing changes.               |
-| `mcp [--compact-tools]`                                                  | Run the local stdio MCP server; compact mode advertises fewer tools.                                        |
-| `context --project PATH --task TEXT --prompt`                             | Output the task and useful bounded metadata as a prompt; does not run an agent.                              |
-| `setup --project PATH [--client codex] [--client antigravity] [--apply]` | Preview or apply indexing and optional client registration.                                                  |
-| `setup --test-connection`                                                | Verify local MCP initialization and tool discovery.                                                           |
-| `setup --rollback RECEIPT`                                               | Restore unchanged managed configuration from its verified backup. Refuse newer edits.                        |
-| `doctor [--format json\|text\|table]`                                    | Check runtime, package integrity, storage, SQLite, clients, watcher and dashboard port. JSON is the default. |
-| `dashboard [--port N] [--no-browser]`                                    | Run the loopback-only 2D/3D graph; 3D loads on demand.                                                       |
-| `serve [--port N] [--no-browser]`                                        | Start the local server and connect the browser interface.                                                    |
+| `context ... --model NAME --strict-budget`                               | Require a matching configured offline tokenizer; refuse estimation fallback.                                             |
+| `checkpoint --project PATH --session-id ID`                              | Return a compact reference to the context already supplied.                                                              |
+| `checkpoint --project PATH --session-id ID --acknowledge-source`         | Accept the current indexed source as the session baseline after syncing and reviewing changes.                           |
+| `mcp [--compact-tools]`                                                  | Run the local stdio MCP server; compact mode advertises fewer tools.                                                     |
+| `context --project PATH --task TEXT --prompt`                            | Output the task and useful bounded metadata as a prompt; does not run an agent.                                          |
+| `setup --project PATH [--client codex] [--client antigravity] [--apply]` | Preview or apply indexing and optional client registration.                                                              |
+| `setup --test-connection`                                                | Verify local MCP initialization and tool discovery.                                                                      |
+| `setup --rollback RECEIPT`                                               | Restore unchanged managed configuration from its verified backup. Refuse newer edits.                                    |
+| `doctor [--format json\|text\|table]`                                    | Check runtime, package integrity, storage, SQLite, clients, watcher and dashboard port. JSON is the default.             |
+| `dashboard [--port N] [--no-browser]`                                    | Run the loopback-only 2D/3D graph; 3D loads on demand.                                                                   |
+| `serve [--port N] [--no-browser]`                                        | Start the local server and connect the browser interface.                                                                |
 
 The offline tokenizer is configured with `LAZYTOKEN_TOKENIZER_MODEL` and `LAZYTOKEN_TOKENIZER_FILE`. The operator must select a tokenizer matching the requested model. No tokenizer is downloaded automatically. Budgets cover the compact JSON payload, excluding transport/provider framing.
 
