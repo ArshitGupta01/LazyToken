@@ -1641,7 +1641,9 @@ def main() -> None:
     )
     impact_cmd.add_argument("--project", default="")
     for cmd_name in ("toksmart", "repomind", "lazytoken"):
-        lt = sub.add_parser(cmd_name, help=f"Run a {cmd_name.capitalize()} action with JSON arguments")
+        lt = sub.add_parser(
+            cmd_name, help=f"Run a {cmd_name.capitalize()} action with JSON arguments"
+        )
         lt.add_argument(
             "action",
             choices=[

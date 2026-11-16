@@ -105,14 +105,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "Invalid host"}, 403)
         parsed = urlparse(self.path)
         if parsed.path in ("/api/health", "/api/ping"):
-            return self._json({
-                "status": "ok",
-                "service": "toksmart",
-                "name": "TokSmart",
-                "legacy_service": "lazytoken",
-                "version": kn.VERSION,
-                "port": self.server.server_port,
-            })
+            return self._json(
+                {
+                    "status": "ok",
+                    "service": "toksmart",
+                    "name": "TokSmart",
+                    "legacy_service": "lazytoken",
+                    "version": kn.VERSION,
+                    "port": self.server.server_port,
+                }
+            )
         if parsed.path == "/api/session":
             return self._json({"token": self.server.review_token})
         if parsed.path.startswith("/api/session/"):
@@ -251,9 +253,7 @@ class Handler(BaseHTTPRequestHandler):
             or self.headers.get("X-RepoMind-Review", "")
             or self.headers.get("X-LazyToken-Review", "")
         )
-        if not origin_valid or not secrets.compare_digest(
-            review_token, self.server.review_token
-        ):
+        if not origin_valid or not secrets.compare_digest(review_token, self.server.review_token):
             return self._json({"error": "Invalid review request"}, 403)
         if self.headers.get_content_type() != "application/json":
             return self._json({"error": "JSON required"}, 415)
