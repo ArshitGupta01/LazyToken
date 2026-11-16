@@ -230,7 +230,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "Invalid host"}, 403)
         if self.path != "/api/review":
             return self._json({"error": "Not found"}, 404)
-        if self.headers.get("Origin") != f"http://{host}" or not secrets.compare_digest(
+        origin = self.headers.get("Origin", "")
+        allowed_origins = {
+            f"http://{host}",
+            f"http://127.0.0.1:{self.server.server_port}",
+            f"http://localhost:{self.server.server_port}",
+            "https://lazytoken-steel.vercel.app",
+        }
+        origin_valid = origin in allowed_origins or origin.endswith(".vercel.app")
+        if not origin_valid or not secrets.compare_digest(
             self.headers.get("X-LazyToken-Review", ""), self.server.review_token
         ):
             return self._json({"error": "Invalid review request"}, 403)

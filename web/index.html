@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0c0d16" />
+    <meta name="theme-color" content="#050913" />
     <meta
       name="description"
-      content="Start your LazyToken local server and connect automatically in the browser."
+      content="Local-first AI coding memory, context & interactive 2D/3D knowledge graph visualizer."
     />
-    <title>LazyToken · Start your local server</title>
+    <title>LazyToken · Knowledge graph</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -24,9 +24,11 @@
       } catch (e) {}
     </script>
     <script src="app.js" defer></script>
+    <script src="features-ui.js" defer></script>
   </head>
   <body>
-    <div class="page-container">
+    <!-- Connection Screen (shown when local server is not running) -->
+    <div class="page-container" id="connect-screen">
       <main class="connect-card" role="region" aria-label="Start your local server">
         <header class="card-header">
           <div class="brand-badge">
@@ -37,7 +39,7 @@
           </div>
           <h1 class="card-title">Start your local server</h1>
           <p class="card-subtitle">
-            One command is all it takes. The browser connects automatically.
+            One command is all it takes. The knowledge graph opens right here automatically.
           </p>
         </header>
 
@@ -222,7 +224,7 @@
                     Listening for server ...
                   </div>
                   <div class="listening-secondary" id="listening-secondary">
-                    Will auto-connect when detected
+                    Will auto-connect when detected on port 8765
                   </div>
                 </div>
               </div>
@@ -255,22 +257,13 @@
             <div class="step-main">
               <div class="step-heading">
                 <span class="step-label text-muted" id="step-3-title"
-                  >Auto-connects and opens the graph</span
+                  >Opens directly on this website</span
                 >
               </div>
               <p class="step-description" id="step-3-description">
-                No refresh needed — the page detects the server automatically.
+                No new tab or raw localhost needed — the graph visualizer renders right here.
               </p>
               <div class="action-fallback" id="action-fallback">
-                <a
-                  href="http://127.0.0.1:8765/"
-                  class="launch-btn"
-                  id="launch-btn"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  Open Graph Dashboard ↗
-                </a>
                 <span class="status-tip" id="status-tip"></span>
               </div>
             </div>
@@ -302,5 +295,247 @@
         </footer>
       </main>
     </div>
+
+    <!-- Main Dashboard Application Shell -->
+    <div class="app-shell" id="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="LazyToken home">
+          <span class="brand-mark"><i></i><i></i><i></i></span>
+          <span>LazyToken</span>
+        </a>
+        <span class="brand-subtitle">Local-first AI coding memory &amp; context</span>
+        <nav class="topnav" aria-label="Main navigation">
+          <button class="active" data-workspace-view="graph" aria-label="Graph">
+            ◈ <span>Graph</span>
+          </button>
+          <button data-workspace-view="proposals" aria-label="Memory">▤ <span>Memory</span></button>
+          <button data-workspace-view="search" aria-label="Search">⌕ <span>Search</span></button>
+          <button data-workspace-view="benchmark_list" aria-label="Benchmarks">
+            ▥ <span>Benchmarks</span>
+          </button>
+        </nav>
+        <div
+          class="header-meta"
+          id="header-server-status"
+          title="Connected to local server at 127.0.0.1:8765"
+        >
+          <span class="live-dot"></span> <span id="header-port-label">127.0.0.1:8765</span>
+        </div>
+        <button
+          id="disconnect-btn"
+          class="header-disconnect-btn"
+          title="Disconnect and show connection screen"
+        >
+          Disconnect
+        </button>
+        <button id="refresh" class="icon-button" title="Refresh graph" aria-label="Refresh graph">
+          ↻
+        </button>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar">
+          <div class="panel-heading">
+            <span class="panel-icon">⏚</span><strong>Explorer filters</strong>
+          </div>
+          <div class="section-head"><span>PROJECT SCOPE</span></div>
+          <div class="scope-tabs">
+            <button class="scope" data-project="@workspace">◈ &nbsp; All projects</button>
+            <button class="scope active" data-project="">◈ &nbsp; Shared graph</button>
+            <select id="project" aria-label="Select a project">
+              <option value="">Choose a project…</option>
+            </select>
+          </div>
+          <div class="section-head kind-heading">
+            <span>NODE TYPE</span><button id="clear-filters" class="text-button">Reset</button>
+          </div>
+          <div id="filters" class="filters"></div>
+          <label class="section-head" for="node-jump">FIND A NODE</label>
+          <select id="node-jump" class="health-filter" aria-label="Inspect any visible graph node">
+            <option value="">Choose a node…</option>
+          </select>
+          <label class="section-head" for="health-filter">MEMORY STATUS</label>
+          <select id="health-filter" class="health-filter">
+            <option value="all">All knowledge</option>
+            <option value="verified">Verified and current</option>
+            <option value="stale">Needs revalidation</option>
+            <option value="unverified">Unverified</option>
+          </select>
+          <button id="workspace-open" class="workspace-open">
+            Knowledge workspace <span>↗</span>
+          </button>
+          <div class="sidebar-foot">
+            <div class="scope-note">
+              <span class="shield">◈</span>
+              <span>Project relationships stay scoped to their source.</span>
+            </div>
+            <span class="local-tag"><i></i> PRIVATE · ON THIS DEVICE</span>
+          </div>
+        </aside>
+
+        <section class="graph-area" aria-label="Interactive knowledge graph">
+          <div class="graph-topline">
+            <div class="graph-title">
+              <div class="eyebrow">
+                <span class="panel-icon">✣</span>
+                <span id="graph-mode-label">2D RELATIONSHIP MAP</span>
+              </div>
+              <h1>Knowledge graph</h1>
+              <span id="scope-label" class="scope-label">Shared knowledge</span>
+            </div>
+            <label class="searchbox">
+              <span>⌕</span>
+              <input
+                id="search"
+                placeholder="Search knowledge, decisions, technologies…"
+                autocomplete="off"
+                aria-label="Search graph"
+              />
+              <kbd>/</kbd>
+            </label>
+            <div class="graph-actions">
+              <div class="view-toggle" aria-label="Graph view">
+                <button id="view-2d" class="active" aria-pressed="true">2D</button>
+                <button id="view-3d" aria-pressed="false">◇ 3D</button>
+              </div>
+              <button id="fit" class="small-button">FIT <span>⌖</span></button>
+              <button id="zoom-out" class="round-button" aria-label="Zoom out">−</button>
+              <button id="zoom-in" class="round-button" aria-label="Zoom in">+</button>
+            </div>
+          </div>
+
+          <div class="canvas-wrap">
+            <canvas
+              id="graph"
+              tabindex="0"
+              aria-label="2D knowledge graph. Use arrow keys to inspect nodes; Enter to focus."
+              aria-describedby="graph-keyboard-help"
+            ></canvas>
+            <div id="webgl-host" class="webgl-host" hidden></div>
+            <div id="loading" class="loading">
+              <span class="loader"></span>Connecting to local graph…
+            </div>
+            <div id="empty" class="empty" hidden>
+              <b>No matching knowledge yet</b>
+              <span>Try another search or switch project scope.</span>
+            </div>
+            <div id="edge-note" class="edge-note" role="status" hidden></div>
+            <span id="graph-keyboard-help" class="sr-only">
+              Arrow keys cycle through visible nodes. Enter focuses the selected node. Use the node
+              inspector to read its relationships and evidence.
+            </span>
+            <div id="canvas-hint" class="canvas-hint">DRAG TO EXPLORE · SCROLL TO ZOOM</div>
+            <div id="tooltip" class="tooltip" hidden></div>
+          </div>
+
+          <footer class="graph-footer">
+            <div class="stat"><strong id="node-count">—</strong><span>NODES</span></div>
+            <div class="stat"><strong id="edge-count">—</strong><span>RELATIONSHIPS</span></div>
+            <div class="stat wide">
+              <strong id="evidence-count">—</strong><span>EVIDENCE LINKS</span>
+            </div>
+            <div class="legend">
+              <i class="legend-line"></i> relationship <i class="legend-node"></i> asset
+            </div>
+          </footer>
+
+          <div class="analytics">
+            <div class="analytics-heading">
+              <span class="panel-icon">▥</span>
+              <strong>Network overview</strong>
+              <span>Live local data</span>
+            </div>
+            <div class="analytics-grid">
+              <div class="metric-card">
+                <span>Knowledge assets</span>
+                <strong id="analytics-nodes">—</strong>
+                <small>in this view</small>
+              </div>
+              <div class="metric-card">
+                <span>Connections</span>
+                <strong id="analytics-edges">—</strong>
+                <small>in this view</small>
+              </div>
+              <div class="metric-card">
+                <span>Evidence links</span>
+                <strong id="analytics-evidence">—</strong>
+                <small>with recorded evidence</small>
+              </div>
+              <div class="metric-card">
+                <span>Token savings</span>
+                <strong id="analytics-bench" class="metric-empty">Not measured</strong>
+                <small id="analytics-bench-note">No benchmark records yet</small>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside id="inspector" class="inspector">
+          <div class="panel-heading">
+            <span class="panel-icon">◇</span><strong>Node inspector</strong>
+            <button
+              id="inspector-minimize"
+              class="icon-button inspector-minimize"
+              type="button"
+              aria-label="Minimize node inspector"
+              title="Minimize node inspector"
+              aria-controls="inspector"
+            >
+              −
+            </button>
+          </div>
+          <div class="inspector-empty">
+            <span class="inspect-orbit">✣</span>
+            <div class="eyebrow">EXPLORE THE NETWORK</div>
+            <h2>Select a node<br />to inspect it.</h2>
+            <p>See its summary, relationships, and the evidence behind them.</p>
+          </div>
+          <div
+            id="detail"
+            role="region"
+            aria-label="Selected node details"
+            aria-live="polite"
+            hidden
+          ></div>
+        </aside>
+      </main>
+
+      <button
+        id="inspector-restore"
+        class="inspector-restore"
+        type="button"
+        aria-label="Restore node inspector"
+        aria-controls="inspector"
+        aria-expanded="false"
+        hidden
+      >
+        <span aria-hidden="true">◇</span> Node inspector <span aria-hidden="true">↗</span>
+      </button>
+    </div>
+
+    <!-- Knowledge Workspace Section -->
+    <section
+      id="knowledge-workspace"
+      class="knowledge-workspace"
+      hidden
+      aria-label="Knowledge workspace"
+    >
+      <header>
+        <div>
+          <span class="eyebrow">LAZYTOKEN</span>
+          <h2>Knowledge workspace</h2>
+        </div>
+        <button id="workspace-close" aria-label="Close workspace">✕</button>
+      </header>
+      <nav class="workspace-nav" aria-label="Workspace sections">
+        <button data-view="search">Search</button>
+        <button data-view="proposals">Memory review</button>
+        <button data-view="benchmark_list">Benchmarks</button>
+        <button data-view="dependencies">Dependencies</button>
+        <button data-view="discover">Patterns</button>
+      </nav>
+      <p id="workspace-scope" class="workspace-scope"></p>
+      <div id="workspace-body" class="workspace-body"></div>
+    </section>
   </body>
 </html>
