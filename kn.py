@@ -554,9 +554,14 @@ def sync(
         return {"error": "Repository is unavailable; the previous index was preserved."}
     original = Path(os.path.abspath(root))
     root = original.resolve()
-    if (
-        root != original
-        and conn.execute("SELECT 1 FROM projects WHERE id=?", (str(original),)).fetchone()
+    orig_long = str(original.parent.resolve() / original.name)
+    if (root != Path(orig_long) or original.is_symlink()) and (
+        conn.execute(
+            "SELECT 1 FROM projects WHERE id=? OR root=?", (str(original), str(original))
+        ).fetchone()
+        or conn.execute(
+            "SELECT 1 FROM projects WHERE id=? OR root=?", (orig_long, orig_long)
+        ).fetchone()
     ):
         return {"error": "Indexed project path changed through a link; previous index preserved."}
     project = str(root)

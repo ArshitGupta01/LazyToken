@@ -6,12 +6,18 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import kn
-from legacy_seed_fixture import seed_fixture
+
+try:
+    from legacy_seed_fixture import seed_fixture
+except ImportError:
+    from tests.legacy_seed_fixture import seed_fixture
 
 
 def legacy_asset(args, conn):
     project = args.get("project", "")
     scope = args.get("scope", "global")
+    if project:
+        project = kn.resolve_project(project, conn) or str(Path(project).resolve())
     cur = conn.execute(
         "INSERT INTO assets(kind,name,summary,tags,source,created_at,scope,project_id) VALUES(?,?,?,'','',0,?,?)",
         (args["kind"], args["name"], args["summary"], scope, project),
