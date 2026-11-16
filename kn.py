@@ -899,7 +899,6 @@ def search(
     terms = list(dict.fromkeys(terms))[:8]
     if not terms:
         return {"query": query, "results": []}
-    like = "%" + "%".join(terms[:3]) + "%"
     requested_project = project
     project = resolve_project(project, conn) if project else ""
     if requested_project and not project:
@@ -935,21 +934,28 @@ def search(
                 "match_score": round(score, 2),
             }
         )
+    asset_match = " OR ".join("lower(name||' '||summary||' '||tags) LIKE ?" for _ in terms)
+    asset_terms = tuple("%" + term + "%" for term in terms)
     if project:
         arows = conn.execute(
-            "SELECT id,kind,name,summary,tags,source FROM assets WHERE (scope='global' OR (scope='project' AND project_id=?)) AND lower(name||' '||summary||' '||tags) LIKE ? ORDER BY name LIMIT ?",
-            (project, like, limit),
+            f"SELECT id,kind,name,summary,tags,source FROM assets WHERE (scope='global' OR (scope='project' AND project_id=?)) AND ({asset_match})",
+            (project, *asset_terms),
         ).fetchall()
         edge_scope = "(scope='*' OR scope=?)"
         edge_args = (project,)
     else:
         arows = conn.execute(
-            "SELECT id,kind,name,summary,tags,source FROM assets WHERE scope='global' AND lower(name||' '||summary||' '||tags) LIKE ? ORDER BY name LIMIT ?",
-            (like, limit),
+            f"SELECT id,kind,name,summary,tags,source FROM assets WHERE scope='global' AND ({asset_match})",
+            asset_terms,
         ).fetchall()
         edge_scope = "scope='*'"
         edge_args = ()
-    activation: dict[int, float] = {int(r["id"]): 1.0 for r in arows}
+    activation: dict[int, float] = {
+        int(r["id"]): len(set(terms) & search_words(" ".join((r["name"], r["summary"], r["tags"]))))
+        / len(terms)
+        for r in arows
+    }
+    activation = {asset_id: score for asset_id, score in activation.items() if score}
     activation = {
         asset_id: score
         for asset_id, score in activation.items()
@@ -1257,9 +1263,18 @@ def get_master_graph(
     total_nodes = conn.execute(f"SELECT count(*) FROM assets WHERE {condition}", values).fetchone()[
         0
     ]
+    edge_scope = "e.scope='*'"
+    edge_values = ()
+    if workspace:
+        edge_scope = "(e.scope='*' OR e.scope IN (SELECT id FROM projects))"
+    elif project_id:
+        edge_scope = "(e.scope='*' OR e.scope=?)"
+        edge_values = (project_id,)
     nodes = conn.execute(
-        f"SELECT id,kind,name,summary,tags,source,scope,project_id FROM assets WHERE {condition} ORDER BY kind,name LIMIT ?",
-        (*values, limit),
+        f"SELECT id,kind,name,summary,tags,source,scope,project_id FROM assets WHERE {condition} "
+        f"ORDER BY CASE WHEN EXISTS (SELECT 1 FROM asset_link_evidence e WHERE {edge_scope} "
+        "AND (e.source_id=assets.id OR e.target_id=assets.id)) THEN 0 ELSE 1 END, kind,name LIMIT ?",
+        (*values, *edge_values, limit),
     ).fetchall()
     ids = {int(n["id"]) for n in nodes}
     edges = []

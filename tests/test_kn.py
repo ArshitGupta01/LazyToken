@@ -251,6 +251,40 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["type"], "asset")
         self.assertGreaterEqual(result["estimated_tokens"], 1)
 
+    def test_memory_search_matches_terms_in_any_order_and_ranks_full_match_first(self):
+        legacy_asset(
+            {"kind": "lesson", "name": "Session timeout", "summary": "Expire old sessions"},
+            self.db,
+        )
+        legacy_asset(
+            {"kind": "lesson", "name": "Session logging", "summary": "Record events"},
+            self.db,
+        )
+        results = kn.search("timeout session", self.db)["results"]
+        self.assertEqual(
+            [item["name"] for item in results[:2]], ["Session timeout", "Session logging"]
+        )
+        self.assertGreater(results[0]["activation"], results[1]["activation"])
+        self.assertEqual(kn.search("billing invoice", self.db)["results"], [])
+
+    def test_bounded_graph_keeps_connected_nodes_before_isolated_nodes(self):
+        for name in ("A isolated", "B isolated", "Y linked", "Z linked"):
+            legacy_asset({"kind": "lesson", "name": name, "summary": ""}, self.db)
+        linked = kn.link_assets(
+            {
+                "source": "Y linked",
+                "target": "Z linked",
+                "relation": "uses",
+                "evidence": "Verified test relation",
+                "project": "*",
+            },
+            self.db,
+        )
+        self.assertTrue(linked["linked"])
+        graph = kn.get_master_graph(self.db, limit=2)
+        self.assertEqual({node["name"] for node in graph["nodes"]}, {"Y linked", "Z linked"})
+        self.assertEqual(graph["edge_count"], 1)
+
     def test_seeded_master_asset_links_to_project(self):
         kn.sync(self.root, self.db)
         seeded = seed_fixture(self.root, self.db)
