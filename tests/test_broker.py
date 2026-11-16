@@ -35,6 +35,18 @@ class ContextBrokerTests(unittest.TestCase):
             self.db,
         )
 
+    def test_retrieval_keeps_late_paths_and_unicode_terms(self):
+        import features
+
+        (self.root / "billing.py").write_text("def invoice(): pass\n", encoding="utf-8")
+        (self.root / "ÉCOLE.py").write_text("def chercher(): pass\n", encoding="utf-8")
+        kn.sync(self.root, self.db)
+        query = "please investigate and correct the underlying behavior described above carefully ensuring proper functionality in billing.py"
+        results = features.ranked_search(kn, {"project": self.project, "query": query}, self.db)
+        self.assertTrue(any(row.get("path") == "billing.py" for row in results["results"]))
+        results = features.ranked_search(kn, {"project": self.project, "query": "école"}, self.db)
+        self.assertTrue(any(row.get("path") == "ÉCOLE.py" for row in results["results"]))
+
     def test_budget_explanation_and_session_dedup(self):
         first = self.call(session_id="session-1", budget=500)
         self.assertEqual(first["decision"], "retrieve")

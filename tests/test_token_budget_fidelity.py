@@ -15,27 +15,31 @@ import token_budget
 import mcp_schema
 
 
+def expected_schema_tokens(compact):
+    return len(json.dumps(mcp_schema.mcp_tools(compact=compact))) // 4
+
+
 class TestMcpSchemaOverhead(unittest.TestCase):
     """Verifies MCP schema overhead token estimation."""
 
     def test_mcp_schema_overhead_full_default(self):
-        """Full schema overhead without arguments returns ~2,371 tokens."""
+        """Full schema overhead reflects the current catalog."""
         val = token_budget.mcp_schema_overhead()
         self.assertIsInstance(val, int)
-        self.assertEqual(val, 2371)
-        expected = len(json.dumps(mcp_schema.mcp_tools(compact=False))) // 4
+        expected = expected_schema_tokens(False)
         self.assertEqual(val, expected)
 
     def test_mcp_schema_overhead_full_explicit(self):
-        """Full schema overhead with compact=False returns 2,371 tokens."""
-        self.assertEqual(token_budget.mcp_schema_overhead(compact=False), 2371)
+        """Full schema overhead with compact=False uses the current catalog."""
+        self.assertEqual(
+            token_budget.mcp_schema_overhead(compact=False), expected_schema_tokens(False)
+        )
 
     def test_mcp_schema_overhead_compact(self):
-        """Compact schema overhead with compact=True returns ~713 tokens."""
+        """Compact schema overhead reflects the current catalog."""
         val = token_budget.mcp_schema_overhead(compact=True)
         self.assertIsInstance(val, int)
-        self.assertEqual(val, 713)
-        expected = len(json.dumps(mcp_schema.mcp_tools(compact=True))) // 4
+        expected = expected_schema_tokens(True)
         self.assertEqual(val, expected)
 
     def test_mcp_schema_overhead_savings_ratio(self):
@@ -92,9 +96,11 @@ class TestTokenAccounting(unittest.TestCase):
         """Arithmetic check with full MCP schema."""
         acct = token_budget.token_accounting(payload_tokens=200, compact_mcp=False, is_approx=True)
         self.assertEqual(acct["payload_tokens"], 200)
-        self.assertEqual(acct["mcp_schema_overhead_tokens"], 2371)
+        self.assertEqual(acct["mcp_schema_overhead_tokens"], expected_schema_tokens(False))
         self.assertEqual(acct["chat_framing_overhead_tokens"], 25)
-        self.assertEqual(acct["total_context_footprint_tokens"], 200 + 2371 + 25)
+        self.assertEqual(
+            acct["total_context_footprint_tokens"], 200 + expected_schema_tokens(False) + 25
+        )
         self.assertTrue(acct["is_approximate"])
         self.assertEqual(acct["fidelity"], "approximate_chars_div_4")
         self.assertIn("approximate", acct["estimation_note"].lower())
@@ -103,9 +109,11 @@ class TestTokenAccounting(unittest.TestCase):
         """Arithmetic check with compact MCP schema."""
         acct = token_budget.token_accounting(payload_tokens=100, compact_mcp=True, is_approx=True)
         self.assertEqual(acct["payload_tokens"], 100)
-        self.assertEqual(acct["mcp_schema_overhead_tokens"], 713)
+        self.assertEqual(acct["mcp_schema_overhead_tokens"], expected_schema_tokens(True))
         self.assertEqual(acct["chat_framing_overhead_tokens"], 25)
-        self.assertEqual(acct["total_context_footprint_tokens"], 100 + 713 + 25)
+        self.assertEqual(
+            acct["total_context_footprint_tokens"], 100 + expected_schema_tokens(True) + 25
+        )
 
     def test_token_accounting_exact_tokenizer_mode(self):
         """Accounting reflects exact tokenizer fidelity when is_approx=False."""
@@ -115,6 +123,7 @@ class TestTokenAccounting(unittest.TestCase):
         self.assertFalse(acct["is_approximate"])
         self.assertEqual(acct["fidelity"], "exact_offline_tokenizer")
         self.assertNotIn("chars/4", acct["estimation_note"])
+        self.assertTrue(acct["total_is_approximate"])
 
     def test_token_accounting_zero_and_negative_clamp(self):
         """Negative payload and negative turns clamp cleanly to 0."""
@@ -123,8 +132,8 @@ class TestTokenAccounting(unittest.TestCase):
         )
         self.assertEqual(acct["payload_tokens"], 0)
         self.assertEqual(acct["chat_framing_overhead_tokens"], 0)
-        self.assertEqual(acct["mcp_schema_overhead_tokens"], 713)
-        self.assertEqual(acct["total_context_footprint_tokens"], 713)
+        self.assertEqual(acct["mcp_schema_overhead_tokens"], expected_schema_tokens(True))
+        self.assertEqual(acct["total_context_footprint_tokens"], expected_schema_tokens(True))
 
     def test_token_accounting_huge_token_footprint(self):
         """Context footprint exceeding 1,000,000 tokens tracked without precision loss."""
@@ -132,9 +141,11 @@ class TestTokenAccounting(unittest.TestCase):
             payload_tokens=1000000, compact_mcp=False, is_approx=True, turns=4
         )
         self.assertEqual(acct["payload_tokens"], 1000000)
-        self.assertEqual(acct["mcp_schema_overhead_tokens"], 2371)
+        self.assertEqual(acct["mcp_schema_overhead_tokens"], expected_schema_tokens(False))
         self.assertEqual(acct["chat_framing_overhead_tokens"], 100)
-        self.assertEqual(acct["total_context_footprint_tokens"], 1002471)
+        self.assertEqual(
+            acct["total_context_footprint_tokens"], 1000000 + expected_schema_tokens(False) + 100
+        )
 
 
 class TestCounterBackwardsCompatibility(unittest.TestCase):
@@ -275,12 +286,13 @@ class TestBrokerTaskContextFidelityIntegration(unittest.TestCase):
         self.assertIn("token_accounting", res)
         acct = res["token_accounting"]
         self.assertEqual(acct["payload_tokens"], res["used_tokens"])
-        self.assertEqual(acct["mcp_schema_overhead_tokens"], 2371)
+        self.assertIsNone(acct["mcp_schema_overhead_tokens"])
         self.assertEqual(acct["chat_framing_overhead_tokens"], 25)
-        self.assertEqual(acct["total_context_footprint_tokens"], res["used_tokens"] + 2371 + 25)
+        self.assertIsNone(acct["total_context_footprint_tokens"])
+        self.assertTrue(acct["total_is_approximate"])
 
     def test_task_context_compact_mcp_option(self):
-        """compact_mcp: True scales schema overhead down to ~713 tokens."""
+        """compact_mcp: True uses the compact schema estimate."""
         res = broker.task_context(
             kn,
             {
@@ -294,8 +306,11 @@ class TestBrokerTaskContextFidelityIntegration(unittest.TestCase):
         )
         self.assertNotIn("error", res)
         acct = res["token_accounting"]
-        self.assertEqual(acct["mcp_schema_overhead_tokens"], 713)
-        self.assertEqual(acct["total_context_footprint_tokens"], res["used_tokens"] + 713 + 25)
+        self.assertEqual(acct["mcp_schema_overhead_tokens"], expected_schema_tokens(True))
+        self.assertEqual(
+            acct["total_context_footprint_tokens"],
+            res["used_tokens"] + expected_schema_tokens(True) + 25,
+        )
 
     def test_task_context_skip_includes_token_accounting(self):
         """Skip retrieval branch includes token_accounting and approximation flag."""

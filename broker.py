@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import posixpath
+import re
 import sqlite3
 import sys
 import time
@@ -447,8 +448,12 @@ def classify_retrieval_need(
         "summarize this text",
         "summarise this text",
     )
-    if any(p in t for p in formatting_patterns) and not any(
-        k in t for k in ("in repo", "in file", "in project", "across", "caller", "import")
+    if (
+        any(p in t for p in formatting_patterns)
+        and not re.search(r"[\w-]+\.[\w-]+|[/\\]", t)
+        and not any(
+            k in t for k in ("in repo", "in file", "in project", "across", "caller", "import")
+        )
     ):
         return (
             "skip",
@@ -514,7 +519,9 @@ def task_context(kn, args, conn):
     is_approx = getattr(
         counter_result, "is_approximate", not str(budget_type).startswith("tokenizer:")
     )
-    compact_mcp = (mode == "compact") or bool(args.get("compact_mcp", False))
+    compact_mcp = args.get("compact_mcp")
+    if compact_mcp is not None and not isinstance(compact_mcp, bool):
+        return {"error": "compact_mcp must be boolean."}
 
     def used(response):
         # Count the final compact payload, including the usage counters themselves.
@@ -528,9 +535,13 @@ def task_context(kn, args, conn):
                 if "token_accounting" in response:
                     response["token_accounting"]["payload_tokens"] = response["used_tokens"]
                     response["token_accounting"]["total_context_footprint_tokens"] = (
-                        response["used_tokens"]
-                        + response["token_accounting"]["mcp_schema_overhead_tokens"]
-                        + response["token_accounting"]["chat_framing_overhead_tokens"]
+                        None
+                        if response["token_accounting"]["mcp_schema_overhead_tokens"] is None
+                        else (
+                            response["used_tokens"]
+                            + response["token_accounting"]["mcp_schema_overhead_tokens"]
+                            + response["token_accounting"]["chat_framing_overhead_tokens"]
+                        )
                     )
                 return response["used_tokens"]
             response["estimated_tokens"] = max(response["estimated_tokens"], estimated)
@@ -538,9 +549,13 @@ def task_context(kn, args, conn):
             if "token_accounting" in response:
                 response["token_accounting"]["payload_tokens"] = response["used_tokens"]
                 response["token_accounting"]["total_context_footprint_tokens"] = (
-                    response["used_tokens"]
-                    + response["token_accounting"]["mcp_schema_overhead_tokens"]
-                    + response["token_accounting"]["chat_framing_overhead_tokens"]
+                    None
+                    if response["token_accounting"]["mcp_schema_overhead_tokens"] is None
+                    else (
+                        response["used_tokens"]
+                        + response["token_accounting"]["mcp_schema_overhead_tokens"]
+                        + response["token_accounting"]["chat_framing_overhead_tokens"]
+                    )
                 )
         raise ValueError("Unable to stabilize payload accounting.")
 
@@ -935,10 +950,29 @@ def clear_session(kn, args, conn):
     session = args.get("session_id")
     if not project or not isinstance(session, str) or not session.strip() or len(session) > 120:
         return {"error": "An indexed project and session_id are required."}
-    count = conn.execute(
-        "DELETE FROM context_session_items WHERE project_id=? AND session_id=?", (project, session)
-    ).rowcount
-    conn.commit()
+    include_state = args.get("include_state", False)
+    if not isinstance(include_state, bool):
+        return {"error": "include_state must be boolean."}
+    try:
+        count = conn.execute(
+            "DELETE FROM context_session_items WHERE project_id=? AND session_id=?",
+            (project, session),
+        ).rowcount
+        if include_state:
+            for table in (
+                "session_decisions",
+                "session_blockers",
+                "session_test_outcomes",
+                "session_breadcrumbs",
+                "task_sessions",
+            ):
+                conn.execute(
+                    f"DELETE FROM {table} WHERE project_id=? AND session_id=?", (project, session)
+                )
+        conn.commit()
+    except sqlite3.DatabaseError as exc:
+        conn.rollback()
+        return {"error": f"Unable to clear session: {exc}"}
     return {"cleared": count}
 
 
@@ -1057,7 +1091,9 @@ def session_checkpoint(kn, args, conn):
     now = int(time.time())
 
     # Ensure task_sessions record exists
-    sess_row = conn.execute("SELECT * FROM task_sessions WHERE session_id=?", (session,)).fetchone()
+    sess_row = conn.execute(
+        "SELECT * FROM task_sessions WHERE project_id=? AND session_id=?", (project, session)
+    ).fetchone()
 
     file_rows = conn.execute(
         "SELECT path, digest FROM files WHERE project_id=? ORDER BY path", (project,)
@@ -1075,110 +1111,144 @@ def session_checkpoint(kn, args, conn):
         if sess_row
         else current_source_digest
     )
-    try:
-        if sess_row is None:
-            conn.execute(
-                "INSERT INTO task_sessions(session_id, project_id, goal, status, source_digest, created_at, updated_at) VALUES(?, ?, ?, 'active', ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET updated_at=excluded.updated_at",
-                (session, project, goal, current_source_digest, now, now),
-            )
-            stored_source_digest = current_source_digest
-        else:
-            sess_dict = dict(sess_row)
-            stored_source_digest = sess_dict.get("source_digest") or current_source_digest
-            if goal and goal != sess_dict.get("goal", ""):
+    read_only = args.get("read_only", False)
+    if not isinstance(read_only, bool):
+        return {"error": "read_only must be boolean."}
+    acknowledge = args.get("acknowledge_source", False)
+    if not isinstance(acknowledge, bool):
+        return {"error": "acknowledge_source must be boolean."}
+    if read_only and any(
+        k in args
+        for k in (
+            "goal",
+            "decisions",
+            "blockers",
+            "test_outcomes",
+            "breadcrumbs",
+            "acknowledge_source",
+        )
+    ):
+        return {"error": "Read-only checkpoint cannot change session state."}
+    if not read_only:
+        try:
+            if sess_row is None:
                 conn.execute(
-                    "UPDATE task_sessions SET goal=?, updated_at=? WHERE session_id=?",
-                    (goal, now, session),
+                    "INSERT INTO task_sessions(session_id, project_id, goal, status, source_digest, created_at, updated_at) VALUES(?, ?, ?, 'active', ?, ?, ?) ON CONFLICT(project_id,session_id) DO UPDATE SET updated_at=excluded.updated_at",
+                    (session, project, goal, current_source_digest, now, now),
                 )
+                stored_source_digest = current_source_digest
+            else:
+                sess_dict = dict(sess_row)
+                stored_source_digest = sess_dict.get("source_digest") or current_source_digest
+                if goal and goal != sess_dict.get("goal", ""):
+                    conn.execute(
+                        "UPDATE task_sessions SET goal=?, updated_at=? WHERE project_id=? AND session_id=?",
+                        (goal, now, project, session),
+                    )
 
-        # Persist new decisions idempotently
-        decisions_input = args.get("decisions", [])
-        if isinstance(decisions_input, list):
-            for d in decisions_input:
-                if isinstance(d, str):
-                    d_text, d_rat = d.strip(), ""
-                elif isinstance(d, dict):
-                    d_text = str(d.get("decision", "")).strip()
-                    d_rat = str(d.get("rationale", "")).strip()
-                else:
-                    continue
-                if d_text:
-                    exists = conn.execute(
-                        "SELECT 1 FROM session_decisions WHERE session_id=? AND decision=?",
-                        (session, d_text),
-                    ).fetchone()
-                    if not exists:
-                        conn.execute(
-                            "INSERT INTO session_decisions(session_id, decision, rationale, recorded_at) VALUES(?, ?, ?, ?)",
-                            (session, d_text, d_rat, now),
-                        )
-
-        # Persist new blockers idempotently
-        blockers_input = args.get("blockers", [])
-        if isinstance(blockers_input, list):
-            for b in blockers_input:
-                if isinstance(b, str):
-                    b_text, b_stat = b.strip(), "open"
-                elif isinstance(b, dict):
-                    b_text = str(b.get("blocker", "")).strip()
-                    b_stat = str(b.get("status", "open")).strip()
-                else:
-                    continue
-                if b_text:
-                    exists = conn.execute(
-                        "SELECT 1 FROM session_blockers WHERE session_id=? AND blocker=?",
-                        (session, b_text),
-                    ).fetchone()
-                    if not exists:
-                        conn.execute(
-                            "INSERT INTO session_blockers(session_id, blocker, status, recorded_at) VALUES(?, ?, ?, ?)",
-                            (session, b_text, b_stat, now),
-                        )
-
-        # Persist new test outcomes idempotently
-        test_outcomes_input = args.get("test_outcomes", [])
-        if isinstance(test_outcomes_input, list):
-            for t in test_outcomes_input:
-                if isinstance(t, dict):
-                    t_name = str(t.get("test_name", "")).strip()
-                    t_outcome = str(t.get("outcome", "")).strip()
-                    t_exit = int(t.get("exit_code", 0))
-                    t_dur = float(t.get("duration_ms", 0.0))
-                    if t_name:
+            # Persist new decisions idempotently
+            decisions_input = args.get("decisions", [])
+            if isinstance(decisions_input, list):
+                for d in decisions_input:
+                    if isinstance(d, str):
+                        d_text, d_rat = d.strip(), ""
+                    elif isinstance(d, dict):
+                        d_text = str(d.get("decision", "")).strip()
+                        d_rat = str(d.get("rationale", "")).strip()
+                    else:
+                        continue
+                    if d_text:
                         exists = conn.execute(
-                            "SELECT 1 FROM session_test_outcomes WHERE session_id=? AND test_name=? AND outcome=?",
-                            (session, t_name, t_outcome),
+                            "SELECT 1 FROM session_decisions WHERE project_id=? AND session_id=? AND decision=?",
+                            (project, session, d_text),
                         ).fetchone()
                         if not exists:
                             conn.execute(
-                                "INSERT INTO session_test_outcomes(session_id, test_name, outcome, exit_code, duration_ms, recorded_at) VALUES(?, ?, ?, ?, ?, ?)",
-                                (session, t_name, t_outcome, t_exit, t_dur, now),
+                                "INSERT INTO session_decisions(project_id, session_id, decision, rationale, recorded_at) VALUES(?, ?, ?, ?, ?)",
+                                (project, session, d_text, d_rat, now),
+                            )
+                        elif isinstance(d, dict):
+                            conn.execute(
+                                "UPDATE session_decisions SET rationale=?,recorded_at=? WHERE project_id=? AND session_id=? AND decision=?",
+                                (d_rat, now, project, session, d_text),
                             )
 
-        # Persist breadcrumbs idempotently
-        breadcrumbs_input = args.get("breadcrumbs", [])
-        if isinstance(breadcrumbs_input, list):
-            for c in breadcrumbs_input:
-                if isinstance(c, str):
-                    c_type, c_payload = "note", c.strip()
-                elif isinstance(c, dict):
-                    c_type = str(c.get("crumb_type", "note")).strip()
-                    c_payload = json.dumps(c.get("payload", c))
-                else:
-                    continue
-                if c_payload:
-                    exists = conn.execute(
-                        "SELECT 1 FROM session_breadcrumbs WHERE session_id=? AND payload=?",
-                        (session, c_payload),
-                    ).fetchone()
-                    if not exists:
-                        conn.execute(
-                            "INSERT INTO session_breadcrumbs(session_id, crumb_type, payload, recorded_at) VALUES(?, ?, ?, ?)",
-                            (session, c_type, c_payload, now),
-                        )
-        conn.commit()
-    except (sqlite3.OperationalError, sqlite3.DatabaseError):
-        pass
+            # Persist new blockers idempotently
+            blockers_input = args.get("blockers", [])
+            if isinstance(blockers_input, list):
+                for b in blockers_input:
+                    if isinstance(b, str):
+                        b_text, b_stat = b.strip(), "open"
+                    elif isinstance(b, dict):
+                        b_text = str(b.get("blocker", "")).strip()
+                        b_stat = str(b.get("status", "open")).strip()
+                    else:
+                        continue
+                    if b_text:
+                        exists = conn.execute(
+                            "SELECT 1 FROM session_blockers WHERE project_id=? AND session_id=? AND blocker=?",
+                            (project, session, b_text),
+                        ).fetchone()
+                        if not exists:
+                            conn.execute(
+                                "INSERT INTO session_blockers(project_id, session_id, blocker, status, recorded_at) VALUES(?, ?, ?, ?, ?)",
+                                (project, session, b_text, b_stat, now),
+                            )
+                        elif isinstance(b, dict):
+                            conn.execute(
+                                "UPDATE session_blockers SET status=?,recorded_at=? WHERE project_id=? AND session_id=? AND blocker=?",
+                                (b_stat, now, project, session, b_text),
+                            )
+
+            # Persist new test outcomes idempotently
+            test_outcomes_input = args.get("test_outcomes", [])
+            if isinstance(test_outcomes_input, list):
+                for t in test_outcomes_input:
+                    if isinstance(t, dict):
+                        t_name = str(t.get("test_name", "")).strip()
+                        t_outcome = str(t.get("outcome", "")).strip()
+                        t_exit = int(t.get("exit_code", 0))
+                        t_dur = float(t.get("duration_ms", 0.0))
+                        if t_name:
+                            exists = conn.execute(
+                                "SELECT 1 FROM session_test_outcomes WHERE project_id=? AND session_id=? AND test_name=? AND outcome=?",
+                                (project, session, t_name, t_outcome),
+                            ).fetchone()
+                            if not exists:
+                                conn.execute(
+                                    "INSERT INTO session_test_outcomes(project_id, session_id, test_name, outcome, exit_code, duration_ms, recorded_at) VALUES(?, ?, ?, ?, ?, ?, ?)",
+                                    (project, session, t_name, t_outcome, t_exit, t_dur, now),
+                                )
+                            else:
+                                conn.execute(
+                                    "UPDATE session_test_outcomes SET exit_code=?,duration_ms=?,recorded_at=? WHERE project_id=? AND session_id=? AND test_name=? AND outcome=?",
+                                    (t_exit, t_dur, now, project, session, t_name, t_outcome),
+                                )
+
+            # Persist breadcrumbs idempotently
+            breadcrumbs_input = args.get("breadcrumbs", [])
+            if isinstance(breadcrumbs_input, list):
+                for c in breadcrumbs_input:
+                    if isinstance(c, str):
+                        c_type, c_payload = "note", c.strip()
+                    elif isinstance(c, dict):
+                        c_type = str(c.get("crumb_type", "note")).strip()
+                        c_payload = json.dumps(c.get("payload", c))
+                    else:
+                        continue
+                    if c_payload:
+                        exists = conn.execute(
+                            "SELECT 1 FROM session_breadcrumbs WHERE project_id=? AND session_id=? AND payload=?",
+                            (project, session, c_payload),
+                        ).fetchone()
+                        if not exists:
+                            conn.execute(
+                                "INSERT INTO session_breadcrumbs(project_id, session_id, crumb_type, payload, recorded_at) VALUES(?, ?, ?, ?, ?)",
+                                (project, session, c_type, c_payload, now),
+                            )
+        except (sqlite3.DatabaseError, ValueError, TypeError) as exc:
+            conn.rollback()
+            return {"error": f"Unable to persist checkpoint: {exc}"}
 
     # Detect source invalidation
     changed_files = []
@@ -1192,12 +1262,34 @@ def session_checkpoint(kn, args, conn):
                 deleted_files.append(r["path"])
             else:
                 try:
-                    disk_digest = hashlib.sha256(fpath.read_bytes()).hexdigest()
+                    raw = kn.read_project_file(root_path, r["path"])
+                    disk_digest = hashlib.sha256(raw).hexdigest()
                     if disk_digest != r["digest"]:
                         changed_files.append(r["path"])
                 except OSError:
                     changed_files.append(r["path"])
 
+    if acknowledge:
+        if changed_files or deleted_files:
+            conn.rollback()
+            return {
+                "error": "Sync changed source files before acknowledging the checkpoint baseline."
+            }
+        try:
+            conn.execute(
+                "UPDATE task_sessions SET source_digest=?,updated_at=? WHERE project_id=? AND session_id=?",
+                (current_source_digest, now, project, session),
+            )
+        except sqlite3.DatabaseError as exc:
+            conn.rollback()
+            return {"error": f"Unable to acknowledge checkpoint baseline: {exc}"}
+        stored_source_digest = current_source_digest
+    if not read_only:
+        try:
+            conn.commit()
+        except sqlite3.DatabaseError as exc:
+            conn.rollback()
+            return {"error": f"Unable to persist checkpoint: {exc}"}
     invalidated = bool(
         changed_files or deleted_files or (stored_source_digest != current_source_digest)
     )
@@ -1206,7 +1298,7 @@ def session_checkpoint(kn, args, conn):
         "changed_files": changed_files,
         "deleted_files": deleted_files,
         "reason": (
-            f"Source modified ({len(changed_files)} changed, {len(deleted_files)} deleted)."
+            f"Source differs from session baseline ({len(changed_files)} unsynced changes, {len(deleted_files)} deletions; indexed baseline changed: {stored_source_digest != current_source_digest})."
             if invalidated
             else "Source code matches session checkpoint digest."
         ),
@@ -1248,15 +1340,15 @@ def session_checkpoint(kn, args, conn):
     saved_decisions = [
         {"decision": r["decision"], "rationale": r["rationale"], "recorded_at": r["recorded_at"]}
         for r in conn.execute(
-            "SELECT decision, rationale, recorded_at FROM session_decisions WHERE session_id=? ORDER BY id",
-            (session,),
+            "SELECT decision, rationale, recorded_at FROM session_decisions WHERE project_id=? AND session_id=? ORDER BY id",
+            (project, session),
         ).fetchall()
     ]
     saved_blockers = [
         {"blocker": r["blocker"], "status": r["status"], "recorded_at": r["recorded_at"]}
         for r in conn.execute(
-            "SELECT blocker, status, recorded_at FROM session_blockers WHERE session_id=? ORDER BY id",
-            (session,),
+            "SELECT blocker, status, recorded_at FROM session_blockers WHERE project_id=? AND session_id=? ORDER BY id",
+            (project, session),
         ).fetchall()
     ]
     asserted_state = {
@@ -1275,8 +1367,8 @@ def session_checkpoint(kn, args, conn):
             "recorded_at": r["recorded_at"],
         }
         for r in conn.execute(
-            "SELECT test_name, outcome, exit_code, duration_ms, recorded_at FROM session_test_outcomes WHERE session_id=? ORDER BY id",
-            (session,),
+            "SELECT test_name, outcome, exit_code, duration_ms, recorded_at FROM session_test_outcomes WHERE project_id=? AND session_id=? ORDER BY id",
+            (project, session),
         ).fetchall()
     ]
     verified_lessons = [
@@ -1286,16 +1378,19 @@ def session_checkpoint(kn, args, conn):
             (project,),
         ).fetchall()
     ]
-    verified_state = {
-        "test_outcomes": saved_tests,
-        "verified_lessons": verified_lessons,
-    }
+    asserted_state["test_outcomes"] = saved_tests
+    current_lessons = []
+    for lesson in verified_lessons:
+        health = features.health(conn, lesson["id"])
+        if health["freshness"] == "current" and health["lifecycle_state"] == "verified":
+            current_lessons.append({**lesson, **health})
+    verified_state = {"verified_lessons": current_lessons}
 
     recovery_breadcrumbs = [
         {"crumb_type": r["crumb_type"], "payload": r["payload"], "recorded_at": r["recorded_at"]}
         for r in conn.execute(
-            "SELECT crumb_type, payload, recorded_at FROM session_breadcrumbs WHERE session_id=? ORDER BY id",
-            (session,),
+            "SELECT crumb_type, payload, recorded_at FROM session_breadcrumbs WHERE project_id=? AND session_id=? ORDER BY id",
+            (project, session),
         ).fetchall()
     ]
 

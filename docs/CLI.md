@@ -16,6 +16,7 @@ Commands below use the installed `lazytoken` launcher. For source development, u
 | `context ... --expand-assets`                                            | Include full memory summaries and provenance within the budget; current verified summaries already appear when they fit. |
 | `context ... --model NAME --strict-budget`                               | Require a matching configured offline tokenizer; refuse estimation fallback.                                 |
 | `checkpoint --project PATH --session-id ID`                              | Return a compact reference to the context already supplied.                                                  |
+| `checkpoint --project PATH --session-id ID --acknowledge-source`         | Accept the current indexed source as the session baseline after syncing and reviewing changes.               |
 | `mcp [--compact-tools]`                                                  | Run the local stdio MCP server; compact mode advertises fewer tools.                                        |
 | `context --project PATH --task TEXT --prompt`                             | Output the task and useful bounded metadata as a prompt; does not run an agent.                              |
 | `setup --project PATH [--client codex] [--client antigravity] [--apply]` | Preview or apply indexing and optional client registration.                                                  |
@@ -23,8 +24,11 @@ Commands below use the installed `lazytoken` launcher. For source development, u
 | `setup --rollback RECEIPT`                                               | Restore unchanged managed configuration from its verified backup. Refuse newer edits.                        |
 | `doctor [--format json\|text\|table]`                                    | Check runtime, package integrity, storage, SQLite, clients, watcher and dashboard port. JSON is the default. |
 | `dashboard [--port N] [--no-browser]`                                    | Run the loopback-only 2D/3D graph; 3D loads on demand.                                                       |
+| `serve [--port N] [--no-browser]`                                        | Start the local server and connect the browser interface.                                                    |
 
 The offline tokenizer is configured with `LAZYTOKEN_TOKENIZER_MODEL` and `LAZYTOKEN_TOKENIZER_FILE`. The operator must select a tokenizer matching the requested model. No tokenizer is downloaded automatically. Budgets cover the compact JSON payload, excluding transport/provider framing.
+
+Checkpoint test outcomes are caller-reported, not independently verified. `clear_session` clears fingerprints by default; pass `include_state: true` to also delete the project's stored checkpoint state. Opening an older database creates a pre-migration backup; rolling back the application does not reverse the database schema.
 
 See [client integration evidence](CLIENT_COMPATIBILITY.md) for tested client versions and the limits of the local setup check. Setup preview reports whether an existing registration exactly matches the suggested entry; it preserves existing configuration either way.
 

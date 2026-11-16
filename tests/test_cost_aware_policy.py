@@ -61,6 +61,7 @@ class TestCostAwareTaskClassifier(unittest.TestCase):
             "Find callers of session_checkpoint in broker",
             "Fix payment deadlock in transaction processor",
             "Investigate import loop between auth and user services",
+            "Fix indentation in dashboard.py",
         ]
         for t in code_tasks:
             decision, reason = broker.classify_retrieval_need(t)

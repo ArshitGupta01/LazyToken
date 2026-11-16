@@ -66,6 +66,15 @@ def python_symbols(body):
                 if prefix:
                     symbols.append((full_name, node.lineno))
                 visit(node.body, prefix=f"{full_name}.")
+            else:
+                visit(
+                    [
+                        child
+                        for child in ast.iter_child_nodes(node)
+                        if not isinstance(child, ast.expr)
+                    ],
+                    prefix,
+                )
 
     visit(tree.body)
     return symbols
@@ -568,6 +577,39 @@ def python_calls(body):
                 return f"object.{callee_name}", "exact", "super_resolution"
             return callee_name, "provisional", "unresolved_super_base"
 
+        def linearize(name, seen):
+            if name in seen or name not in class_hierarchy:
+                return None
+            parents = class_hierarchy[name]["bases"]
+            sequences = []
+            for parent in parents:
+                order = linearize(parent, seen | {name})
+                if order is None:
+                    return None
+                sequences.append(order)
+            sequences.append(list(parents))
+            result = [name]
+            while any(sequences):
+                sequences = [s for s in sequences if s]
+                candidate = next(
+                    (s[0] for s in sequences if all(s[0] not in other[1:] for other in sequences)),
+                    None,
+                )
+                if candidate is None:
+                    return None
+                result.append(candidate)
+                for sequence in sequences:
+                    if sequence[0] == candidate:
+                        sequence.pop(0)
+            return result
+
+        order = linearize(start_class, set())
+        if order is not None:
+            for base in order[1:]:
+                if callee_name in class_hierarchy[base]["methods"]:
+                    return f"{base}.{callee_name}", "exact", "super_resolution"
+            return f"{bases[0]}.{callee_name}", "provisional", "unresolved_super_method"
+
         queue = list(bases)
         visited = set()
         external_candidates = []
@@ -584,7 +626,11 @@ def python_calls(body):
             if lookup_base and lookup_base not in visited:
                 visited.add(lookup_base)
                 if callee_name in class_hierarchy[lookup_base]["methods"]:
-                    return f"{lookup_base}.{callee_name}", "exact", "super_resolution"
+                    return (
+                        f"{lookup_base}.{callee_name}",
+                        "provisional",
+                        "multiple_inheritance_ambiguous",
+                    )
                 queue.extend(class_hierarchy[lookup_base]["bases"])
             elif base not in visited and base != "object":
                 visited.add(base)
@@ -650,7 +696,7 @@ def python_calls(body):
                     elif receiver in local_types:
                         inferred_cls = local_types[receiver]
                         resolved = f"{inferred_cls}.{callee_name}"
-                        confidence = "exact"
+                        confidence = "inferred"
                         resolution_method = "inferred_type"
                     elif receiver in imported_symbols:
                         resolved = f"{receiver}.{callee_name}"
@@ -680,7 +726,7 @@ def python_calls(body):
                                 break
                     if store_cls:
                         resolved = f"{store_cls}.{callee_name}"
-                        confidence = "exact"
+                        confidence = "inferred"
                         resolution_method = "inferred_type"
                     else:
                         resolved = f"{attr_name}.{callee_name}"
@@ -705,7 +751,7 @@ def python_calls(body):
                 callee_name = call_node.func.id
                 receiver = ""
                 resolved = callee_name
-                confidence = "exact"
+                confidence = "inferred" if callee_name in imported_symbols else "provisional"
                 resolution_method = (
                     "explicit_import" if callee_name in imported_symbols else "lexical_scope"
                 )
@@ -741,6 +787,16 @@ def python_calls(body):
                 names = [full_name] if prefix else [node.name]
                 record_calls(node, names, class_name=class_name)
                 visit(node.body, prefix=f"{full_name}.", class_name=class_name)
+            else:
+                visit(
+                    [
+                        child
+                        for child in ast.iter_child_nodes(node)
+                        if not isinstance(child, ast.expr)
+                    ],
+                    prefix,
+                    class_name,
+                )
 
     visit(tree.body)
     return calls
@@ -833,7 +889,7 @@ def javascript_symbols(body):
         r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function(?:\s+([a-zA-Z0-9_$]+)|\s*\()"
     )
     re_arrow = re.compile(
-        r"^\s*(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>"
+        r"^\s*(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*(?::\s*.*?\s*)?=\s*(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>"
     )
     re_method = re.compile(
         r"^\s*(?:(?:public|private|protected|static|readonly|async|override)\s+)*(?:get\s+|set\s+)?([a-zA-Z0-9_$]+)\s*(?:<[^>]+>)?\s*\([^)]*\)\s*(?::\s*[^{;]+)?\s*[\{;]"
@@ -909,7 +965,11 @@ class JSClassFrame:
 def javascript_calls(body):
     """Extract call relationships (caller_symbol -> callee_name) for JavaScript and TypeScript with calibrated confidence."""
     calls = []
+    # Preserve line numbers while masking comments and literals.
+    token = re.compile(r'(["\'`])(?:\\.|(?!\1)[\s\S])*?\1|//[^\n]*|/\*[\s\S]*?\*/')
+    masked = token.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), body)
     lines = body.splitlines()
+    clean_lines = masked.splitlines()
 
     imported_symbols = set()
     local_classes = {}
@@ -922,7 +982,7 @@ def javascript_calls(body):
         r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function(?:\s+([a-zA-Z0-9_$]+)|\s*\()"
     )
     re_arrow = re.compile(
-        r"^\s*(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>"
+        r"^\s*(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*(?::\s*.*?\s*)?=\s*(?:async\s*)?(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>"
     )
     re_method = re.compile(
         r"^\s*(?:(?:public|private|protected|static|readonly|async|override)\s+)*(?:get\s+|set\s+)?([a-zA-Z0-9_$]+)\s*(?:<[^>]+>)?\s*\([^)]*\)\s*(?::\s*[^{;]+)?\s*[\{;]"
@@ -954,9 +1014,7 @@ def javascript_calls(body):
     func_stack = []
     brace_depth = 0
 
-    for lineno, line in enumerate(lines, 1):
-        clean_line = re.sub(r"//.*$", "", line)
-        clean_line = re.sub(r"([\"'`])(?:\\.|(?!\1)[\s\S])*?\1", '""', clean_line)
+    for lineno, clean_line in enumerate(clean_lines, 1):
 
         stripped = clean_line.strip()
         if not stripped:
@@ -986,13 +1044,24 @@ def javascript_calls(body):
         elif m_arr:
             pending_func = m_arr.group(1)
 
+        open_b = clean_line.count("{")
+        close_b = clean_line.count("}")
+        if pending_class and open_b > 0:
+            class_stack.append(JSClassFrame(pending_class, pending_base, brace_depth + 1))
+        if pending_func and open_b > 0:
+            func_stack.append((pending_func, brace_depth + 1, lineno))
+
         if func_stack:
             curr_func = func_stack[-1][0]
             curr_cls = class_stack[-1][0] if class_stack else ""
             for match in re_call.finditer(clean_line):
                 recv = match.group(1) or ""
                 callee = match.group(2)
-                if callee in JS_KEYWORDS or (not recv and callee == curr_func.split(".")[-1]):
+                if (
+                    callee in JS_KEYWORDS
+                    or callee in JS_CONTROL_FLOW
+                    or (not recv and callee == curr_func.split(".")[-1])
+                ):
                     continue
                 if m_meth and callee == m_meth.split(".")[-1]:
                     continue
@@ -1064,7 +1133,7 @@ def javascript_calls(body):
                 calls.append(
                     {
                         "caller_symbol": curr_func,
-                        "caller_line": func_stack[-1][1],
+                        "caller_line": func_stack[-1][2],
                         "callee_name": callee,
                         "receiver": recv,
                         "resolved_callee": resolved,
@@ -1073,14 +1142,6 @@ def javascript_calls(body):
                         "line": lineno,
                     }
                 )
-
-        open_b = clean_line.count("{")
-        close_b = clean_line.count("}")
-
-        if pending_class and open_b > 0:
-            class_stack.append(JSClassFrame(pending_class, pending_base, brace_depth + 1))
-        if pending_func and open_b > 0:
-            func_stack.append((pending_func, brace_depth + 1))
 
         brace_depth += open_b - close_b
 

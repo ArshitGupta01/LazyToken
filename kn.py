@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sqlite3
+import stat
 import subprocess
 import sys
 import time
@@ -95,7 +96,7 @@ IMPORTS = re.compile(r"^\s*(?:import\s+(?:static\s+)?|from\s+)([\w.$/]+)")
 def split_words(value: str) -> list[str]:
     value = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", value)
     value = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
-    return re.findall(r"[a-z0-9]+", value.casefold())
+    return re.findall(r"[^\W_]+", value.casefold())
 
 
 def search_words(value: str) -> set[str]:
@@ -140,6 +141,7 @@ def _init_schema_and_migrations(conn: sqlite3.Connection) -> None:
       CREATE TABLE IF NOT EXISTS task_measurements(id INTEGER PRIMARY KEY, task TEXT NOT NULL, baseline_tokens INTEGER NOT NULL, network_tokens INTEGER NOT NULL, indexing_tokens INTEGER NOT NULL, measured_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, receiver TEXT NOT NULL DEFAULT '', resolved_callee TEXT NOT NULL DEFAULT '', confidence TEXT NOT NULL DEFAULT 'provisional', caller_symbol_id TEXT NOT NULL DEFAULT '', callee_symbol_id TEXT NOT NULL DEFAULT '', resolution_method TEXT NOT NULL DEFAULT 'unresolved', line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,receiver,line));
       CREATE TABLE IF NOT EXISTS index_skipped_files(project_id TEXT NOT NULL, path TEXT NOT NULL, reason TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY(project_id,path));
+      CREATE TABLE IF NOT EXISTS sync_generations(project_id TEXT PRIMARY KEY, generation INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS symbol_calls_callee_idx ON symbol_calls(project_id, callee_name);
       CREATE INDEX IF NOT EXISTS symbol_calls_resolved_idx ON symbol_calls(project_id, resolved_callee);
       CREATE INDEX IF NOT EXISTS symbol_calls_caller_id_idx ON symbol_calls(project_id, caller_symbol_id);
@@ -212,15 +214,15 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
             if "lazytoken_migrations" in tables
             else 0
         )
-        if version > 6:
+        if version > 7:
             conn.close()
             raise RuntimeError(
                 "Database was created by a newer LazyToken version; upgrade the application before opening it."
             )
-        if tables and version < 6:
+        if tables and version < 7:
             # SQLite's backup API includes committed WAL data and leaves the original intact.
             stamp = f"{time.time_ns()}"
-            backup_path = Path(target).with_name(Path(target).name + f".pre-v6-{stamp}.sqlite3")
+            backup_path = Path(target).with_name(Path(target).name + f".pre-v7-{stamp}.sqlite3")
             descriptor = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             os.close(descriptor)
             try:
@@ -233,7 +235,7 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
                 backup_path.unlink(missing_ok=True)
                 conn.close()
                 raise
-    if (not existed) or ("projects" not in tables) or (version < 6):
+    if (not existed) or ("projects" not in tables) or (version < 7):
         _init_schema_and_migrations(conn)
     return conn
 
@@ -312,18 +314,110 @@ def safe_file(root: Path, relative: str) -> bool:
         return False
 
 
+def read_project_file(
+    root: Path, relative: str, limit: int = 1_000_001, *, ignore_file: bool = False
+) -> bytes:
+    """Read through held directory handles, refusing links at every project path component."""
+    check_path = (
+        str(Path(relative).with_name("ignore-rules.py"))
+        if ignore_file and Path(relative).name == ".gitignore"
+        else relative
+    )
+    if not safe_relative(check_path):
+        raise OSError("Ineligible project path")
+    root = Path(os.path.abspath(root))
+    parts = Path(relative).parts
+    if os.name == "nt":
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        kernel.CreateFileW.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.GetFileInformationByHandleEx.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+        ]
+
+        class Attributes(ctypes.Structure):
+            _fields_ = [("attributes", wintypes.DWORD), ("tag", wintypes.DWORD)]
+
+        handles = []
+        try:
+            absolute_parts = (root / relative).parts
+            current = Path(absolute_parts[0])
+            for index, part in enumerate(absolute_parts):
+                if index:
+                    current /= part
+                final = index == len(absolute_parts) - 1
+                handle = kernel.CreateFileW(
+                    str(current), 0x80000000 if final else 0x80, 3, None, 3, 0x02200000, None
+                )
+                if handle == ctypes.c_void_p(-1).value:
+                    raise ctypes.WinError(ctypes.get_last_error())
+                handles.append(handle)
+                info = Attributes()
+                if not kernel.GetFileInformationByHandleEx(
+                    handle, 9, ctypes.byref(info), ctypes.sizeof(info)
+                ):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                if info.attributes & 0x400 or (final and info.attributes & 0x10):
+                    raise OSError("Link or directory in project path")
+            fd = msvcrt.open_osfhandle(handles[-1], os.O_RDONLY | os.O_BINARY)
+            handles.pop()
+            with os.fdopen(fd, "rb") as source:
+                return source.read(limit)
+        finally:
+            for handle in reversed(handles):
+                kernel.CloseHandle(handle)
+    else:
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        root_parts = root.parts
+        fd = os.open(root_parts[0], flags | os.O_DIRECTORY)
+        try:
+            for part in root_parts[1:]:
+                child = os.open(part, flags | os.O_DIRECTORY, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            for index, part in enumerate(parts):
+                child = os.open(
+                    part, flags | (os.O_DIRECTORY if index < len(parts) - 1 else 0), dir_fd=fd
+                )
+                os.close(fd)
+                fd = child
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("Project path is not a regular file")
+            with os.fdopen(fd, "rb") as source:
+                fd = -1
+                return source.read(limit)
+        finally:
+            if fd != -1:
+                os.close(fd)
+
+
 def _ignore_rules(directory: Path, root: Path) -> list[tuple[str, str, bool]]:
     """Read positive local ignore patterns; re-inclusions stay excluded in fallback mode."""
-    ignore = directory / ".gitignore"
-    if not ignore.exists():
-        return []
     try:
-        stat = ignore.lstat()
-        if ignore.is_symlink() or getattr(stat, "st_file_attributes", 0) & 0x400:
+        raw = read_project_file(
+            root, str((directory / ".gitignore").relative_to(root)), ignore_file=True
+        )
+        if len(raw) > 1_000_000:
             return [(directory.relative_to(root).as_posix(), "*", False)]
-        if stat.st_size > 1_000_000:
-            return [(directory.relative_to(root).as_posix(), "*", False)]
-        lines = ignore.read_text(encoding="utf-8-sig").splitlines()
+        lines = raw.decode("utf-8-sig").splitlines()
+    except FileNotFoundError:
+        return []
     except (OSError, UnicodeError):
         return [(directory.relative_to(root).as_posix(), "*", False)]
     base = directory.relative_to(root).as_posix()
@@ -422,17 +516,29 @@ def list_files(root: Path) -> list[str]:
     return sorted(p for p in paths if safe_file(root, p))
 
 
-def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = None) -> dict:
+def sync(
+    root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = None, _attempt=0
+) -> dict:
     if not root.is_dir():
         return {"error": "Repository is unavailable; the previous index was preserved."}
-    root = root.resolve()
+    original = Path(os.path.abspath(root))
+    root = original.resolve()
+    if (
+        root != original
+        and conn.execute("SELECT 1 FROM projects WHERE id=?", (str(original),)).fetchone()
+    ):
+        return {"error": "Indexed project path changed through a link; previous index preserved."}
     project = str(root)
 
     # 1. Non-locking reads to get baseline state
+    generation = conn.execute(
+        "SELECT generation FROM sync_generations WHERE project_id=?", (project,)
+    ).fetchone()
+    generation = generation[0] if generation else 0
     index_state = conn.execute(
         "SELECT extractor_version FROM index_state WHERE project_id=?", (project,)
     ).fetchone()
-    reextract = not index_state or index_state[0] < 4
+    reextract = not index_state or index_state[0] < 5
 
     existing_files = {
         r[0]: r[1]
@@ -483,8 +589,7 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
             if changed_hint is not None and rel not in changed_hint and not reextract:
                 if rel in existing_files:
                     continue
-            with path.open("rb") as source:
-                raw = source.read(1_000_001)
+            raw = read_project_file(root, rel)
             if len(raw) > 1_000_000 or b"\x00" in raw:
                 present.discard(rel)
                 reason = "oversized" if len(raw) > 1_000_000 else "binary"
@@ -615,6 +720,15 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
     # 3. Short atomic write transaction
     conn.execute("BEGIN IMMEDIATE")
     try:
+        current = conn.execute(
+            "SELECT generation FROM sync_generations WHERE project_id=?", (project,)
+        ).fetchone()
+        if (current[0] if current else 0) != generation:
+            conn.rollback()
+            if _attempt >= 19:
+                return {"error": "Index changed during sync; retry after concurrent writes finish."}
+            time.sleep(min(0.01 * (_attempt + 1), 0.1))
+            return sync(root, conn, changed_hint=None, _attempt=_attempt + 1)
         conn.execute(
             "INSERT INTO projects(id,root,updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET root=excluded.root",
             (project, project, int(time.time())),
@@ -657,7 +771,11 @@ def sync(root: Path, conn: sqlite3.Connection, changed_hint: set[str] | None = N
         conn.executemany(
             "INSERT INTO index_errors VALUES(?,?)", [(project, path) for path in errors]
         )
-        conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,4)", (project,))
+        conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,5)", (project,))
+        conn.execute(
+            "INSERT INTO sync_generations VALUES(?,1) ON CONFLICT(project_id) DO UPDATE SET generation=generation+1",
+            (project,),
+        )
         features.refresh_fts(conn, project, changed_paths, removed_paths)
         import frameworks
 
@@ -907,6 +1025,10 @@ def context(project: str, conn: sqlite3.Connection, limit: int = 30) -> dict[str
 
 def add_asset(args: dict[str, Any], conn: sqlite3.Connection) -> dict[str, Any]:
     kind, name, summary = (str(args.get(k, "")).strip() for k in ("kind", "name", "summary"))
+    if kind in {"lesson", "decision", "pattern", "component"}:
+        return {
+            "error": "Propose project memories through lazytoken/propose and approve them explicitly through review."
+        }
     if kind not in {
         "library",
         "package",
@@ -1252,9 +1374,13 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
     }
     if name in direct_actions:
         return feature_call(direct_actions[name], args, conn)
-    if name == "lazytoken" and args.get("action") == "review":
+    if name == "lazytoken" and args.get("action") in (
+        "review",
+        "delete_memory",
+        "retention_memories",
+    ):
         return {
-            "error": "MCP clients cannot make review decisions. Use the local dashboard or operator CLI for human review."
+            "error": "MCP clients cannot review or delete memories. Use the local dashboard or operator CLI."
         }
     if name == "lazytoken":
         payload = args.get("payload", {})
@@ -1295,10 +1421,6 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
         }
         return result
     if name == "record_asset":
-        if str(args.get("kind", "")) in {"lesson", "decision", "pattern", "component"}:
-            return {
-                "error": "Propose project memories through lazytoken/propose and approve them explicitly through review."
-            }
         return add_asset(args, conn)
     if name == "seed_project":
         return seed_project(Path(str(args["root"])), conn)
@@ -1398,7 +1520,18 @@ def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
                 if not isinstance(p, dict):
                     error_reply(rid, -32602, "Invalid params")
                     continue
-                value = call(p.get("name", ""), p.get("arguments", {}), conn)
+                arguments = p.get("arguments", {})
+                if isinstance(arguments, dict):
+                    arguments = dict(arguments)
+                    if p.get("name") == "get_task_context":
+                        arguments["compact_mcp"] = compact
+                    elif (
+                        p.get("name") == "lazytoken"
+                        and arguments.get("action") == "task_context"
+                        and isinstance(arguments.get("payload"), dict)
+                    ):
+                        arguments["payload"] = {**arguments["payload"], "compact_mcp": compact}
+                value = call(p.get("name", ""), arguments, conn)
                 result = {
                     "content": [
                         {
@@ -1430,7 +1563,7 @@ def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) > 1 and sys.argv[1] == "dashboard":
+    if len(sys.argv) > 1 and sys.argv[1] in ("dashboard", "serve"):
         from dashboard import main as dashboard_main
 
         del sys.argv[1]
@@ -1447,6 +1580,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("dashboard", help="Open the local graph dashboard")
+    sub.add_parser("serve", help="Start the local server and open dashboard")
     sub.add_parser("benchmark", help="Validate and compare benchmark records")
     sub.add_parser("evaluate", help="Evaluate retrieval against supplied labels")
     ix = sub.add_parser("sync")
@@ -1565,6 +1699,11 @@ def main() -> None:
     checkpoint = sub.add_parser("checkpoint", help="Summarize a project session for continuation")
     checkpoint.add_argument("--project", required=True)
     checkpoint.add_argument("--session-id", required=True)
+    checkpoint.add_argument(
+        "--acknowledge-source",
+        action="store_true",
+        help="Accept the current indexed source as the new checkpoint baseline",
+    )
     setup = sub.add_parser("setup", help="Preview or explicitly apply local project/client setup")
     setup.add_argument("--project")
     setup.add_argument("--client", action="append", choices=["codex", "antigravity"], default=[])
@@ -1830,7 +1969,13 @@ def main() -> None:
             print(json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
     elif a.cmd == "checkpoint":
         result = broker.session_checkpoint(
-            sys.modules[__name__], {"project": a.project, "session_id": a.session_id}, db
+            sys.modules[__name__],
+            {
+                "project": a.project,
+                "session_id": a.session_id,
+                "acknowledge_source": a.acknowledge_source,
+            },
+            db,
         )
         print(json.dumps(result, indent=2, ensure_ascii=False))
         if "error" in result:

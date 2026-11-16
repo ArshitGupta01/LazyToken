@@ -66,6 +66,13 @@ def evaluate(cases, k=5):
             }
         )
 
+    methods_seen = {method for _, method in ids}
+    if any(
+        {case_id for case_id, name in ids if name == method} != set(labels)
+        for method in methods_seen
+    ):
+        raise ValueError("All methods must evaluate the same case IDs")
+
     def mean(field, items=details):
         values = [x[field] for x in items if x[field] is not None]
         return sum(values) / len(values) if values else None

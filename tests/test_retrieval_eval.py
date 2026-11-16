@@ -43,6 +43,15 @@ class RetrievalMetricsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             retrieval_eval.evaluate([cases[0], {**cases[1], "relevant": ["b"]}], k=2)
 
+    def test_methods_cannot_omit_difficult_cases(self):
+        cases = [
+            {"id": "easy", "method": "a", "relevant": ["x"], "predicted": ["x"]},
+            {"id": "hard", "method": "a", "relevant": ["y"], "predicted": []},
+            {"id": "easy", "method": "b", "relevant": ["x"], "predicted": ["x"]},
+        ]
+        with self.assertRaisesRegex(ValueError, "same case IDs"):
+            retrieval_eval.evaluate(cases)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -241,6 +241,14 @@ TOOLS = [
                         "verified": {"type": "boolean"},
                         "mode": {"type": "string", "enum": ["compact", "balanced", "deep"]},
                         "session_id": {"type": "string"},
+                        "acknowledge_source": {
+                            "type": "boolean",
+                            "description": "Accept the current indexed source as the checkpoint baseline after sync.",
+                        },
+                        "include_state": {
+                            "type": "boolean",
+                            "description": "Also delete stored checkpoint state when clearing a session.",
+                        },
                         "skip_retrieval": {"type": "boolean"},
                         "context_is_complete": {"type": "boolean"},
                         "include_seen": {"type": "boolean"},
@@ -301,10 +309,14 @@ TOOLS = [
     },
     {
         "name": "clear_context_session",
-        "description": "Forget deduplication fingerprints for one project and session.",
+        "description": "Forget deduplication fingerprints; optionally delete checkpoint state for one project and session.",
         "inputSchema": {
             "type": "object",
-            "properties": {"project": {"type": "string"}, "session_id": {"type": "string"}},
+            "properties": {
+                "project": {"type": "string"},
+                "session_id": {"type": "string"},
+                "include_state": {"type": "boolean"},
+            },
             "required": ["project", "session_id"],
         },
     },

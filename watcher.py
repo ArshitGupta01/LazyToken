@@ -91,111 +91,12 @@ def snapshot(kn, root):
     return values
 
 
-def _get_dir_mtimes(root):
-    dir_mtimes = {}
-    skip_dirs = {
-        ".git",
-        ".hg",
-        ".svn",
-        "__pycache__",
-        "node_modules",
-        ".venv",
-        "venv",
-        ".idea",
-        ".vscode",
-    }
-    try:
-        dir_mtimes[""] = root.stat().st_mtime_ns
-        for dirpath, dirnames, _ in os.walk(root):
-            dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
-            rel_dir = os.path.relpath(dirpath, root).replace("\\", "/")
-            if rel_dir == ".":
-                rel_dir = ""
-            try:
-                dir_mtimes[rel_dir] = Path(dirpath).stat().st_mtime_ns
-            except OSError:
-                pass
-    except OSError:
-        pass
-    return dir_mtimes
-
-
 def incremental_snapshot(kn, root, state):
-    """Fast incremental directory reconciliation using directory mtimes and os.scandir."""
-    if not root.is_dir():
-        return None
-    dir_cache = state.setdefault("dir_mtime_cache", {})
-    file_cache = state.setdefault("file_cache", {})
-    skip_dirs = {
-        ".git",
-        ".hg",
-        ".svn",
-        "__pycache__",
-        "node_modules",
-        ".venv",
-        "venv",
-        ".idea",
-        ".vscode",
-    }
-
-    new_dir_mtimes = {}
-    new_file_cache = {}
-
-    def scan_dir(dir_path, rel_prefix=""):
-        try:
-            d_stat = dir_path.stat()
-            d_mtime = d_stat.st_mtime_ns
-            new_dir_mtimes[rel_prefix] = d_mtime
-        except OSError:
-            return
-
-        cached_mtime = dir_cache.get(rel_prefix)
-        # If this is a subdirectory whose mtime has not changed, reuse cached file entries without stating them
-        if rel_prefix and cached_mtime is not None and cached_mtime == d_mtime:
-            prefix_slash = f"{rel_prefix}/"
-            for rel_file, stat_tuple in file_cache.items():
-                if rel_file.startswith(prefix_slash) and "/" not in rel_file[len(prefix_slash) :]:
-                    new_file_cache[rel_file] = stat_tuple
-            # Still scan for potential subdirectories
-            try:
-                with os.scandir(dir_path) as entries:
-                    for entry in entries:
-                        if entry.is_dir(follow_symlinks=False):
-                            if entry.name not in skip_dirs and not entry.name.startswith("."):
-                                sub_rel = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
-                                scan_dir(Path(entry.path), sub_rel)
-            except OSError:
-                pass
-            return
-
-        # Scan directory entries with os.scandir
-        try:
-            with os.scandir(dir_path) as entries:
-                for entry in entries:
-                    try:
-                        if entry.is_dir(follow_symlinks=False):
-                            if entry.name not in skip_dirs and not entry.name.startswith("."):
-                                sub_rel = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
-                                scan_dir(Path(entry.path), sub_rel)
-                        elif entry.is_file(follow_symlinks=False):
-                            rel_file = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
-                            st = Path(entry.path).stat()
-                            new_file_cache[rel_file] = (
-                                st.st_mtime_ns,
-                                st.st_ctime_ns,
-                                st.st_size,
-                                st.st_ino,
-                            )
-                    except OSError:
-                        rel_file = f"{rel_prefix}/{entry.name}" if rel_prefix else entry.name
-                        new_file_cache[rel_file] = ("unreadable",)
-        except OSError:
-            pass
-
-    scan_dir(root, "")
-    state["dir_mtime_cache"] = new_dir_mtimes
-    state["file_cache"] = new_file_cache
-    return new_file_cache
+    """Reconcile eligible file metadata without rereading unchanged contents."""
+    current = snapshot(kn, root)
+    if current is not None:
+        state["file_cache"] = dict(current)
+    return current
 
 
 class ProjectWatcher:
@@ -240,7 +141,6 @@ class ProjectWatcher:
                     "pending_since": None,
                     "last_change": now,
                     "last_full": None,
-                    "dir_mtime_cache": {},
                     "file_cache": {},
                 },
             )
@@ -255,7 +155,6 @@ class ProjectWatcher:
                     current = snapshot(self.kn, root)
                     if current is not None:
                         state["file_cache"] = dict(current)
-                        state["dir_mtime_cache"] = _get_dir_mtimes(root)
                 else:
                     current = incremental_snapshot(self.kn, root, state)
             except (OSError, subprocess.SubprocessError):
@@ -348,7 +247,6 @@ class ProjectWatcher:
                     "pending_since",
                     "last_change",
                     "last_full",
-                    "dir_mtime_cache",
                     "file_cache",
                 )
             }

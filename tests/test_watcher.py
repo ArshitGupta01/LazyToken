@@ -193,7 +193,7 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(watcher_engine.consecutive_idle, 0)
 
     def test_incremental_directory_reconciliation(self):
-        """M6 / F20: Subdirectories whose mtimes have not changed are skipped in incremental scan."""
+        """Nested file edits are detected even when the directory timestamp stays unchanged."""
         sub1 = self.root / "sub1"
         sub1.mkdir()
         (sub1 / "file1.py").write_text("class F1: pass")
@@ -207,12 +207,18 @@ class WatcherTests(unittest.TestCase):
         self.assertIn("sub1/file1.py", state["file_cache"])
         self.assertIn("sub2/file2.py", state["file_cache"])
 
-        # Modify only file in sub1
+        # Modify only file in sub1 while preserving the directory timestamp.
+        before = (sub1.stat().st_atime_ns, sub1.stat().st_mtime_ns)
         (sub1 / "file1.py").write_text("class F1Updated: pass")
+        os.utime(sub1, ns=before)
         current = watcher.incremental_snapshot(kn, self.root, state)
         self.assertIsNotNone(current)
         self.assertIn("sub1/file1.py", current)
         self.assertIn("sub2/file2.py", current)
+        self.assertNotEqual(current["sub1/file1.py"], state["applied"]["sub1/file1.py"])
+        watcher_engine.tick(now=1)
+        watcher_engine.tick(now=2)
+        self.assertTrue(self.db.execute("SELECT 1 FROM symbols WHERE name='F1Updated'").fetchone())
 
     def test_burst_write_coalescing_within_debounce(self):
         """M6 / F20: Multiple rapid file edits within debounce window trigger single sync once settled."""

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0c0d16" />
+    <meta
+      name="description"
+      content="Start your LazyToken local server and connect automatically in the browser."
+    />
+    <title>LazyToken · Start your local server</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-container">
+      <main class="connect-card" role="region" aria-label="Start your local server">
+        <header class="card-header">
+          <div class="brand-badge">
+            <svg class="sparkle-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+            </svg>
+            <span>LAZYTOKEN</span>
+          </div>
+          <h1 class="card-title">Start your local server</h1>
+          <p class="card-subtitle">
+            One command is all it takes. The browser connects automatically.
+          </p>
+        </header>
+
+        <div class="stepper" role="list">
+          <!-- Step 1: Copy Command -->
+          <div class="step-row step-done" id="step-1" role="listitem">
+            <div class="step-gutter">
+              <div class="step-badge badge-green" aria-label="Step 1 completed">
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+                </svg>
+              </div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-main">
+              <div class="step-heading">
+                <span class="step-label text-green">Copy the command</span>
+                <span class="pill pill-green" id="step-1-badge">DONE</span>
+              </div>
+
+              <!-- Terminal: NPX -->
+              <div class="terminal-card">
+                <div class="terminal-header">
+                  <div class="window-controls">
+                    <span class="dot dot-red"></span>
+                    <span class="dot dot-yellow"></span>
+                    <span class="dot dot-green"></span>
+                  </div>
+                  <span class="terminal-tab-title">Terminal</span>
+                  <button
+                    class="copy-button"
+                    data-command="npx lazytoken@latest serve"
+                    aria-label="Copy npx command"
+                    title="Copy command"
+                  >
+                    <svg
+                      class="copy-svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <svg
+                      class="check-svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </button>
+                </div>
+                <div class="terminal-body">
+                  <span class="terminal-prompt">$</span>
+                  <code class="terminal-code">npx lazytoken@latest serve</code>
+                </div>
+              </div>
+
+              <!-- Divider -->
+              <div class="section-divider">
+                <span>OR INSTALL GLOBALLY</span>
+              </div>
+
+              <!-- Terminal: Global Install -->
+              <div class="terminal-card">
+                <div class="terminal-header">
+                  <div class="window-controls">
+                    <span class="dot dot-red"></span>
+                    <span class="dot dot-yellow"></span>
+                    <span class="dot dot-green"></span>
+                  </div>
+                  <span class="terminal-tab-title">Global install</span>
+                  <button
+                    class="copy-button"
+                    data-command="npm install -g lazytoken && lazytoken serve"
+                    aria-label="Copy global install command"
+                    title="Copy command"
+                  >
+                    <svg
+                      class="copy-svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <svg
+                      class="check-svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </button>
+                </div>
+                <div class="terminal-body">
+                  <span class="terminal-prompt">$</span>
+                  <code class="terminal-code"
+                    >npm install -g lazytoken &amp;&amp; lazytoken serve</code
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Waiting for Server -->
+          <div class="step-row step-active" id="step-2" role="listitem">
+            <div class="step-gutter">
+              <div
+                class="step-badge badge-purple"
+                id="step-2-indicator"
+                aria-label="Step 2: Waiting for server"
+              >
+                <span class="badge-num">2</span>
+                <svg
+                  class="badge-check"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+                </svg>
+              </div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-main">
+              <div class="step-heading">
+                <span class="step-label text-white" id="step-2-title"
+                  >Waiting for server to start</span
+                >
+              </div>
+              <div class="listening-box" id="listening-box">
+                <div class="listening-icon-wrap" id="listening-icon-wrap">
+                  <svg
+                    class="lightning-svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                  </svg>
+                  <span class="radar-ping"></span>
+                </div>
+                <div class="listening-content">
+                  <div class="listening-primary" id="listening-primary">
+                    Listening for server ...
+                  </div>
+                  <div class="listening-secondary" id="listening-secondary">
+                    Will auto-connect when detected
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Auto-connects -->
+          <div class="step-row step-muted" id="step-3" role="listitem">
+            <div class="step-gutter">
+              <div
+                class="step-badge badge-muted"
+                id="step-3-indicator"
+                aria-label="Step 3: Connects"
+              >
+                <span class="badge-num">3</span>
+                <svg
+                  class="badge-check"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
+                </svg>
+              </div>
+            </div>
+            <div class="step-main">
+              <div class="step-heading">
+                <span class="step-label text-muted" id="step-3-title"
+                  >Auto-connects and opens the graph</span
+                >
+              </div>
+              <p class="step-description" id="step-3-description">
+                No refresh needed — the page detects the server automatically.
+              </p>
+              <div class="action-fallback" id="action-fallback" style="display: none">
+                <a
+                  href="http://127.0.0.1:8765/"
+                  class="launch-btn"
+                  id="launch-btn"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Open Graph Dashboard ↗
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="card-footer">
+          <div class="footer-item footer-runtime">
+            <svg
+              class="footer-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+              <line x1="6" y1="8" x2="6" y2="8"></line>
+              <line x1="10" y1="8" x2="10" y2="8"></line>
+            </svg>
+            <span>Requires <span class="highlight">Node.js 18+ · Python 3.11+</span></span>
+          </div>
+          <div class="footer-item footer-port">
+            <span class="port-prompt">&gt;_</span>
+            <span>Port <span class="port-num">8765</span></span>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

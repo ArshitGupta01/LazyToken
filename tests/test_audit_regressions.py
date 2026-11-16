@@ -490,9 +490,21 @@ export { thing } from './export';
                     raise AssertionError("Unbounded source read")
                 return super().read(size)
 
-        with patch.object(Path, "open", side_effect=lambda *a, **k: Bounded(b"class Auth: pass")):
+        original_read = kn.read_project_file
+
+        def bounded_read(root, path, limit=1_000_001, **kwargs):
+            if path.endswith(".py"):
+                return Bounded(b"class Auth: pass").read(limit)
+            return original_read(root, path, limit, **kwargs)
+
+        with patch.object(kn, "read_project_file", side_effect=bounded_read):
             kn.sync(self.root, self.db)
-        with patch.object(Path, "open", side_effect=PermissionError("synthetic")):
+        def unreadable(root, path, limit=1_000_001, **kwargs):
+            if path.endswith(".py"):
+                raise PermissionError("synthetic")
+            return original_read(root, path, limit, **kwargs)
+
+        with patch.object(kn, "read_project_file", side_effect=unreadable):
             result = kn.sync(self.root, self.db)
         self.assertEqual(result["error_count"], 1)
         self.assertEqual(result["unchanged"], 0)

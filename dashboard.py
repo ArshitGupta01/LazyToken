@@ -57,6 +57,17 @@ def read_projects() -> list[dict]:
 class Handler(BaseHTTPRequestHandler):
     server_version = "LazyTokenLocal/0.4"
 
+    def _cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self._cors_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def _json(self, value: object, status: int = 200) -> None:
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -64,6 +75,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self._cors_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -88,6 +100,13 @@ class Handler(BaseHTTPRequestHandler):
         }:
             return self._json({"error": "Invalid host"}, 403)
         parsed = urlparse(self.path)
+        if parsed.path in ("/api/health", "/api/ping"):
+            return self._json({
+                "status": "ok",
+                "service": "lazytoken",
+                "version": kn.VERSION,
+                "port": self.server.server_port,
+            })
         if parsed.path == "/api/session":
             return self._json({"token": self.server.review_token})
         if parsed.path.startswith("/api/session/"):
@@ -132,7 +151,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 return self._json(
                     broker.session_checkpoint(
-                        kn, {"project": projects[0], "session_id": session}, conn
+                        kn, {"project": projects[0], "session_id": session, "read_only": True}, conn
                     )
                 )
             finally:

@@ -121,7 +121,7 @@ class LazyTokenFeaturesTests(unittest.TestCase):
                 )
 
     def test_migration_is_idempotent_and_preserves_assets(self):
-        kn.add_asset({"kind": "lesson", "name": "old", "summary": "existing"}, self.db)
+        kn.add_asset({"kind": "framework", "name": "old", "summary": "existing"}, self.db)
         self.db.close()
         self.db = kn.connect(Path(self.temp.name) / "test.sqlite3")
         self.assertGreaterEqual(
@@ -371,6 +371,39 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         self.assertIn("error", result)
         self.assertEqual(
             self.db.execute("SELECT count(*) FROM assets WHERE name='Unreviewed'").fetchone()[0], 0
+        )
+
+        proposal = self.run_action(
+            "propose",
+            project=self.project,
+            kind="lesson",
+            name="Approved",
+            summary="Original",
+            task="Fix login",
+            evidence="Reviewed",
+            paths=["AccountService.kt"],
+        )
+        self.assertEqual(
+            self.run_action("review", project=self.project, id=proposal["id"], action="approve")[
+                "status"
+            ],
+            "approved",
+        )
+        for kind in ("lesson", "decision", "pattern", "component"):
+            for name in ("Unreviewed", "Approved"):
+                with self.subTest(kind=kind, name=name):
+                    args = {
+                        "kind": f" {kind} ",
+                        "name": name,
+                        "summary": "Modified",
+                        "scope": "project",
+                        "project": self.project,
+                    }
+                    self.assertIn("error", kn.call("record_asset", args, self.db))
+                    self.assertIn("error", kn.add_asset(args, self.db))
+        self.assertEqual(
+            self.db.execute("SELECT summary FROM assets WHERE name='Approved'").fetchone()[0],
+            "Original",
         )
 
     def test_metadata_search_budget_and_dependencies(self):

@@ -59,7 +59,7 @@ def chat_framing_overhead(turns: int = 1) -> int:
 
 def token_accounting(
     payload_tokens: int,
-    compact_mcp: bool = False,
+    compact_mcp: bool | None = False,
     model: str | None = None,
     is_approx: bool = True,
     turns: int = 1,
@@ -70,9 +70,9 @@ def token_accounting(
     except (ValueError, TypeError):
         safe_payload = 0
 
-    schema_tax = mcp_schema_overhead(compact=compact_mcp)
+    schema_tax = None if compact_mcp is None else mcp_schema_overhead(compact=compact_mcp)
     framing_tax = chat_framing_overhead(turns=turns)
-    total_footprint = safe_payload + schema_tax + framing_tax
+    total_footprint = None if schema_tax is None else safe_payload + schema_tax + framing_tax
 
     is_approximate = bool(is_approx)
     fidelity = "approximate_chars_div_4" if is_approximate else "exact_offline_tokenizer"
@@ -93,6 +93,8 @@ def token_accounting(
         "fidelity": fidelity,
         "budget_scope": "payload",
         "estimation_note": estimation_note,
+        "overhead_note": "Schema and framing are estimates; schema is unknown unless the catalog is supplied.",
+        "total_is_approximate": True,
     }
 
 

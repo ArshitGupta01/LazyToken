@@ -2,10 +2,22 @@ import tempfile
 import unittest
 from pathlib import Path
 import sys
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import kn
 from legacy_seed_fixture import seed_fixture
+
+
+def legacy_asset(args, conn):
+    project = args.get("project", "")
+    scope = args.get("scope", "global")
+    cur = conn.execute(
+        "INSERT INTO assets(kind,name,summary,tags,source,created_at,scope,project_id) VALUES(?,?,?,'','',0,?,?)",
+        (args["kind"], args["name"], args["summary"], scope, project),
+    )
+    conn.commit()
+    return {"saved": True, "id": cur.lastrowid}
 
 
 class KnowledgeNetworkTests(unittest.TestCase):
@@ -49,6 +61,90 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.assertEqual(second["removed"], 1)
         self.assertEqual(kn.search("CaseStore", self.db)["results"][0]["name"], "CaseStore")
 
+    def test_project_reader_limits_bytes_and_rejects_paths(self):
+        self.assertEqual(kn.read_project_file(self.root, "src.kt", 7), b"package")
+        for path in ("../outside.py", ".env", "missing.py"):
+            with self.subTest(path=path), self.assertRaises(OSError):
+                kn.read_project_file(self.root, path)
+
+    def test_project_reader_rejects_symlink_replaced_after_discovery(self):
+        outside = Path(self.tmp.name) / "outside.py"
+        outside.write_text("secret", encoding="utf-8")
+        target = self.root / "link.py"
+        try:
+            target.symlink_to(outside)
+        except OSError:
+            self.skipTest("Symlink creation requires privileges")
+        with self.assertRaises(OSError):
+            kn.read_project_file(self.root, "link.py")
+
+    def test_project_reader_rejects_replaced_root(self):
+        original = self.root
+        displaced = Path(self.tmp.name) / "displaced"
+        outside = Path(self.tmp.name) / "outside"
+        outside.mkdir()
+        (outside / "src.kt").write_text("outside", encoding="utf-8")
+        kn.sync(original, self.db)
+        original.rename(displaced)
+        try:
+            try:
+                original.symlink_to(outside, target_is_directory=True)
+            except OSError:
+                self.skipTest("Symlink creation requires privileges")
+            with self.assertRaises(OSError):
+                kn.read_project_file(original, "src.kt")
+            self.assertIn("error", kn.sync(original, self.db))
+        finally:
+            if original.is_symlink():
+                original.unlink()
+            displaced.rename(original)
+
+    @unittest.skipIf(sys.platform == "win32", "Named pipes use a different API on Windows")
+    def test_project_reader_rejects_fifo_without_blocking(self):
+        import os
+
+        os.mkfifo(self.root / "pipe.py")
+        with self.assertRaises(OSError):
+            kn.read_project_file(self.root, "pipe.py")
+
+    @unittest.skipIf(sys.platform == "win32", "Named pipes use a different API on Windows")
+    def test_ignore_rules_reject_fifo_without_blocking(self):
+        import os
+
+        (self.root / ".gitignore").unlink()
+        os.mkfifo(self.root / ".gitignore")
+        self.assertEqual(kn._ignore_rules(self.root, self.root), [(".", "*", False)])
+
+    def test_concurrent_sync_cannot_overwrite_newer_index(self):
+        import source_index
+
+        path = self.root / "race.py"
+        path.write_text("def original(): pass\n", encoding="utf-8")
+        kn.sync(self.root, self.db)
+        path.write_text("def old_staged(): pass\n", encoding="utf-8")
+        extract = source_index.python_symbols
+        interleaved = False
+
+        def extract_with_concurrent_sync(body):
+            nonlocal interleaved
+            if "old_staged" in body and not interleaved:
+                interleaved = True
+                path.write_text("def newest(): pass\n", encoding="utf-8")
+                other = kn.connect(self.db_path)
+                try:
+                    self.assertNotIn("error", kn.sync(self.root, other))
+                finally:
+                    other.close()
+            return extract(body)
+
+        with patch("source_index.python_symbols", side_effect=extract_with_concurrent_sync):
+            result = kn.sync(self.root, self.db)
+        self.assertTrue(interleaved)
+        self.assertNotIn("error", result)
+        names = {row[0] for row in self.db.execute("SELECT name FROM symbols WHERE path='race.py'")}
+        self.assertIn("newest", names)
+        self.assertNotIn("old_staged", names)
+
     def test_project_path_aliases_resolve_to_the_indexed_scope(self):
         kn.sync(self.root, self.db)
         canonical = str(self.root.resolve())
@@ -89,7 +185,7 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.assertNotIn("SidebarNavItem", names)
 
     def test_assets_and_budget_estimate(self):
-        saved = kn.add_asset(
+        saved = legacy_asset(
             {
                 "kind": "pattern",
                 "name": "small-context",
@@ -153,7 +249,7 @@ class KnowledgeNetworkTests(unittest.TestCase):
 
     def test_project_scoped_lesson_stays_in_its_project(self):
         kn.sync(self.root, self.db)
-        saved = kn.add_asset(
+        saved = legacy_asset(
             {
                 "kind": "lesson",
                 "name": "TheekHai-only",
@@ -176,7 +272,7 @@ class KnowledgeNetworkTests(unittest.TestCase):
         shared = kn.add_asset(
             {"kind": "framework", "name": "Same name", "summary": "Shared asset"}, self.db
         )
-        local = kn.add_asset(
+        local = legacy_asset(
             {
                 "kind": "lesson",
                 "name": "Same name",

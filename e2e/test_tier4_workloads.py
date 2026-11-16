@@ -463,12 +463,16 @@ class TestTier4Workloads(E2ETestCase):
             init_conn.close()
 
         errors: list[Exception] = []
+        start = threading.Barrier(8, timeout=15)
 
         def worker_sync(worker_id: int) -> None:
             conn = kn.connect(db_file)
             try:
+                start.wait()
                 for _ in range(5):
-                    kn.sync(repo, conn)
+                    result = kn.sync(repo, conn)
+                    self.assertNotIn("error", result)
+                    self.assertEqual(result["error_count"], 0)
                     time.sleep(0.02)
             except Exception as exc:
                 errors.append(exc)
@@ -478,8 +482,12 @@ class TestTier4Workloads(E2ETestCase):
         def worker_search(worker_id: int) -> None:
             conn = kn.connect(db_file)
             try:
+                start.wait()
                 for _ in range(5):
-                    features.ranked_search(kn, {"project": str(repo), "query": "compute"}, conn)
+                    result = features.ranked_search(
+                        kn, {"project": str(repo), "query": "compute"}, conn
+                    )
+                    self.assertNotIn("error", result)
                     time.sleep(0.02)
             except Exception as exc:
                 errors.append(exc)
@@ -489,8 +497,9 @@ class TestTier4Workloads(E2ETestCase):
         def worker_context(worker_id: int) -> None:
             conn = kn.connect(db_file)
             try:
+                start.wait()
                 for i in range(5):
-                    broker.task_context(
+                    result = broker.task_context(
                         kn,
                         {
                             "project": str(repo),
@@ -499,6 +508,7 @@ class TestTier4Workloads(E2ETestCase):
                         },
                         conn,
                     )
+                    self.assertNotIn("error", result)
                     time.sleep(0.02)
             except Exception as exc:
                 errors.append(exc)
@@ -508,11 +518,12 @@ class TestTier4Workloads(E2ETestCase):
         def worker_writer(worker_id: int) -> None:
             conn = kn.connect(db_file)
             try:
+                start.wait()
                 for i in range(5):
-                    features.benchmark(
+                    result = features.benchmark(
                         {
                             "task": f"stress_task_{worker_id}_{i}",
-                            "variant": "lazytoken",
+                            "variant": "network",
                             "model": "gpt-4o",
                             "input_tokens": 100,
                             "output_tokens": 50,
@@ -521,6 +532,7 @@ class TestTier4Workloads(E2ETestCase):
                         },
                         conn,
                     )
+                    self.assertTrue(result.get("saved"), result)
                     time.sleep(0.02)
             except Exception as exc:
                 errors.append(exc)
@@ -545,6 +557,7 @@ class TestTier4Workloads(E2ETestCase):
             t.join(timeout=15)
 
         # Assert zero database lock errors or exceptions under 8-worker stress
+        self.assertFalse(any(t.is_alive() for t in threads), "Concurrency workers did not finish")
         self.assertEqual(len(errors), 0, f"High concurrency errors: {errors}")
 
         # Verify DB integrity
@@ -552,6 +565,9 @@ class TestTier4Workloads(E2ETestCase):
         try:
             status = check_conn.execute("PRAGMA integrity_check").fetchone()[0]
             self.assertEqual(status.lower(), "ok")
+            self.assertEqual(
+                check_conn.execute("SELECT count(*) FROM benchmark_runs").fetchone()[0], 10
+            )
         finally:
             check_conn.close()
 

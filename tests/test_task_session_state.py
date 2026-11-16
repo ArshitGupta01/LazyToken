@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import tempfile
+import sqlite3
+import threading
+import features
 import unittest
 from pathlib import Path
 
@@ -20,6 +23,60 @@ class TestTaskSessionSchemaMigration(unittest.TestCase):
     def tearDown(self) -> None:
         self.db.close()
         self.temp_dir.cleanup()
+
+    def test_v6_session_state_is_migrated_with_its_owner(self):
+        legacy = sqlite3.connect(":memory:")
+        legacy.row_factory = sqlite3.Row
+        legacy.executescript(
+            """
+            CREATE TABLE lazytoken_migrations(version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
+            INSERT INTO lazytoken_migrations VALUES(6,0);
+            CREATE TABLE task_sessions(session_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,goal TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'active',source_digest TEXT NOT NULL DEFAULT '',created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+            INSERT INTO task_sessions VALUES('same','project-a','old','active','',0,0);
+            CREATE TABLE session_decisions(id INTEGER PRIMARY KEY,session_id TEXT NOT NULL,decision TEXT NOT NULL,rationale TEXT NOT NULL DEFAULT '',recorded_at INTEGER NOT NULL);
+            INSERT INTO session_decisions VALUES(1,'same','keep','',0);
+        """
+        )
+        features.migrate(legacy)
+        self.assertEqual(
+            legacy.execute("SELECT project_id FROM session_decisions").fetchone()[0], "project-a"
+        )
+        legacy.execute("INSERT INTO task_sessions VALUES('same','project-b','','active','',0,0)")
+        self.assertEqual(legacy.execute("SELECT count(*) FROM task_sessions").fetchone()[0], 2)
+        legacy.close()
+
+    def test_concurrent_v6_migrations_are_idempotent(self):
+        path = Path(self.temp_dir.name) / "legacy.sqlite3"
+        legacy = sqlite3.connect(path)
+        legacy.executescript(
+            """
+            CREATE TABLE lazytoken_migrations(version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
+            INSERT INTO lazytoken_migrations VALUES(6,0);
+            CREATE TABLE task_sessions(session_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,goal TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'active',source_digest TEXT NOT NULL DEFAULT '',created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+        """
+        )
+        legacy.close()
+        start = threading.Barrier(2)
+        errors = []
+
+        def migrate():
+            db = sqlite3.connect(path, timeout=10)
+            db.row_factory = sqlite3.Row
+            try:
+                start.wait()
+                features.migrate(db)
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                db.close()
+
+        threads = [threading.Thread(target=migrate) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(20)
+            self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
 
     def test_migration_6_tables_exist(self) -> None:
         tables = {
@@ -72,6 +129,81 @@ class TestSessionCheckpointPersistence(unittest.TestCase):
         self.db.close()
         self.temp_dir.cleanup()
 
+    def test_project_isolation_updates_and_clear(self):
+        other = Path(self.temp_dir.name) / "other"
+        other.mkdir()
+        (other / "other.py").write_text("pass\n")
+        kn.sync(other, self.db)
+        first = {
+            "project": self.project,
+            "session_id": "shared",
+            "goal": "private",
+            "decisions": ["secret"],
+            "blockers": [{"blocker": "build", "status": "open"}],
+        }
+        broker.session_checkpoint(kn, first, self.db)
+        second = broker.session_checkpoint(
+            kn, {"project": str(other), "session_id": "shared", "goal": "other"}, self.db
+        )
+        self.assertEqual(second["goal"], "other")
+        self.assertEqual(second["asserted_state"]["decisions"], [])
+        result = broker.session_checkpoint(
+            kn,
+            {
+                "project": self.project,
+                "session_id": "shared",
+                "blockers": [{"blocker": "build", "status": "resolved"}],
+            },
+            self.db,
+        )
+        self.assertEqual(result["asserted_state"]["blockers"][0]["status"], "resolved")
+        broker.clear_session(
+            kn, {"project": self.project, "session_id": "shared", "include_state": True}, self.db
+        )
+        result = broker.session_checkpoint(
+            kn, {"project": self.project, "session_id": "shared"}, self.db
+        )
+        self.assertEqual(result["goal"], "")
+        self.assertEqual(
+            broker.session_checkpoint(kn, {"project": str(other), "session_id": "shared"}, self.db)[
+                "goal"
+            ],
+            "other",
+        )
+
+    def test_read_only_and_write_error(self):
+        self.db.execute("PRAGMA query_only=ON")
+        result = broker.session_checkpoint(
+            kn, {"project": self.project, "session_id": "new", "goal": "unsaved"}, self.db
+        )
+        self.assertIn("error", result)
+        result = broker.session_checkpoint(
+            kn, {"project": self.project, "session_id": "new", "read_only": True}, self.db
+        )
+        self.assertNotIn("error", result)
+        self.db.execute("PRAGMA query_only=OFF")
+
+    def test_acknowledge_synced_baseline(self):
+        args = {"project": self.project, "session_id": "baseline"}
+        broker.session_checkpoint(kn, args, self.db)
+        (self.repo / "app.py").write_text("def changed(): pass\n")
+        self.assertIn(
+            "error",
+            broker.session_checkpoint(
+                kn, dict(args, acknowledge_source=True, goal="must roll back"), self.db
+            ),
+        )
+        self.assertEqual(broker.session_checkpoint(kn, args, self.db)["goal"], "")
+        kn.sync(self.repo, self.db)
+        self.assertTrue(
+            broker.session_checkpoint(kn, args, self.db)["source_invalidation"]["invalidated"]
+        )
+        self.assertFalse(
+            broker.session_checkpoint(kn, dict(args, acknowledge_source=True), self.db)[
+                "source_invalidation"
+            ]["invalidated"]
+        )
+
     def test_checkpoint_persists_goals_decisions_blockers_tests_breadcrumbs(self) -> None:
         session_id = "sess-persisted-1"
         args = {
@@ -115,7 +247,7 @@ class TestSessionCheckpointPersistence(unittest.TestCase):
             self.assertEqual(blockers[0]["blocker"], "Database connection pool exhausted")
 
             # Verify test outcomes
-            tests = res2["verified_state"]["test_outcomes"]
+            tests = res2["asserted_state"]["test_outcomes"]
             self.assertEqual(len(tests), 1)
             self.assertEqual(tests[0]["test_name"], "test_app_startup")
             self.assertEqual(tests[0]["outcome"], "passed")
@@ -186,8 +318,8 @@ class TestEpistemicLayering(unittest.TestCase):
         # 3. Verified State
         self.assertIn("verified_state", cp)
         self.assertIsInstance(cp["verified_state"], dict)
-        self.assertEqual(len(cp["verified_state"]["test_outcomes"]), 1)
-        self.assertEqual(cp["verified_state"]["test_outcomes"][0]["test_name"], "test_core_perf")
+        self.assertEqual(len(cp["asserted_state"]["test_outcomes"]), 1)
+        self.assertEqual(cp["asserted_state"]["test_outcomes"][0]["test_name"], "test_core_perf")
 
 
 class TestSourceVersionInvalidation(unittest.TestCase):

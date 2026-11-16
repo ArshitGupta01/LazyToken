@@ -14,4 +14,5 @@ build/
 release/
 work/
 _workspace/
+.harness/
 

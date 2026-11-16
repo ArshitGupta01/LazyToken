@@ -20,6 +20,7 @@ import broker
 import dashboard
 import features
 import kn
+import mcp_schema
 import retrieval_eval
 import token_budget
 import watcher
@@ -1567,15 +1568,16 @@ class TestF17FiveModeRetrievalAblations(E2ETestCase):
         try:
             kn.sync(repo, conn)
             project_id = str(repo.resolve())
-            kn.add_asset(
-                {
-                    "kind": "lesson",
-                    "name": "TokenStore Scope Contract",
-                    "summary": "TokenStore validate method requires scope string argument in token_store.py",
-                    "project_id": project_id,
-                },
-                conn,
+            conn.execute(
+                "INSERT INTO assets(kind,name,summary,tags,source,created_at,scope,project_id) VALUES(?,?,?,'','',0,'project',?)",
+                (
+                    "lesson",
+                    "TokenStore Scope Contract",
+                    "TokenStore validate method requires scope string argument in token_store.py",
+                    project_id,
+                ),
             )
+            conn.commit()
             import benchmark.graph_ablation as ga
 
             res = ga.verified_memory_no_graph(
@@ -1708,8 +1710,8 @@ class TestF19TokenBudgetFidelity(E2ETestCase):
     def test_f19_mcp_schema_overhead_distinction(self) -> None:
         full_tax = token_budget.mcp_schema_overhead(compact=False)
         compact_tax = token_budget.mcp_schema_overhead(compact=True)
-        self.assertEqual(full_tax, 2371)
-        self.assertEqual(compact_tax, 713)
+        self.assertEqual(full_tax, len(json.dumps(mcp_schema.mcp_tools(compact=False))) // 4)
+        self.assertEqual(compact_tax, len(json.dumps(mcp_schema.mcp_tools(compact=True))) // 4)
         self.assertGreater(full_tax, compact_tax)
 
     def test_f19_chat_framing_overhead_accounting(self) -> None:
@@ -1738,9 +1740,10 @@ class TestF19TokenBudgetFidelity(E2ETestCase):
             payload_tokens=200, compact_mcp=True, is_approx=True, turns=2
         )
         self.assertEqual(acct["payload_tokens"], 200)
-        self.assertEqual(acct["mcp_schema_overhead_tokens"], 713)
+        compact_tax = len(json.dumps(mcp_schema.mcp_tools(compact=True))) // 4
+        self.assertEqual(acct["mcp_schema_overhead_tokens"], compact_tax)
         self.assertEqual(acct["chat_framing_overhead_tokens"], 50)
-        self.assertEqual(acct["total_context_footprint_tokens"], 963)
+        self.assertEqual(acct["total_context_footprint_tokens"], 200 + compact_tax + 50)
         self.assertTrue(acct["is_approximate"])
         self.assertEqual(acct["fidelity"], "approximate_chars_div_4")
         self.assertIn("budget_scope", acct)
@@ -1824,7 +1827,7 @@ class TestF20PersistentTaskSessionState(E2ETestCase):
             self.assertEqual(cp["asserted_state"]["decisions"][0]["decision"], "Decouple storage")
             self.assertEqual(len(cp["asserted_state"]["blockers"]), 1)
             self.assertEqual(cp["asserted_state"]["blockers"][0]["blocker"], "Slow DB")
-            self.assertEqual(len(cp["verified_state"]["test_outcomes"]), 1)
+            self.assertEqual(len(cp["asserted_state"]["test_outcomes"]), 1)
             self.assertEqual(len(cp["recovery_breadcrumbs"]), 1)
         finally:
             conn2.close()
@@ -1860,7 +1863,7 @@ class TestF20PersistentTaskSessionState(E2ETestCase):
             self.assertEqual(len(cp["asserted_state"]["decisions"]), 1)
 
             self.assertIn("verified_state", cp)
-            self.assertEqual(len(cp["verified_state"]["test_outcomes"]), 1)
+            self.assertEqual(len(cp["asserted_state"]["test_outcomes"]), 1)
         finally:
             conn.close()
 

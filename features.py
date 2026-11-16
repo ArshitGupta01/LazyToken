@@ -120,6 +120,38 @@ def migrate(conn):
         )
     conn.execute("INSERT OR IGNORE INTO lazytoken_migrations VALUES(6, strftime('%s','now'))")
     conn.commit()
+    if not conn.execute("SELECT 1 FROM lazytoken_migrations WHERE version=7").fetchone():
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT 1 FROM lazytoken_migrations WHERE version=7").fetchone():
+                conn.commit()
+                return
+            conn.execute("ALTER TABLE task_sessions RENAME TO task_sessions_v6")
+            conn.execute(
+                "CREATE TABLE task_sessions(session_id TEXT NOT NULL, project_id TEXT NOT NULL, goal TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active', source_digest TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(project_id,session_id))"
+            )
+            conn.execute(
+                "INSERT INTO task_sessions SELECT session_id,project_id,goal,status,source_digest,created_at,updated_at FROM task_sessions_v6"
+            )
+            for table in (
+                "session_decisions",
+                "session_blockers",
+                "session_test_outcomes",
+                "session_breadcrumbs",
+            ):
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN project_id TEXT NOT NULL DEFAULT ''")
+                conn.execute(
+                    f"UPDATE {table} SET project_id=COALESCE((SELECT project_id FROM task_sessions_v6 WHERE task_sessions_v6.session_id={table}.session_id),'')"
+                )
+                conn.execute(
+                    f"CREATE INDEX {table}_project_session_idx ON {table}(project_id,session_id)"
+                )
+            conn.execute("DROP TABLE task_sessions_v6")
+            conn.execute("INSERT INTO lazytoken_migrations VALUES(7, strftime('%s','now'))")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
 
 def refresh_fts(conn, project, changed_paths, removed_paths):
@@ -614,8 +646,7 @@ def live_evidence_error(kn, conn, proposal, project):
         if not kn.safe_file(root, row["path"]) or row["path"] not in eligible:
             return "Evidence is missing or no longer eligible; sync before review."
         try:
-            with (root / row["path"]).open("rb") as source:
-                raw = source.read(1_000_001)
+            raw = kn.read_project_file(root, row["path"])
         except OSError:
             return "Evidence cannot be read; review refused."
         if len(raw) > 1_000_000 or hashlib.sha256(raw).hexdigest() != row["indexed_digest"]:
@@ -853,6 +884,7 @@ def delete_memory(kn, args, conn) -> dict:
             "SELECT id, asset_id FROM memory_proposals WHERE id=? AND project_id=?", (pid, project)
         ).fetchone()
         if not row:
+            conn.rollback()
             return {"error": "Proposal not found in this project."}
         conn.execute("DELETE FROM memory_test_evidence WHERE proposal_id=?", (pid,))
         conn.execute("DELETE FROM memory_evidence WHERE proposal_id=?", (pid,))
@@ -880,13 +912,20 @@ def ranked_search(kn, args, conn):
     if not project:
         return {"error": "An indexed project is required."}
     query = str(args.get("query", ""))[:1000]
-    words = [t for t in kn.split_words(query) if len(t) > 1]
+    words = [t for t in kn.split_words(query) if len(t) > 1 or not t.isascii()]
     # Keep the limited search budget for meaningful terms in natural-language tasks.
     stop_words = set(
         "the and for with that this from while into where which what when how does its "
         "is are was were to of in on at an or as by".split()
     )
-    terms = list(dict.fromkeys(t for t in words if t not in stop_words))[:12]
+    paths = re.findall(r"[\w./\\-]+\.[\w-]+", query)
+    identifiers = [
+        word
+        for path in paths
+        for word in kn.split_words(path)
+        if len(word) > 1 or not word.isascii()
+    ]
+    terms = list(dict.fromkeys(identifiers + [t for t in words if t not in stop_words]))[:64]
     if not terms:
         terms = list(dict.fromkeys(words))[:12]
     aliases = {
@@ -934,6 +973,10 @@ def ranked_search(kn, args, conn):
 
     def candidates(table, columns, fields):
         # SQL prefilter preserves every lexical match while avoiding Python work on unrelated rows.
+        if any(not term.isascii() for term in terms):
+            return conn.execute(
+                "SELECT " + columns + " FROM " + table + " WHERE project_id=?", (project,)
+            )
         clause = " OR ".join("lower(" + fields + ") LIKE ?" for _ in terms)
         return conn.execute(
             "SELECT " + columns + " FROM " + table + " WHERE project_id=? AND (" + clause + ")",
@@ -1491,8 +1534,7 @@ def inspect_source(kn, args, conn):
     if not kn.safe_file(root, path) or path not in kn.list_files(root):
         return {"error": "File is no longer eligible for inspection."}
     try:
-        with (root / path).open("rb") as file:
-            raw = file.read(1_000_001)
+        raw = kn.read_project_file(root, path)
     except OSError:
         return {"error": "File cannot be read."}
     if len(raw) > 1_000_000 or b"\0" in raw:
@@ -1507,8 +1549,9 @@ def inspect_source(kn, args, conn):
     size = 0
     truncated = False
     secret_literal = re.compile(
-        r"(?i)\b\w*(?:password|passwd|secret|api_?key|access_?token|refresh_?token|authorization|private_?key|credential|service_?role_?key)\w*\b.*?(?:=|:)\s*[\"\'][^\"\']+[\"\']"
+        r"(?i)\b\w*(?:password|passwd|secret|api_?key|access_?token|refresh_?token|authorization|private_?key|credential|service_?role_?key)\w*\b(?:.*?(?:=|:)\s*[\"'][^\"']+[\"']|[\"']?\s*(?:=|:)\s*[^\s#\"',}\]]+)"
     )
+    credential_url = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[^\s/@:]+:[^\s/@]+@[^\s/]+")
     bearer_token = re.compile(r"(?i)\bbearer\s+[a-zA-Z0-9_\-\.]{20,}\b")
     jwt_token = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
     aws_key = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
@@ -1520,6 +1563,7 @@ def inspect_source(kn, args, conn):
     for number, line in enumerate(lines[start - 1 : end], start):
         if (
             secret_literal.search(line)
+            or credential_url.search(line)
             or bearer_token.search(line)
             or jwt_token.search(line)
             or aws_key.search(line)

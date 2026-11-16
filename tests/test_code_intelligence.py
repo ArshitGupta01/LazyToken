@@ -655,7 +655,7 @@ class LocalService(ExternalBase):
         ][0]
         self.assertEqual(exec_call["receiver"], "self.store")
         self.assertEqual(exec_call["resolved_callee"], "TokenStore.save")
-        self.assertEqual(exec_call["confidence"], "exact")
+        self.assertEqual(exec_call["confidence"], "inferred")
         self.assertEqual(exec_call["resolution_method"], "inferred_type")
 
     def test_attribute_inference_from_class_level_annotations(self):
@@ -677,10 +677,10 @@ class LocalService(ExternalBase):
         self.assertEqual(
             h_calls["execute_query"]["resolved_callee"], "DatabaseClient.execute_query"
         )
-        self.assertEqual(h_calls["execute_query"]["confidence"], "exact")
+        self.assertEqual(h_calls["execute_query"]["confidence"], "inferred")
         self.assertEqual(h_calls["execute_query"]["resolution_method"], "inferred_type")
         self.assertEqual(h_calls["get_item"]["resolved_callee"], "MemoryCache.get_item")
-        self.assertEqual(h_calls["get_item"]["confidence"], "exact")
+        self.assertEqual(h_calls["get_item"]["confidence"], "inferred")
         self.assertEqual(h_calls["get_item"]["resolution_method"], "inferred_type")
 
     def test_local_type_inference_from_parameter_annotations(self):
@@ -692,10 +692,10 @@ class LocalService(ExternalBase):
         calls = source_index.python_calls(code)
         c_map = {c["callee_name"]: c for c in calls if c["caller_symbol"] == "process_order"}
         self.assertEqual(c_map["charge"]["resolved_callee"], "PaymentGateway.charge")
-        self.assertEqual(c_map["charge"]["confidence"], "exact")
+        self.assertEqual(c_map["charge"]["confidence"], "inferred")
         self.assertEqual(c_map["charge"]["resolution_method"], "inferred_type")
         self.assertEqual(c_map["validate"]["resolved_callee"], "OrderValidator.validate")
-        self.assertEqual(c_map["validate"]["confidence"], "exact")
+        self.assertEqual(c_map["validate"]["confidence"], "inferred")
 
     def test_local_variable_type_annotation_in_body(self):
         """M6: Type-annotated local variables inside function body resolve calls."""
@@ -710,7 +710,7 @@ class LocalService(ExternalBase):
             if c["caller_symbol"] == "dispatch_task" and c["callee_name"] == "post_payload"
         ][0]
         self.assertEqual(post_call["resolved_callee"], "APIClient.post_payload")
-        self.assertEqual(post_call["confidence"], "exact")
+        self.assertEqual(post_call["confidence"], "inferred")
         self.assertEqual(post_call["resolution_method"], "inferred_type")
 
     def test_javascript_calls_calibrated_confidence(self):
@@ -828,6 +828,64 @@ export class UserController extends BaseController {
         )
         self.assertIn("python", res_table.stdout)
         self.assertIn("ast", res_table.stdout)
+
+
+class ExtractionRegressionTests(unittest.TestCase):
+    def test_python_conditional_definitions_and_method_order(self):
+        code = """if True:
+    def hidden():
+        helper()
+try:
+    pass
+except Exception:
+    def recovered():
+        helper()
+class G:
+    def run(self): pass
+class E(G): pass
+class F:
+    def run(self): pass
+class B(E): pass
+class C(F): pass
+class D(B, C):
+    def run(self): super().run()
+"""
+        symbols = source_index.python_symbols(code)
+        self.assertIn(("hidden", 2), symbols)
+        self.assertIn(("recovered", 7), symbols)
+        calls = source_index.python_calls(code)
+        self.assertTrue(
+            any(c["caller_symbol"] == "recovered" and c["callee_name"] == "helper" for c in calls)
+        )
+        self.assertEqual(
+            next(c for c in calls if c["caller_symbol"] == "D.run")["resolved_callee"], "G.run"
+        )
+
+    def test_javascript_inline_calls_comments_and_annotated_arrow(self):
+        code = """function f() { helper(); }
+function g() {
+/*
+ghost();
+*/
+real();
+}
+export const b: () => void = () => {};
+"""
+        calls = source_index.javascript_calls(code)
+        self.assertTrue(
+            any(
+                c["caller_symbol"] == "f" and c["callee_name"] == "helper" and c["caller_line"] == 1
+                for c in calls
+            )
+        )
+        self.assertTrue(
+            any(
+                c["caller_symbol"] == "g" and c["callee_name"] == "real" and c["caller_line"] == 2
+                for c in calls
+            )
+        )
+        self.assertFalse(any(c["callee_name"] == "ghost" for c in calls))
+        self.assertIn(("b", 8), source_index.javascript_symbols(code))
 
 
 if __name__ == "__main__":

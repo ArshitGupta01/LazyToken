@@ -122,13 +122,9 @@ def update(connection, project):
         ):
             continue
         try:
-            from onboarding import regular_path
+            import kn
 
-            regular_path(root / relative)
-            if not (root / relative).resolve().is_relative_to(root.resolve()):
-                raise ValueError("Outside project")
-            with (root / relative).open("rb") as source:
-                raw = source.read(262145)
+            raw = kn.read_project_file(root, relative, 262145)
             if len(raw) > 262144 or hashlib.sha256(raw).hexdigest() != row["digest"]:
                 incomplete = True
                 continue
