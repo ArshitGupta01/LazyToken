@@ -1,6 +1,6 @@
 {
   "name": "toksmart",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Local-first AI coding memory, AST graph intelligence, and zero-amnesia context engine",
   "license": "MIT",
   "bin": { "toksmart": "launcher.cjs", "repomind": "launcher.cjs", "lazytoken": "launcher.cjs" },

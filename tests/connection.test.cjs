@@ -30,7 +30,8 @@ for (const file of ['app.js', 'web/app.js']) {
       setInterval: () => 1,
       setTimeout: () => 1,
       clearTimeout: () => {},
-      URL
+      URL,
+      URLSearchParams
     };
     vm.runInNewContext(readFileSync(join(__dirname, '..', file), 'utf8'), context);
     listeners.DOMContentLoaded();
@@ -64,7 +65,8 @@ for (const file of ['app.js']) {
       setInterval: () => 1,
       setTimeout: () => 1,
       clearTimeout: () => {},
-      URL
+      URL,
+      URLSearchParams
     };
     vm.runInNewContext(readFileSync(join(__dirname, '..', file), 'utf8'), context);
     let started = false;
@@ -83,7 +85,9 @@ test('hosted page opens the local dashboard even after a saved disconnect', asyn
   const redirects = [];
   const document = {
     readyState: 'loading',
-    addEventListener: (name, fn) => { listeners[name] = fn; },
+    addEventListener: (name, fn) => {
+      listeners[name] = fn;
+    },
     querySelectorAll: () => [],
     getElementById: () => null
   };
@@ -101,7 +105,8 @@ test('hosted page opens the local dashboard even after a saved disconnect', asyn
     AbortController,
     setInterval: () => 1,
     setTimeout: () => 1,
-    clearTimeout: () => {}
+    clearTimeout: () => {},
+    URLSearchParams
   };
   vm.runInNewContext(readFileSync(join(__dirname, '..', 'web/app.js'), 'utf8'), context);
   listeners.DOMContentLoaded();

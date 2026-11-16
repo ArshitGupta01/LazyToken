@@ -27,7 +27,7 @@ from source_index import (
     language_for_file,
 )
 
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 EXTENSIONS = {
     ".kt",
     ".kts",
@@ -1660,6 +1660,10 @@ def main() -> None:
         from benchmark.harness import main as benchmark_main
 
         raise SystemExit(benchmark_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "prompt-benchmark":
+        from benchmark.prompt_modes import main as prompt_benchmark_main
+
+        raise SystemExit(prompt_benchmark_main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "evaluate":
         from retrieval_eval import main as evaluation_main
 
@@ -1669,6 +1673,7 @@ def main() -> None:
     sub.add_parser("dashboard", help="Open the local graph dashboard")
     sub.add_parser("serve", help="Start the local server and open dashboard")
     sub.add_parser("benchmark", help="Validate and compare benchmark records")
+    sub.add_parser("prompt-benchmark", help="Plan, run and export Normal/Lite/Pro prompt trials")
     sub.add_parser("evaluate", help="Evaluate retrieval against supplied labels")
     ix = sub.add_parser("sync")
     ix.add_argument("root", nargs="?")

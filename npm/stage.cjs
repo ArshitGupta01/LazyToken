@@ -23,6 +23,7 @@ const files = [
   "index.html", "styles.css", "app.js", "features-ui.js", "graph3d.js", "POLICY.md", "LICENSE",
   "vendor/OrbitControls.js", "vendor/three.core.js", "vendor/three.module.js", "vendor/THREE-LICENSE.txt",
   "benchmark/__init__.py", "benchmark/harness.py", "benchmark/corpus.json",
+  "benchmark/prompt_modes.py", "web/prompts.json",
 ];
 for (const name of files) {
   const target = path.join(runtime, name);

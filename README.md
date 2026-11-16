@@ -6,7 +6,7 @@
 
 _Precision SQLite knowledge graph, deterministic context broker, and active session recall for AI coding agents._
 
-[![Version](https://img.shields.io/badge/version-v0.5.0-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/LazyToken/releases)
+[![Version](https://img.shields.io/badge/version-v0.5.2-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/TokSmart/releases)
 [![Unit Tests](https://img.shields.io/badge/unit%20tests-256%20verified-10b981.svg?style=for-the-badge&logo=pytest&logoColor=white)](#-verification--test-readiness)
 [![E2E Tests](https://img.shields.io/badge/e2e%20tests-209%2F209%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
 [![Architecture](https://img.shields.io/badge/architecture-100%25%20local%20%7C%20offline-f59e0b.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)
@@ -92,15 +92,17 @@ python kn.py serve
 
 ### Coding from a phone
 
-Tap **Open Coding mode** on the web page. Choose any AI assistant, describe your task,
-add your stack and relevant snippets, then generate and copy the prompt into your AI
-app or website. The prompt asks it to inspect existing code and dependencies, reuse
-compatible libraries and components from official sources, and test the smallest change.
+The mobile web page offers **TokSmart Lite**, **TokSmart Pro**, and **Coding Mode**.
+Tap a mode's **Copy prompt** button, paste into any AI assistant, then send your task.
+Coding Mode asks the assistant to reuse existing code, dependencies and compatible
+open-source components before writing custom code. No form or prompt generation step
+is required. The PC setup and graph remain separate from this mobile prompt hub.
 
-Coding mode runs in your browser without an account, API key or local server. It
-generates instructions; your chosen AI performs the coding. It sends no task or code
-to a server and retains drafts only while the page is open. Attach project files in
-your AI chat and run the generated changes in your development environment.
+The mobile page runs without an account, API key or local engine. It sends no task
+or code to an AI provider; your chosen assistant receives what you paste there.
+Attach project files in your AI chat and test changes in your development environment.
+See [mobile setup and benchmarking](docs/MOBILE_PROMPTS.md) for the exact workflow,
+benchmark commands, report imports and verification limits.
 
 The repository index and graph still run on your computer. `127.0.0.1` on a phone
 refers to that phone, so use the desktop setup commands on the computer. Prompts

@@ -72,8 +72,9 @@
   function start() {
     setupCopyButtons();
     if (
-      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      new URLSearchParams(window.location.search).get('desktop') !== '1' &&
+      (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
     ) {
       window.location.replace('mobile.html');
       return;
