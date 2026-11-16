@@ -514,6 +514,51 @@ body {
   color: #f87171;
 }
 
+/* Persistent Connected State (instant render on refresh) */
+.server-connected #step-2 .step-badge {
+  background: var(--green-bg);
+  border: 1.5px solid var(--green-main);
+  color: var(--green-text);
+}
+
+.server-connected #step-2 .badge-num {
+  display: none;
+}
+
+.server-connected #step-2 .badge-check {
+  display: block;
+}
+
+.server-connected #step-2-title {
+  color: var(--green-text) !important;
+}
+
+.server-connected #listening-box {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.server-connected .listening-icon-wrap {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: var(--green-text);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+}
+
+.server-connected #step-3 .step-label {
+  color: #ffffff;
+}
+
+.server-connected #step-3 .step-description {
+  color: var(--text-secondary);
+}
+
+.server-connected #step-3-indicator {
+  background: var(--purple-bg);
+  border: 1.5px solid var(--purple-border);
+  color: var(--purple-light);
+}
+
 /* Footer */
 .card-footer {
   margin-top: 32px;
