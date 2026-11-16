@@ -17,6 +17,96 @@ import kn
 
 
 class LocalReviewTests(unittest.TestCase):
+    def test_client_disconnect_is_quiet_but_server_errors_still_surface(self):
+        handler = dashboard.Handler.__new__(dashboard.Handler)
+        with patch.object(
+            dashboard.BaseHTTPRequestHandler, "handle", side_effect=ConnectionAbortedError
+        ):
+            handler.handle()
+        with patch.object(dashboard.BaseHTTPRequestHandler, "handle", side_effect=RuntimeError):
+            with self.assertRaises(RuntimeError):
+                handler.handle()
+
+    def test_empty_install_explains_how_to_index_a_project(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"KN_HOME": temp}):
+            server = dashboard.LocalServer(("127.0.0.1", 0), dashboard.Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            try:
+                conn.request("GET", "/api/graph")
+                response = conn.getresponse()
+                self.assertEqual(response.status, 400)
+                self.assertIn("toksmart@latest add", json.loads(response.read())["error"])
+            finally:
+                conn.close()
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
+    def test_cross_origin_health_only_and_no_remote_review(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"KN_HOME": temp}):
+            server = dashboard.LocalServer(("127.0.0.1", 0), dashboard.Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            trusted = "https://lazytoken-steel.vercel.app"
+            try:
+                conn.request("GET", "/api/health", headers={"Origin": trusted})
+                response = conn.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.getheader("Access-Control-Allow-Origin"), trusted)
+                self.assertEqual(json.loads(response.read())["status"], "ok")
+                for origin in (trusted, "https://attacker.vercel.app", "https://evil.example"):
+                    for path in ("/api/session", "/api/projects", "/api/graph"):
+                        conn.request("GET", path, headers={"Origin": origin})
+                        response = conn.getresponse()
+                        self.assertEqual(response.status, 403)
+                        self.assertIsNone(response.getheader("Access-Control-Allow-Origin"))
+                        self.assertNotIn(server.review_token, response.read().decode())
+                    conn.request(
+                        "POST",
+                        "/api/review",
+                        "{}",
+                        {
+                            "Origin": origin,
+                            "Content-Type": "application/json",
+                            "X-LazyToken-Review": server.review_token,
+                        },
+                    )
+                    response = conn.getresponse()
+                    self.assertEqual(response.status, 403)
+                    self.assertIsNone(response.getheader("Access-Control-Allow-Origin"))
+                    response.read()
+                conn.request(
+                    "OPTIONS",
+                    "/api/health",
+                    headers={
+                        "Origin": trusted,
+                        "Access-Control-Request-Method": "GET",
+                        "Access-Control-Request-Private-Network": "true",
+                    },
+                )
+                response = conn.getresponse()
+                self.assertEqual(response.status, 204)
+                self.assertEqual(response.getheader("Access-Control-Allow-Origin"), trusted)
+                self.assertEqual(response.getheader("Access-Control-Allow-Private-Network"), "true")
+                response.read()
+                conn.request(
+                    "OPTIONS",
+                    "/api/review",
+                    headers={"Origin": trusted, "Access-Control-Request-Method": "POST"},
+                )
+                response = conn.getresponse()
+                self.assertEqual(response.status, 403)
+                self.assertIsNone(response.getheader("Access-Control-Allow-Origin"))
+                response.read()
+            finally:
+                conn.close()
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
     def test_session_graph_is_scoped_and_ambiguous_ids_are_rejected(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"KN_HOME": temp}):
             db = kn.connect()

@@ -14,7 +14,6 @@ import re
 import shutil
 import sys
 import tempfile
-import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -430,15 +429,19 @@ def verified_memory_no_graph(kn, project: str, query: str, conn, limit: int = 10
     matched_assets = []
     associated_files = []
 
-    if conn and terms:
+    project = features.project_id(kn, conn, project) if conn else None
+    if project and terms:
         rows = conn.execute(
-            "SELECT id, kind, name, summary, tags FROM assets "
-            "WHERE (scope='global' OR (scope='project' AND project_id=?)) "
-            "AND NOT EXISTS (SELECT 1 FROM memory_proposals m WHERE m.asset_id=assets.id AND m.status='superseded')",
-            (project,),
+            "SELECT a.id, a.kind, a.name, a.summary, a.tags, m.id AS proposal_id "
+            "FROM assets a JOIN memory_proposals m ON m.asset_id=a.id "
+            "WHERE m.project_id=? AND a.scope='project' AND a.project_id=? "
+            "AND m.status='approved' AND m.verification_state='verified'",
+            (project, project),
         ).fetchall()
 
         for r in rows:
+            if features.health(conn, r["proposal_id"]).get("freshness") != "current":
+                continue
             name_score = sum(4 for t in terms if t in r["name"].lower())
             sum_score = sum(2 for t in terms if t in r["summary"].lower())
             score = name_score + sum_score
@@ -496,9 +499,9 @@ def full_lazytoken_pipeline(
 
     # Relational order: impact callers first, then broker retrieved files
     combined = list(dict.fromkeys(impact_files + broker_files))
-    tokens = mem_res.get("used_tokens", 0)
-    if combined and tokens == 0:
-        tokens = min(budget, len(combined) * 35)
+    tokens = kn.estimate(json.dumps(mem_res, ensure_ascii=False)) + kn.estimate(
+        json.dumps(impact, ensure_ascii=False)
+    )
 
     return {
         "method": "full_pipeline",
@@ -535,22 +538,37 @@ def run_ablation(scenarios: list[dict] | None = None, k: int = 5) -> AblationRes
             kn.sync(root, conn)
             project = root.name
 
-            # Seed verified domain lessons for all scenarios
-            now = int(time.time())
+            # Seed synthetic lessons through the same review and evidence checks as real memory.
             for sc in target_scenarios:
                 lesson_name = sc.get("lesson_name", f"{sc['id']} Lesson")
                 lesson_summary = sc.get("lesson_summary", f"Verified lesson for {sc['task']}")
-                conn.execute(
-                    "INSERT INTO assets(kind, scope, name, summary, created_at, project_id) "
-                    "VALUES('lesson', 'global', ?, ?, ?, ?)",
-                    (lesson_name, lesson_summary, now, project),
+                proposal = features.propose(
+                    kn,
+                    {
+                        "project": project,
+                        "kind": "lesson",
+                        "name": lesson_name,
+                        "summary": lesson_summary,
+                        "task": sc["task"],
+                        "evidence": "Synthetic benchmark evidence",
+                        "paths": [sc["relevant_files"][0]],
+                    },
+                    conn,
                 )
-                lesson_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-                conn.execute(
-                    "INSERT INTO asset_projects VALUES(?, ?, 'applies_to')",
-                    (lesson_id, project),
+                if "error" in proposal:
+                    raise ValueError(f"Failed to seed benchmark lesson: {proposal['error']}")
+                reviewed = features.review(
+                    kn,
+                    {
+                        "project": project,
+                        "id": proposal["id"],
+                        "action": "approve",
+                        "verified": True,
+                    },
+                    conn,
                 )
-            conn.commit()
+                if "error" in reviewed:
+                    raise ValueError(f"Failed to approve benchmark lesson: {reviewed['error']}")
 
             # Compute raw whole-file token baseline
             total_repo_chars = sum(len(f.read_text(encoding="utf-8")) for f in root.glob("*.py"))
@@ -773,11 +791,11 @@ def generate_markdown_report(
         "",
         "> **Objective**: Empirically evaluate all 5 ablation modes (Plain Grep baseline, Lexical alone,",
         "> Lexical + AST Graph, Verified Memory alone, and Full Pipeline) across multi-service scenarios.",
-        "> Quantifies Precision@k, Recall@k, MRR@k, NDCG@k, Abstention, Tokens, and Token Savings vs Raw Repo.",
+        "> Compares retrieval and estimated payload size against a raw-repository payload. It does not measure provider usage or task success.",
         "",
         "## 1. Executive Summary & Comparative Matrix",
         "",
-        "| Scenario | Mode 1 (Plain Grep) | Mode 2 (Lexical) | Mode 3 (Lexical+Graph) | Mode 4 (Memory) | Mode 5 (Full Pipeline) | Net Savings |",
+        "| Scenario | Mode 1 (Plain Grep) | Mode 2 (Lexical) | Mode 3 (Lexical+Graph) | Mode 4 (Memory) | Mode 5 (Full Pipeline) | Estimated payload reduction vs raw |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
 
@@ -803,7 +821,7 @@ def generate_markdown_report(
             else "No Match ❌"
         )
         m5 = (
-            f"Full Coverage 🟢 ({r['modes']['full_pipeline'].get('blast_radius', 'exact')})"
+            f"Caller Found 🟢 ({r['modes']['full_pipeline'].get('blast_radius', 'unknown')})"
             if r["modes"]["full_pipeline"]["caller_discovered"]
             else "Missed ❌"
         )
@@ -818,7 +836,7 @@ def generate_markdown_report(
             "",
             "## 2. Standard IR Evaluation Metrics Across All 5 Modes",
             "",
-            "| Mode | Precision@5 | Recall@5 | MRR@5 | NDCG@5 | Abstention Acc | Tokens (mean) | Net Savings vs Raw |",
+            "| Mode | Precision@5 | Recall@5 | MRR@5 | NDCG@5 | Abstention Acc | Estimated tokens (mean) | Payload reduction vs raw |",
             "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
         ]
     )
@@ -850,20 +868,20 @@ def generate_markdown_report(
             "",
             "## 3. Key Empirical Findings",
             "",
-            "### Finding 1: Plain Grep Baseline (Mode 1) Misses Indirect Callers",
-            "- **Observation**: Scans raw disk files line-by-line without SQLite or AST knowledge. In `ABL-01`, `TokenStore.validate` is called by `AuthMiddleware.authenticate`, which calls `self.store.validate`. Plain grep captures `token_store.py` and `auth_middleware.py`, but completely misses 2-hop caller `api_gateway.py`.",
+            "### Finding 1: Plain Grep Baseline (Mode 1)",
+            "- This mode scans files without graph traversal; inspect per-scenario results for observed caller discovery.",
             "",
-            "### Finding 2: Lexical Search (Mode 2) Suffers False-Positive Noise on Disambiguation",
-            "- **Observation**: In `ABL-02`, the repository contains `UserService.delete()`, `FileService.delete()`, and `CacheService.delete()`. FTS word matching returns all three files, introducing noise.",
+            "### Finding 2: Lexical Search (Mode 2)",
+            "- Inspect precision and recall above for the observed lexical matches.",
             "",
             "### Finding 3: Relational Graph Expansion (Mode 3) Resolves Inbound Caller Blast Radius",
-            "- **Observation**: AST graph impact analysis isolates exact call sites with qualified symbol confidence, elevating Recall@5 significantly over lexical search alone.",
+            "- Inspect the scenario metrics above for the graph's observed recall and precision; inferred call edges can be inaccurate.",
             "",
             "### Finding 4: Verified Domain Memory (Mode 4) Targets Contractual Lessons",
-            "- **Observation**: Domain lessons provide concise operational constraints (e.g., scope arguments or cascading deletions) with the smallest token footprint (~40-80 tokens).",
+            "- Synthetic reviewed lessons are seeded with indexed evidence; inspect the scenario metrics above for their estimated payload size.",
             "",
-            "### Finding 5: Full LazyToken Pipeline (Mode 5) Delivers Maximum Recall & Token Savings",
-            "- **Observation**: Combines lexical search, verified memory, AST relational graph, and token budgeting. Delivers full coverage in 180–310 tokens vs 1,250+ raw repository tokens (>80% net savings).",
+            "### Finding 5: Full LazyToken Pipeline (Mode 5)",
+            "- Estimated payloads include both broker and impact responses. These synthetic payload comparisons do not measure provider usage or task success.",
             "",
             "---",
             "",

@@ -67,6 +67,52 @@ class KnowledgeNetworkTests(unittest.TestCase):
         self.assertEqual(second["removed"], 1)
         self.assertEqual(kn.search("CaseStore", self.db)["results"][0]["name"], "CaseStore")
 
+    def test_discovery_access_failure_preserves_index_until_retry(self):
+        import subprocess
+
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        kn.sync(self.root, self.db)
+        before = self.db.execute(
+            "SELECT digest FROM files WHERE project_id=? AND path=?",
+            (str(self.root.resolve()), "src.kt"),
+        ).fetchone()[0]
+        original_lstat = Path.lstat
+
+        def denied(path, *args, **kwargs):
+            if path == self.root / "src.kt":
+                raise PermissionError("temporary discovery failure")
+            return original_lstat(path, *args, **kwargs)
+
+        with patch.object(Path, "lstat", denied):
+            result = kn.sync(self.root, self.db)
+        self.assertEqual(result["removed"], 0)
+        self.assertIn("src.kt", result["error_paths"])
+        self.assertEqual(
+            self.db.execute(
+                "SELECT digest FROM files WHERE project_id=? AND path=?",
+                (str(self.root.resolve()), "src.kt"),
+            ).fetchone()[0],
+            before,
+        )
+        self.assertTrue(kn.search("lookupAccount", self.db)["results"])
+        (self.root / "src.kt").unlink()
+        self.assertEqual(kn.sync(self.root, self.db)["removed"], 1)
+
+    def test_unreadable_ignore_file_does_not_erase_fallback_index(self):
+        kn.sync(self.root, self.db)
+        reader = kn.read_project_file
+
+        def denied_ignore(root, relative, *args, **kwargs):
+            if Path(relative).name == ".gitignore":
+                raise PermissionError("temporary ignore read failure")
+            return reader(root, relative, *args, **kwargs)
+
+        with patch.object(kn, "read_project_file", side_effect=denied_ignore):
+            result = kn.sync(self.root, self.db)
+        self.assertEqual(result["removed"], 0)
+        self.assertIn(".", result["error_paths"])
+        self.assertTrue(kn.search("lookupAccount", self.db)["results"])
+
     def test_project_reader_limits_bytes_and_rejects_paths(self):
         self.assertEqual(kn.read_project_file(self.root, "src.kt", 7), b"package")
         for path in ("../outside.py", ".env", "missing.py"):

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0b12" />
+    <meta name="description" content="Copy TokSmart Lite, Pro or Coding prompts into your favorite AI assistant. No installation or API key needed." />
+    <title>TokSmart — Pocket prompts</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="mobile.css" />
+    <script src="mobile.js" defer></script>
+  </head>
+  <body class="mobile-page">
+    <div class="pocket-shell">
+      <header class="pocket-header">
+        <a class="brand-badge" href="mobile.html" aria-label="TokSmart home"><span class="pocket-mark" aria-hidden="true">T</span> TOKSMART</a>
+        <a href="index.html?desktop=1" class="desktop-link">PC setup ↗</a>
+      </header>
+
+      <main>
+        <section id="prompts-panel" aria-labelledby="pocket-title">
+          <div class="pocket-hero">
+            <span class="pill pill-green">YOUR AI. A BETTER START.</span>
+            <h1 id="pocket-title">Less busywork.<br /><span>More useful AI.</span></h1>
+            <p>Pick a mode. Copy the prompt.<br />Make your next AI conversation count.</p>
+            <div class="pocket-meta"><span>No signup</span><span>No install</span><span>Any AI assistant</span></div>
+          </div>
+
+          <div class="section-heading"><h2>Choose your mode</h2><span id="prompt-version">Loading prompts…</span></div>
+          <div id="prompt-cards" class="prompt-cards" aria-busy="true"></div>
+          <p id="copy-status" class="copy-status" role="status" aria-live="polite">Loading your prompts…</p>
+          <button id="retry-prompts" class="launch-btn" type="button" hidden>Retry loading prompts</button>
+          <noscript><p class="mobile-note">Enable JavaScript for the copy buttons. You can also open <a href="prompts.json">the prompt text</a> directly.</p></noscript>
+          <aside class="mobile-note"><strong>A prompt, not a promise.</strong> These instructions guide your AI; results and token savings depend on the model and task. Use Benchmarks to compare measured results.</aside>
+        </section>
+
+        <section id="benchmarks-panel" aria-labelledby="benchmarks-title" hidden>
+          <div class="pocket-hero compact"><span class="pill pill-green">MEASURE, THEN COMPARE</span><h1 id="benchmarks-title">Show the<br /><span>whole cost.</span></h1><p>Normal vs Lite vs Pro. Same tasks, same model, instruction overhead included.</p></div>
+          <div class="connect-card benchmark-import">
+            <h2>Your benchmark history</h2>
+            <p>Run the benchmark on your computer, export its JSON report, then open it here. Reports stay in this browser. No API keys go into this page.</p>
+            <label for="benchmark-file" class="launch-btn">Import benchmark JSON</label>
+            <input id="benchmark-file" type="file" accept="application/json,.json" />
+            <p id="benchmark-status" class="copy-status" role="status" aria-live="polite">No measured runs yet. No savings claimed.</p>
+          </div>
+          <div id="benchmark-results"></div>
+          <div class="benchmark-actions">
+            <button id="export-json" class="launch-btn" type="button" disabled>Export JSON</button>
+            <button id="export-csv" class="launch-btn" type="button" disabled>Export CSV</button>
+            <button id="reset-history" class="text-button" type="button" disabled>Clear browser history</button>
+          </div>
+          <details class="mobile-guide"><summary>How to run a fair benchmark</summary><p>On your computer, use the runner in this repository: <code>python -m benchmark.prompt_modes plan</code> previews the experiment. Configure your provider key in your computer’s environment, then run <code>python -m benchmark.prompt_modes run --model YOUR_MODEL</code>. Export with the runner’s export command.</p><p>The suite has 36 cases across 12 categories and defaults to three trials. It uses the exact prompts above. Live calls may incur provider charges. News tests check whether the model admits it has no browsing; this runner supplies no tools. Image cases evaluate text and consent behavior, not generated image quality.</p></details>
+        </section>
+
+        <section id="help-panel" aria-labelledby="help-title" hidden>
+          <div class="pocket-hero compact"><span class="pill pill-green">COPY. PASTE. ASK.</span><h1 id="help-title">Ready in<br /><span>three steps.</span></h1></div>
+          <ol class="help-steps">
+            <li class="connect-card"><span class="step-number">01</span><h2>Choose and copy</h2><p>Lite for everyday questions. Pro for complex work. Coding for reusing existing code and open-source components. Tap that mode’s Copy prompt button.</p></li>
+            <li class="connect-card"><span class="step-number">02</span><h2>Paste into your AI</h2><p>Open ChatGPT, Claude, Gemini or another assistant. Start a chat and paste the prompt. It works as an instruction in whichever model or mode you choose, subject to that assistant’s capabilities.</p></li>
+            <li class="connect-card"><span class="step-number">03</span><h2>Send your actual task</h2><p>Describe what you need. For coding, include your stack, constraints and relevant project files. Apply changes in your editor or a connected coding agent, then run the tests.</p></li>
+          </ol>
+          <details class="mobile-guide" open><summary>What happens to my data?</summary><p>Copying sends nothing to an AI provider. Your chosen assistant receives the prompt and any files you paste or attach there. Benchmark reports can contain task and response text; import only reports you want stored in this browser.</p></details>
+          <details class="mobile-guide"><summary>Where is the graph?</summary><p>The graph and repository index belong to the PC version. This mobile page is a prompt hub. It needs no local engine, account or API key. Your phone cannot reach your computer through 127.0.0.1: that address refers to the device you are using.</p></details>
+          <details class="mobile-guide"><summary>Copy didn’t work?</summary><p>If your browser blocks the clipboard, the prompt opens with its text selected. Use your device’s Copy action, then paste it into your AI assistant.</p></details>
+        </section>
+      </main>
+      <footer class="pocket-footer">Built for thoughtful shortcuts. <span>Keep the quality.</span></footer>
+    </div>
+
+    <nav class="pocket-nav" aria-label="Mobile sections">
+      <button type="button" data-panel="prompts" aria-pressed="true"><span aria-hidden="true">✦</span> Prompts</button>
+      <button type="button" data-panel="benchmarks" aria-pressed="false"><span aria-hidden="true">▥</span> Benchmarks</button>
+      <button type="button" data-panel="help" aria-pressed="false"><span aria-hidden="true">?</span> How to use</button>
+    </nav>
+
+    <dialog id="copy-fallback" aria-labelledby="fallback-title">
+      <h2 id="fallback-title">Copy your prompt</h2>
+      <p>Clipboard access is unavailable. Select and copy this text with your device’s Copy action.</p>
+      <textarea id="fallback-text" readonly rows="12" aria-label="Prompt to copy manually"></textarea>
+      <button id="close-fallback" class="launch-btn" type="button">Done</button>
+    </dialog>
+  </body>
+</html>

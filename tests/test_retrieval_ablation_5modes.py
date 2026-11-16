@@ -22,6 +22,7 @@ from benchmark.graph_ablation import (
     generate_markdown_report,
 )
 import kn
+import features
 import retrieval_eval
 
 
@@ -174,12 +175,53 @@ class TestRetrievalAblation5Modes(unittest.TestCase):
                 )
                 conn.commit()
 
+                self.assertFalse(
+                    verified_memory_no_graph(kn, project, "charge billing amount", conn)[
+                        "has_lesson"
+                    ]
+                )
+                proposal = features.propose(
+                    kn,
+                    {
+                        "project": project,
+                        "kind": "lesson",
+                        "name": "Billing Contract",
+                        "summary": "charge requires non-negative amount in billing.py",
+                        "task": "charge billing amount",
+                        "evidence": "fixture",
+                        "paths": ["billing.py"],
+                    },
+                    conn,
+                )
+                self.assertNotIn("error", proposal)
+                approved = features.review(
+                    kn,
+                    {
+                        "project": project,
+                        "id": proposal["id"],
+                        "action": "approve",
+                        "verified": True,
+                    },
+                    conn,
+                )
+                self.assertNotIn("error", approved)
+
                 res = verified_memory_no_graph(kn, project, "charge billing amount", conn)
                 self.assertEqual(res["method"], "verified_memory_no_graph")
                 self.assertTrue(res["has_lesson"])
                 self.assertIn("billing.py", res["retrieved_files"])
                 self.assertFalse(res["abstained"])
                 self.assertGreater(res["tokens"], 0)
+
+                (repo_root / "billing.py").write_text(
+                    "def charge(amount): return False\n", encoding="utf-8"
+                )
+                kn.sync(repo_root, conn)
+                self.assertFalse(
+                    verified_memory_no_graph(kn, project, "charge billing amount", conn)[
+                        "has_lesson"
+                    ]
+                )
 
                 # Unrelated query with no matching lesson
                 res_nomatch = verified_memory_no_graph(
@@ -215,6 +257,11 @@ class TestRetrievalAblation5Modes(unittest.TestCase):
                 self.assertIn("service.py", res["retrieved_files"])
                 self.assertIn("controller.py", res["retrieved_files"])
                 self.assertGreater(res["tokens"], 0)
+                self.assertEqual(
+                    res["tokens"],
+                    kn.estimate(json.dumps(res["broker_context"], ensure_ascii=False))
+                    + kn.estimate(json.dumps(res["impact"], ensure_ascii=False)),
+                )
             finally:
                 conn.close()
 

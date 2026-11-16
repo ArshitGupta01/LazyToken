@@ -1568,16 +1568,31 @@ class TestF17FiveModeRetrievalAblations(E2ETestCase):
         try:
             kn.sync(repo, conn)
             project_id = str(repo.resolve())
-            conn.execute(
-                "INSERT INTO assets(kind,name,summary,tags,source,created_at,scope,project_id) VALUES(?,?,?,'','',0,'project',?)",
-                (
-                    "lesson",
-                    "TokenStore Scope Contract",
-                    "TokenStore validate method requires scope string argument in token_store.py",
-                    project_id,
-                ),
+            proposal = features.propose(
+                kn,
+                {
+                    "project": project_id,
+                    "kind": "lesson",
+                    "name": "TokenStore Scope Contract",
+                    "summary": "TokenStore validate method requires scope string argument in store.py",
+                    "task": "TokenStore validate scope",
+                    "evidence": "fixture",
+                    "paths": ["store.py"],
+                },
+                conn,
             )
-            conn.commit()
+            self.assertNotIn("error", proposal)
+            reviewed = features.review(
+                kn,
+                {
+                    "project": project_id,
+                    "id": proposal["id"],
+                    "action": "approve",
+                    "verified": True,
+                },
+                conn,
+            )
+            self.assertNotIn("error", reviewed)
             import benchmark.graph_ablation as ga
 
             res = ga.verified_memory_no_graph(
@@ -1607,7 +1622,8 @@ class TestF17FiveModeRetrievalAblations(E2ETestCase):
             )
             self.assertEqual(res["mode"], "full_pipeline")
             self.assertIn("files", res)
-            self.assertLessEqual(res.get("used_tokens", 0), 600)
+            self.assertLessEqual(res["broker_context"]["used_tokens"], 600)
+            self.assertGreater(res["tokens"], res["broker_context"]["used_tokens"])
         finally:
             conn.close()
 

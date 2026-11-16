@@ -17,6 +17,12 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 import kn
 
 HERE = Path(__file__).resolve().parent
+HEALTH_ORIGINS = {
+    "https://toksmart.vercel.app",
+    "https://repomind-live.vercel.app",
+    "https://repomind-graph.vercel.app",
+    "https://lazytoken-steel.vercel.app",
+}
 
 
 def database_path() -> Path:
@@ -27,7 +33,7 @@ def read_graph(project: str = "", workspace: bool = False) -> dict:
     path = database_path()
     if not path.is_file():
         return {
-            "error": "No local knowledge database yet. Run toksmart init, then toksmart add <absolute repository path>."
+            "error": 'No projects indexed yet. Run npx toksmart@latest add "FULL_PATH_TO_PROJECT" in another terminal.'
         }
     conn = sqlite3.connect(f"file:{quote(path.as_posix(), safe='/:')}?mode=ro", uri=True, timeout=2)
     conn.row_factory = sqlite3.Row
@@ -60,15 +66,29 @@ def read_projects() -> list[dict]:
 class Handler(BaseHTTPRequestHandler):
     server_version = "TokSmartLocal/0.5"
 
-    def _cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
+    def handle(self) -> None:
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
 
     def do_OPTIONS(self) -> None:
+        host = self.headers.get("Host", "").lower()
+        origin = self.headers.get("Origin", "")
+        if (
+            host
+            not in {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
+            or urlparse(self.path).path not in ("/api/health", "/api/ping")
+            or origin not in HEALTH_ORIGINS
+            or self.headers.get("Access-Control-Request-Method") != "GET"
+        ):
+            return self._json({"error": "Invalid preflight"}, 403)
         self.send_response(204)
-        self._cors_headers()
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET")
+        if self.headers.get("Access-Control-Request-Private-Network", "").lower() == "true":
+            self.send_header("Access-Control-Allow-Private-Network", "true")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -79,7 +99,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self._cors_headers()
+        origin = self.headers.get("Origin", "")
+        if (
+            status == 200
+            and self.command == "GET"
+            and urlparse(self.path).path in ("/api/health", "/api/ping")
+            and origin in HEALTH_ORIGINS
+        ):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.end_headers()
         self.wfile.write(body)
 
@@ -104,6 +132,10 @@ class Handler(BaseHTTPRequestHandler):
         }:
             return self._json({"error": "Invalid host"}, 403)
         parsed = urlparse(self.path)
+        origin = self.headers.get("Origin", "")
+        if origin and origin != f"http://{self.headers.get('Host', '').lower()}":
+            if parsed.path not in ("/api/health", "/api/ping") or origin not in HEALTH_ORIGINS:
+                return self._json({"error": "Invalid origin"}, 403)
         if parsed.path in ("/api/health", "/api/ping"):
             return self._json(
                 {
@@ -238,16 +270,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/api/review":
             return self._json({"error": "Not found"}, 404)
         origin = self.headers.get("Origin", "")
-        allowed_origins = {
-            f"http://{host}",
-            f"http://127.0.0.1:{self.server.server_port}",
-            f"http://localhost:{self.server.server_port}",
-            "https://toksmart.vercel.app",
-            "https://repomind-live.vercel.app",
-            "https://repomind-graph.vercel.app",
-            "https://lazytoken-steel.vercel.app",
-        }
-        origin_valid = origin in allowed_origins or origin.endswith(".vercel.app")
+        origin_valid = origin == f"http://{host}"
         review_token = (
             self.headers.get("X-TokSmart-Review", "")
             or self.headers.get("X-RepoMind-Review", "")

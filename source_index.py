@@ -676,6 +676,19 @@ def python_calls(body):
 
     def record_calls(func_node, caller_names, class_name="", is_lambda=False):
         local_types = extract_local_types(func_node)
+        arguments = getattr(func_node, "args", None)
+        bound_names = set()
+        if arguments:
+            bound_names.update(
+                arg.arg for arg in arguments.posonlyargs + arguments.args + arguments.kwonlyargs
+            )
+            bound_names.update(arg.arg for arg in (arguments.vararg, arguments.kwarg) if arg)
+        for stmt in walk_local_stmts(func_node):
+            bound_names.update(
+                node.id
+                for node in ast.walk(stmt)
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+            )
         caller_line = getattr(func_node, "lineno", 0)
         for call_node in walk_function_calls(func_node, exclude_lambdas=not is_lambda):
             callee_name = None
@@ -690,23 +703,32 @@ def python_calls(body):
                 if isinstance(val, ast.Name):
                     receiver = val.id
                     if receiver in ("self", "cls") and class_name:
-                        resolved = f"{class_name}.{callee_name}"
-                        confidence = "exact"
-                        resolution_method = "explicit_class"
+                        if callee_name in class_hierarchy.get(class_name, {}).get("methods", set()):
+                            resolved = f"{class_name}.{callee_name}"
+                        else:
+                            resolved, _, _ = resolve_super_target(class_name, callee_name)
+                        confidence = "inferred"
+                        resolution_method = "inferred_type"
                     elif receiver in local_types:
                         inferred_cls = local_types[receiver]
                         resolved = f"{inferred_cls}.{callee_name}"
                         confidence = "inferred"
                         resolution_method = "inferred_type"
-                    elif receiver in imported_symbols:
+                    elif receiver in imported_symbols and receiver not in bound_names:
                         resolved = f"{receiver}.{callee_name}"
                         confidence = "exact"
                         resolution_method = "explicit_import"
                     elif receiver:
                         resolved = f"{receiver}.{callee_name}"
-                        confidence = "exact" if receiver[0].isupper() else "provisional"
+                        confidence = (
+                            "inferred"
+                            if receiver[0].isupper() and receiver not in bound_names
+                            else "provisional"
+                        )
                         resolution_method = (
-                            "explicit_class" if receiver[0].isupper() else "untyped_receiver"
+                            "explicit_class"
+                            if receiver[0].isupper() and receiver not in bound_names
+                            else "untyped_receiver"
                         )
                 elif (
                     isinstance(val, ast.Attribute)
@@ -751,9 +773,15 @@ def python_calls(body):
                 callee_name = call_node.func.id
                 receiver = ""
                 resolved = callee_name
-                confidence = "inferred" if callee_name in imported_symbols else "provisional"
+                confidence = (
+                    "inferred"
+                    if callee_name in imported_symbols and callee_name not in bound_names
+                    else "provisional"
+                )
                 resolution_method = (
-                    "explicit_import" if callee_name in imported_symbols else "lexical_scope"
+                    "explicit_import"
+                    if callee_name in imported_symbols and callee_name not in bound_names
+                    else "lexical_scope"
                 )
 
             if callee_name and isinstance(callee_name, str):
@@ -895,9 +923,9 @@ def javascript_symbols(body):
         r"^\s*(?:(?:public|private|protected|static|readonly|async|override)\s+)*(?:get\s+|set\s+)?([a-zA-Z0-9_$]+)\s*(?:<[^>]+>)?\s*\([^)]*\)\s*(?::\s*[^{;]+)?\s*[\{;]"
     )
 
-    for n, line in enumerate(body.splitlines(), 1):
-        clean = re.sub(r"//.*$", "", line)
-        clean = re.sub(r"([\"'`])(?:\\.|(?!\1)[\s\S])*?\1", '""', clean)
+    token = re.compile(r'(["\'`])(?:\\.|(?!\1)[\s\S])*?\1|//[^\n]*|/\*[\s\S]*?\*/')
+    masked = token.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), body)
+    for n, clean in enumerate(masked.splitlines(), 1):
         stripped = clean.strip()
         if not stripped or stripped.startswith("/*") or stripped.startswith("*"):
             continue
@@ -907,6 +935,13 @@ def javascript_symbols(body):
             cls_name = m_cls.group(1)
             symbols.append((cls_name, n))
             class_stack.append({"name": cls_name, "brace_depth": 0})
+            after_open = clean.find("{", m_cls.end())
+            if after_open >= 0:
+                inline_method = re_method.search(clean[after_open + 1 :])
+                if inline_method and inline_method.group(1) not in JS_CONTROL_FLOW:
+                    symbols.extend(
+                        [(inline_method.group(1), n), (f"{cls_name}.{inline_method.group(1)}", n)]
+                    )
 
         m_decl = re_decl.search(clean)
         if m_decl:
@@ -989,24 +1024,25 @@ def javascript_calls(body):
     )
     re_call = re.compile(r"(?:([a-zA-Z0-9_$]+(?:\.[a-zA-Z0-9_$]+)?)\.)?([a-zA-Z0-9_$]+)\s*\(")
 
-    for line in lines:
-        m_named = re.findall(r"import\s+\{([^}]+)\}\s+from", line)
+    for line, clean in zip(lines, clean_lines):
+        import_line = line if re.match(r"^\s*import\b", clean) else ""
+        m_named = re.findall(r"import\s+(?:[a-zA-Z0-9_$]+\s*,\s*)?\{([^}]+)\}\s+from", import_line)
         for group in m_named:
             for item in group.split(","):
                 sym = item.strip().split(" as ")[-1].strip()
                 if sym:
                     imported_symbols.add(sym)
-        m_default = re.search(r"import\s+([a-zA-Z0-9_$]+)\s+from", line)
+        m_default = re.search(r"import\s+([a-zA-Z0-9_$]+)\s*(?:,|\s+from)", import_line)
         if m_default:
             imported_symbols.add(m_default.group(1))
 
-        m_cls_pre = re_class.search(line)
+        m_cls_pre = re_class.search(clean)
         if m_cls_pre:
             local_classes[m_cls_pre.group(1)] = m_cls_pre.group(2)
-        m_fn_pre = re_func.search(line)
+        m_fn_pre = re_func.search(clean)
         if m_fn_pre and m_fn_pre.group(1):
             local_functions.add(m_fn_pre.group(1))
-        m_arr_pre = re_arrow.search(line)
+        m_arr_pre = re_arrow.search(clean)
         if m_arr_pre and m_arr_pre.group(1):
             local_functions.add(m_arr_pre.group(1))
 
@@ -1051,21 +1087,18 @@ def javascript_calls(body):
         if pending_func and open_b > 0:
             func_stack.append((pending_func, brace_depth + 1, lineno))
 
-        if func_stack:
-            curr_func = func_stack[-1][0]
+        concise_arrow = bool(m_arr and open_b == 0)
+        if func_stack or concise_arrow:
+            curr_func = pending_func if concise_arrow else func_stack[-1][0]
             curr_cls = class_stack[-1][0] if class_stack else ""
             for match in re_call.finditer(clean_line):
                 recv = match.group(1) or ""
                 callee = match.group(2)
-                if (
-                    callee in JS_KEYWORDS
-                    or callee in JS_CONTROL_FLOW
-                    or (not recv and callee == curr_func.split(".")[-1])
-                ):
+                if callee in JS_KEYWORDS or callee in JS_CONTROL_FLOW:
                     continue
-                if m_meth and callee == m_meth.split(".")[-1]:
+                if m_meth and match.start(2) == m_meth_candidate.start(1):
                     continue
-                if m_fn and callee == m_fn.group(1):
+                if m_fn and match.start(2) == m_fn.start(1):
                     continue
 
                 resolved = None
@@ -1133,7 +1166,7 @@ def javascript_calls(body):
                 calls.append(
                     {
                         "caller_symbol": curr_func,
-                        "caller_line": func_stack[-1][2],
+                        "caller_line": lineno if concise_arrow else func_stack[-1][2],
                         "callee_name": callee,
                         "receiver": recv,
                         "resolved_callee": resolved,

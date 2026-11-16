@@ -11,6 +11,15 @@ from pathlib import Path
 
 
 def migrate(conn):
+    def add_column(table, name, definition):
+        if name in {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}:
+            return
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+        except sqlite3.OperationalError:
+            if name not in {row["name"] for row in conn.execute(f"PRAGMA table_info({table}")}:
+                raise
+
     conn.execute("PRAGMA busy_timeout = 5000")
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(
@@ -28,15 +37,13 @@ def migrate(conn):
     INSERT OR IGNORE INTO lazytoken_migrations VALUES(2, strftime('%s','now'));
     """
     )
-    columns = {row["name"] for row in conn.execute("PRAGMA table_info(memory_proposals)")}
     for name, definition in (
         ("problem", "TEXT NOT NULL DEFAULT ''"),
         ("attempts", "TEXT NOT NULL DEFAULT ''"),
         ("resolution", "TEXT NOT NULL DEFAULT ''"),
         ("verification_state", "TEXT NOT NULL DEFAULT 'hypothesis'"),
     ):
-        if name not in columns:
-            conn.execute(f"ALTER TABLE memory_proposals ADD COLUMN {name} {definition}")
+        add_column("memory_proposals", name, definition)
     conn.execute("INSERT OR IGNORE INTO lazytoken_migrations VALUES(3, strftime('%s','now'))")
     fts_existed = conn.execute("SELECT 1 FROM sqlite_master WHERE name='lazytoken_fts'").fetchone()
     try:
@@ -111,13 +118,8 @@ def migrate(conn):
     CREATE INDEX IF NOT EXISTS memory_test_evidence_idx ON memory_test_evidence(proposal_id);
     """
     )
-    cols = {row["name"] for row in conn.execute("PRAGMA table_info(memory_proposals)")}
-    if "replaces_id" not in cols:
-        conn.execute("ALTER TABLE memory_proposals ADD COLUMN replaces_id INTEGER DEFAULT NULL")
-    if "lifecycle_state" not in cols:
-        conn.execute(
-            "ALTER TABLE memory_proposals ADD COLUMN lifecycle_state TEXT NOT NULL DEFAULT 'pending'"
-        )
+    add_column("memory_proposals", "replaces_id", "INTEGER DEFAULT NULL")
+    add_column("memory_proposals", "lifecycle_state", "TEXT NOT NULL DEFAULT 'pending'")
     conn.execute("INSERT OR IGNORE INTO lazytoken_migrations VALUES(6, strftime('%s','now'))")
     conn.commit()
     if not conn.execute("SELECT 1 FROM lazytoken_migrations WHERE version=7").fetchone():
@@ -911,7 +913,7 @@ def ranked_search(kn, args, conn):
     project = project_id(kn, conn, args.get("project"))
     if not project:
         return {"error": "An indexed project is required."}
-    query = str(args.get("query", ""))[:1000]
+    query = str(args.get("query", ""))[:2000]
     words = [t for t in kn.split_words(query) if len(t) > 1 or not t.isascii()]
     # Keep the limited search budget for meaningful terms in natural-language tasks.
     stop_words = set(

@@ -326,22 +326,26 @@ def safe_relative(s: str) -> bool:
     )
 
 
-def safe_file(root: Path, relative: str) -> bool:
+def safe_file(root: Path, relative: str, errors: list[str] | None = None) -> bool:
     if not safe_relative(relative):
         return False
-    root = root.resolve()
-    candidate = root / relative
     try:
+        root = root.resolve()
+        candidate = root / relative
         if not candidate.resolve().is_relative_to(root):
             return False
         current = root
         for part in Path(relative).parts:
             current = current / part
-            stat = current.lstat()
-            if current.is_symlink() or getattr(stat, "st_file_attributes", 0) & 0x400:
+            info = current.lstat()
+            if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
                 return False
-        return candidate.is_file()
+        return stat.S_ISREG(info.st_mode)
+    except FileNotFoundError:
+        return False
     except OSError:
+        if errors is not None:
+            errors.append(relative)
         return False
 
 
@@ -438,18 +442,24 @@ def read_project_file(
                 os.close(fd)
 
 
-def _ignore_rules(directory: Path, root: Path) -> list[tuple[str, str, bool]]:
+def _ignore_rules(
+    directory: Path, root: Path, errors: list[str] | None = None
+) -> list[tuple[str, str, bool]]:
     """Read positive local ignore patterns; re-inclusions stay excluded in fallback mode."""
     try:
         raw = read_project_file(
             root, str((directory / ".gitignore").relative_to(root)), ignore_file=True
         )
         if len(raw) > 1_000_000:
+            if errors is not None:
+                errors.append(directory.relative_to(root).as_posix())
             return [(directory.relative_to(root).as_posix(), "*", False)]
         lines = raw.decode("utf-8-sig").splitlines()
     except FileNotFoundError:
         return []
     except (OSError, UnicodeError):
+        if errors is not None:
+            errors.append(directory.relative_to(root).as_posix())
         return [(directory.relative_to(root).as_posix(), "*", False)]
     base = directory.relative_to(root).as_posix()
     result = []
@@ -492,11 +502,11 @@ def _ignored(relative: str, is_dir: bool, rules: list[tuple[str, str, bool]]) ->
     return False
 
 
-def fallback_list_files(root: Path) -> list[str]:
+def fallback_list_files(root: Path, errors: list[str] | None = None) -> list[str]:
     """Walk without following links. Ignore negations conservatively when Git is unavailable."""
     root = root.resolve()
     found = []
-    rules_by_dir = {root: _ignore_rules(root, root)}
+    rules_by_dir = {root: _ignore_rules(root, root, errors)}
 
     def walk_error(error):
         raise error
@@ -505,7 +515,7 @@ def fallback_list_files(root: Path) -> list[str]:
         directory = Path(current)
         if directory != root:
             rules_by_dir[directory] = rules_by_dir[directory.parent] + _ignore_rules(
-                directory, root
+                directory, root, errors
             )
         rules = rules_by_dir[directory]
         kept = []
@@ -514,7 +524,11 @@ def fallback_list_files(root: Path) -> list[str]:
             rel = p.relative_to(root).as_posix()
             try:
                 attrs = getattr(p.lstat(), "st_file_attributes", 0)
+            except FileNotFoundError:
+                continue
             except OSError:
+                if errors is not None:
+                    errors.append(rel)
                 continue
             if (
                 name.casefold() in DENY_DIRS
@@ -527,12 +541,12 @@ def fallback_list_files(root: Path) -> list[str]:
         dirs[:] = kept
         for name in files:
             rel = (directory / name).relative_to(root).as_posix()
-            if not _ignored(rel, False, rules) and safe_file(root, rel):
+            if not _ignored(rel, False, rules) and safe_file(root, rel, errors):
                 found.append(rel)
     return sorted(found)
 
 
-def list_files(root: Path) -> list[str]:
+def list_files(root: Path, errors: list[str] | None = None) -> list[str]:
     try:
         out = subprocess.run(
             ["git", "-C", str(root), "ls-files", "-z", "-co", "--exclude-standard"],
@@ -543,8 +557,8 @@ def list_files(root: Path) -> list[str]:
         ).stdout
         paths = [os.fsdecode(item) for item in out.split(b"\0") if item]
     except (FileNotFoundError, subprocess.SubprocessError):
-        return fallback_list_files(root)
-    return sorted(p for p in paths if safe_file(root, p))
+        return fallback_list_files(root, errors)
+    return sorted(p for p in paths if safe_file(root, p, errors))
 
 
 def sync(
@@ -574,7 +588,7 @@ def sync(
     index_state = conn.execute(
         "SELECT extractor_version FROM index_state WHERE project_id=?", (project,)
     ).fetchone()
-    reextract = not index_state or index_state[0] < 5
+    reextract = not index_state or index_state[0] < 6
 
     existing_files = {
         r[0]: r[1]
@@ -605,7 +619,12 @@ def sync(
     paths_to_clean = []
 
     # 2. File discovery, reading, hashing, and AST parsing completely in memory
-    for rel in list_files(root):
+    discovery_errors: list[str] = []
+    try:
+        discovered = list_files(root, discovery_errors)
+    except OSError:
+        return {"error": "Repository discovery failed; the previous index was preserved."}
+    for rel in discovered:
         norm_rel = rel.replace("\\", "/").strip().lower()
         if any(
             re.search(pat, norm_rel)
@@ -738,6 +757,18 @@ def sync(
             skipped_to_write.append((project, rel, "unreadable", 0))
             continue
 
+    # Preserve indexed paths hidden by a transient discovery failure.
+    for rel in discovery_errors:
+        errors.append(rel)
+        affected = {
+            path
+            for path in existing_files
+            if rel == "." or path == rel or path.startswith(rel + "/")
+        }
+        present.update(affected)
+        errors.extend(sorted(affected - set(errors)))
+    errors = list(dict.fromkeys(errors))
+
     # Identify removed files
     files_to_remove = []
     for old_path in existing_files:
@@ -750,8 +781,13 @@ def sync(
     # Check index_skipped_files that no longer exist on disk
     skipped_prune = []
     for old_path in existing_skipped:
-        if not (root / old_path).exists():
+        try:
+            (root / old_path).lstat()
+        except FileNotFoundError:
             skipped_prune.append((project, old_path))
+        except OSError:
+            if old_path not in errors:
+                errors.append(old_path)
 
     # 3. Short atomic write transaction
     conn.execute("BEGIN IMMEDIATE")
@@ -807,7 +843,7 @@ def sync(
         conn.executemany(
             "INSERT INTO index_errors VALUES(?,?)", [(project, path) for path in errors]
         )
-        conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,5)", (project,))
+        conn.execute("INSERT OR REPLACE INTO index_state VALUES(?,6)", (project,))
         conn.execute(
             "INSERT INTO sync_generations VALUES(?,1) ON CONFLICT(project_id) DO UPDATE SET generation=generation+1",
             (project,),

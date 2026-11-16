@@ -47,6 +47,14 @@ class ContextBrokerTests(unittest.TestCase):
         results = features.ranked_search(kn, {"project": self.project, "query": "école"}, self.db)
         self.assertTrue(any(row.get("path") == "ÉCOLE.py" for row in results["results"]))
 
+    def test_task_context_keeps_identifier_after_first_1000_characters(self):
+        (self.root / "uniquepath.py").write_text("def specialsignal(): pass\n", encoding="utf-8")
+        kn.sync(self.root, self.db)
+        task = "the " * 260 + " uniquepath.py specialsignal"
+        result = self.call(task=task, budget=1000)
+        self.assertEqual(result["decision"], "retrieve")
+        self.assertTrue(any(row.get("path") == "uniquepath.py" for row in result["results"]))
+
     def test_budget_explanation_and_session_dedup(self):
         first = self.call(session_id="session-1", budget=500)
         self.assertEqual(first["decision"], "retrieve")

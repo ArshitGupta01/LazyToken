@@ -14,31 +14,12 @@
       window.location.protocol === 'http:' &&
       (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
     if (isLocal) return '';
-    const custom = localStorage.getItem('toksmart_custom_host');
-    if (custom) return 'http://' + custom;
-    const port =
-      localStorage.getItem('toksmart_port') ||
-      localStorage.getItem('repomind_port') ||
-      localStorage.getItem('lazytoken_port') ||
-      String(DEFAULT_PORT);
-    return 'http://127.0.0.1:' + port;
+    return 'http://127.0.0.1:' + DEFAULT_PORT;
   }
   window.API_BASE = getApiBase();
 
   function buildEndpoints() {
-    const custom = localStorage.getItem('toksmart_custom_host');
-    const port =
-      localStorage.getItem('toksmart_port') ||
-      localStorage.getItem('repomind_port') ||
-      localStorage.getItem('lazytoken_port') ||
-      String(DEFAULT_PORT);
-    return [
-      ...(custom ? ['http://' + custom + '/api/health', 'http://' + custom + '/api/projects'] : []),
-      'http://127.0.0.1:' + port + '/api/health',
-      'http://localhost:' + port + '/api/health',
-      'http://127.0.0.1:' + port + '/api/toksmart',
-      'http://127.0.0.1:' + port + '/api/projects'
-    ];
+    return [(window.API_BASE || '') + '/api/health'];
   }
   let ENDPOINTS = buildEndpoints();
 
@@ -126,9 +107,13 @@
         signal: controller.signal
       })
         .then((res) => {
+          if (!res.ok) throw new Error('Non-200 response');
+          return res.json();
+        })
+        .then((data) => {
           clearTimeout(timeoutId);
-          if (res.ok) resolve(url);
-          else reject(new Error('Non-200 response'));
+          if (data.service === 'toksmart' || data.service === 'lazytoken') resolve(url);
+          else reject(new Error('Not a TokSmart server'));
         })
         .catch((err) => {
           clearTimeout(timeoutId);
@@ -255,6 +240,11 @@
     } catch (e) {}
 
     window.API_BASE = getApiBase();
+    const localAddress = window.location.host;
+    const portLabel = document.getElementById('header-port-label');
+    const serverStatus = document.getElementById('header-server-status');
+    if (portLabel) portLabel.textContent = localAddress;
+    if (serverStatus) serverStatus.title = 'Connected to local server at ' + localAddress;
 
     document.documentElement.classList.add('server-connected');
     document.body.classList.add('server-connected');
@@ -317,7 +307,8 @@
     document.documentElement.classList.remove('server-connected');
     document.body.classList.remove('server-connected');
 
-    updateConnectCardServerReady(true);
+    updateConnectCardServerReady(false);
+    checkServer();
   }
 
   function handleManualConnect() {
@@ -335,8 +326,7 @@
 
     // Mobile device detection
     const isMobile =
-      'ontouchstart' in window ||
-      navigator.maxTouchPoints > 0 ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
       /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isMobile) {
       document.documentElement.classList.add('is-mobile');
@@ -356,51 +346,13 @@
         e.preventDefault();
         e.stopPropagation();
         handleManualConnect();
-      } else if (target.id === 'btn-demo-graph' || target.closest('#btn-demo-graph')) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (window.startDemoMode) window.startDemoMode();
-      } else if (target.id === 'exit-demo-btn' || target.closest('#exit-demo-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (window.exitDemoMode) window.exitDemoMode();
-      } else if (target.id === 'btn-custom-connect' || target.closest('#btn-custom-connect')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const input = document.getElementById('custom-host-input');
-        if (input && input.value.trim()) {
-          const val = input.value.trim().replace(/^https?:\/\//, '');
-          localStorage.setItem('toksmart_custom_host', val);
-          ENDPOINTS = buildEndpoints();
-          window.API_BASE = getApiBase();
-          checkServer(true);
-        }
       }
     });
 
-    const customInput = document.getElementById('custom-host-input');
-    if (customInput) {
-      const saved = localStorage.getItem('toksmart_custom_host');
-      if (saved) customInput.value = saved;
-    }
+    if (isManuallyDisconnected) updateConnectCardServerReady(false);
 
-    let wasConnected = false;
-    try {
-      const hasConn =
-        localStorage.getItem(STORAGE_KEY) === 'true' ||
-        LEGACY_STORAGE_KEYS.some((k) => localStorage.getItem(k) === 'true');
-      const hasDisc =
-        localStorage.getItem(DISCONNECT_KEY) === 'true' ||
-        LEGACY_DISCONNECT_KEYS.some((k) => localStorage.getItem(k) === 'true');
-      wasConnected = hasConn && !hasDisc;
-    } catch (e) {}
-
-    if (wasConnected) {
-      handleServerFound('http://127.0.0.1:' + DEFAULT_PORT + '/api/health');
-    } else if (isManuallyDisconnected) {
-      updateConnectCardServerReady(true);
-    }
-
+    // Loopback on a phone cannot reach the development computer.
+    if (isMobile) return;
     checkServer();
     pollTimer = setInterval(checkServer, POLL_INTERVAL);
   }
@@ -415,268 +367,12 @@
 // --- TokSmart Interactive Knowledge Graph & Visualizer Dashboard ---
 (() => {
   let initialized = false;
-  let isDemoMode = false;
-
-  const DEMO_GRAPH = {
-    nodes: [
-      {
-        id: 'toksmart-core',
-        kind: 'project',
-        name: 'TokSmart Core',
-        summary: 'Local-first AI coding memory & AST graph intelligence engine.',
-        tags: 'core,python,sqlite',
-        scope: 'global',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'context-broker',
-        kind: 'component',
-        name: 'Context Broker',
-        summary: 'Precision bounded context assembler with deterministic token budgeting.',
-        tags: 'context,broker,budget',
-        scope: 'project',
-        project_id: 'toksmart-core',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'ast-engine',
-        kind: 'component',
-        name: 'AST Code Intelligence',
-        summary: 'Deep AST parser extracting symbols, calls, imports, and blast radius.',
-        tags: 'ast,analysis,callgraph',
-        scope: 'project',
-        project_id: 'toksmart-core',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'sqlite-wal',
-        kind: 'technology',
-        name: 'SQLite WAL Engine',
-        summary: 'High-concurrency local embedded graph database operating in WAL mode.',
-        tags: 'storage,sqlite,wal',
-        scope: 'global',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'session-recall',
-        kind: 'pattern',
-        name: 'Active Session Recall',
-        summary: 'Zero-amnesia checkpoint restoration surviving turn compactions.',
-        tags: 'session,checkpoint,memory',
-        scope: 'global',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'deduplicator',
-        kind: 'component',
-        name: 'Fingerprint Deduplicator',
-        summary: 'SHA-based suppression of seen items across multi-turn sessions.',
-        tags: 'dedup,suppression,tokens',
-        scope: 'project',
-        project_id: 'toksmart-core',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'blast-radius',
-        kind: 'skill',
-        name: 'Blast Radius Analyzer',
-        summary: 'Inbound caller resolution and defensive absence handling for safe edits.',
-        tags: 'impact,risk,callers',
-        scope: 'project',
-        project_id: 'toksmart-core',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'mcp-server',
-        kind: 'platform',
-        name: 'Model Context Protocol',
-        summary: 'JSON-RPC 2.0 stdio interface connecting Claude Code, Cursor, and Windsurf.',
-        tags: 'mcp,protocol,rpc',
-        scope: 'global',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'threejs-view',
-        kind: 'library',
-        name: 'Three.js 3D Visualizer',
-        summary: 'Interactive spatial orbit cluster rendering nodes in real-time WebGL.',
-        tags: 'webgl,threejs,visualizer',
-        scope: 'global',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'human-gate',
-        kind: 'decision',
-        name: 'Human Review Gate',
-        summary: 'Explicit user approval boundary preventing unverified memory mutations.',
-        tags: 'security,review,governance',
-        scope: 'global',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'pydantic-fastapi',
-        kind: 'framework',
-        name: 'FastAPI / Pydantic',
-        summary: 'Validated microservice framework detected in project manifests.',
-        tags: 'framework,rest,api',
-        scope: 'project',
-        project_id: 'demo-gateway',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      },
-      {
-        id: 'credential-guard',
-        kind: 'component',
-        name: 'Credential Redactor',
-        summary: 'Multi-pattern secret scanner redacting AWS, OpenAI, GitHub, and Slack keys.',
-        tags: 'security,redaction,privacy',
-        scope: 'global',
-        freshness: 'fresh',
-        verification_state: 'verified'
-      }
-    ],
-    edges: [
-      {
-        source: 'TokSmart Core',
-        target: 'Context Broker',
-        relation: 'contains_module',
-        weight: 1.0
-      },
-      {
-        source: 'TokSmart Core',
-        target: 'AST Code Intelligence',
-        relation: 'contains_module',
-        weight: 1.0
-      },
-      {
-        source: 'TokSmart Core',
-        target: 'SQLite WAL Engine',
-        relation: 'persists_with',
-        weight: 1.0
-      },
-      {
-        source: 'Context Broker',
-        target: 'Fingerprint Deduplicator',
-        relation: 'suppresses_with',
-        weight: 0.9
-      },
-      {
-        source: 'Context Broker',
-        target: 'Active Session Recall',
-        relation: 'restores_via',
-        weight: 0.9
-      },
-      {
-        source: 'AST Code Intelligence',
-        target: 'Blast Radius Analyzer',
-        relation: 'computes_impact',
-        weight: 0.95
-      },
-      {
-        source: 'Context Broker',
-        target: 'Model Context Protocol',
-        relation: 'exposes_via',
-        weight: 1.0
-      },
-      {
-        source: 'TokSmart Core',
-        target: 'Three.js 3D Visualizer',
-        relation: 'renders_with',
-        weight: 0.8
-      },
-      {
-        source: 'Context Broker',
-        target: 'Human Review Gate',
-        relation: 'guards_memory',
-        weight: 0.85
-      },
-      {
-        source: 'Context Broker',
-        target: 'Credential Redactor',
-        relation: 'sanitizes_with',
-        weight: 0.9
-      },
-      {
-        source: 'TokSmart Core',
-        target: 'FastAPI / Pydantic',
-        relation: 'declares_framework',
-        weight: 0.75
-      }
-    ]
-  };
-
-  window.startDemoMode = function () {
-    isDemoMode = true;
-    document.documentElement.classList.add('server-connected', 'demo-mode');
-    document.body.classList.add('server-connected', 'demo-mode');
-
-    const demoIndicator = document.getElementById('demo-indicator');
-    const serverStatus = document.getElementById('header-server-status');
-    const disconnectBtn = document.getElementById('disconnect-btn');
-    if (demoIndicator) demoIndicator.style.display = 'inline-flex';
-    if (serverStatus) serverStatus.style.display = 'none';
-    if (disconnectBtn) disconnectBtn.style.display = 'none';
-
-    if (window.startDashboard) {
-      window.startDashboard();
-    }
-    if (window.reloadDemoGraph) {
-      window.reloadDemoGraph();
-    }
-  };
-
-  window.exitDemoMode = function () {
-    isDemoMode = false;
-    document.documentElement.classList.remove('server-connected', 'demo-mode');
-    document.body.classList.remove('server-connected', 'demo-mode');
-
-    const demoIndicator = document.getElementById('demo-indicator');
-    const serverStatus = document.getElementById('header-server-status');
-    const disconnectBtn = document.getElementById('disconnect-btn');
-    if (demoIndicator) demoIndicator.style.display = 'none';
-    if (serverStatus) serverStatus.style.display = '';
-    if (disconnectBtn) disconnectBtn.style.display = '';
-  };
-
   window.startDashboard = function () {
     if (initialized) return;
     initialized = true;
 
     runDashboardCode();
   };
-
-  // If already connected on script execution and not manually disconnected, start immediately
-  let canAutoStart = false;
-  try {
-    const hasConn =
-      document.documentElement.classList.contains('server-connected') ||
-      localStorage.getItem('toksmart_connected') === 'true' ||
-      localStorage.getItem('repomind_connected') === 'true' ||
-      localStorage.getItem('lazytoken_connected') === 'true';
-    const hasDisc =
-      localStorage.getItem('toksmart_disconnected') === 'true' ||
-      localStorage.getItem('repomind_disconnected') === 'true' ||
-      localStorage.getItem('lazytoken_disconnected') === 'true';
-    canAutoStart = hasConn && !hasDisc;
-  } catch (e) {}
-
-  if (canAutoStart) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => window.startDashboard());
-    } else {
-      window.startDashboard();
-    }
-  }
 
   function runDashboardCode() {
     const $ = (selector) => document.querySelector(selector);
@@ -738,38 +434,7 @@
     $('#inspector-minimize').onclick = () => setInspectorMinimized(true);
     $('#inspector-restore').onclick = () => setInspectorMinimized(false);
 
-    window.reloadDemoGraph = () => {
-      if (isDemoMode) {
-        loadProjects().then(() => loadGraph(''));
-      }
-    };
-
     async function loadProjects() {
-      if (isDemoMode) {
-        projects = [
-          {
-            id: 'toksmart-core',
-            root: 'D:\\Projects\\TokSmart',
-            files: 42,
-            updated_at: Math.floor(Date.now() / 1000)
-          },
-          {
-            id: 'demo-gateway',
-            root: 'D:\\Projects\\FastAPI-Gateway',
-            files: 18,
-            updated_at: Math.floor(Date.now() / 1000)
-          }
-        ];
-        $('#project').innerHTML =
-          '<option value="">Choose a project…</option>' +
-          projects
-            .map(
-              (p) =>
-                `<option value="${esc(p.id)}">${esc(p.root.split(/[\\/]/).filter(Boolean).pop() || p.root)} · ${p.files} files</option>`
-            )
-            .join('');
-        return;
-      }
       try {
         const response = await fetch((window.API_BASE || '') + '/api/projects');
         if (!response.ok) throw Error('Projects unavailable');
@@ -792,36 +457,6 @@
       if (!background) {
         $('#loading').hidden = false;
         $('#empty').hidden = true;
-      }
-      if (isDemoMode) {
-        if (requestId !== graphRequest) return;
-        const copy = JSON.parse(JSON.stringify(DEMO_GRAPH));
-        if (project && project !== '@workspace') {
-          copy.nodes = copy.nodes.filter(
-            (n) => n.scope === 'global' || n.project_id === project || n.id === project
-          );
-          const validNames = new Set(copy.nodes.map((n) => n.name));
-          copy.edges = copy.edges.filter(
-            (e) => validNames.has(e.source) && validNames.has(e.target)
-          );
-        }
-        data = copy;
-        $('#scope-label').textContent =
-          project === '@workspace'
-            ? 'All indexed projects (Demo)'
-            : project
-              ? `Project · ${project}`
-              : 'Shared knowledge (Demo)';
-        buildFilters();
-        layout();
-        if (selected) {
-          selected = nodes.find((n) => n.id === selected.id) || null;
-          inspector(selected);
-        }
-        hover = null;
-        draw();
-        $('#loading').hidden = true;
-        return;
       }
       try {
         const response = await fetch(
@@ -864,8 +499,12 @@
         nodes = [];
         edges = [];
         $('#empty').hidden = false;
-        $('#empty b').textContent = 'Graph unavailable';
-        $('#empty span').textContent = error.message;
+        const noProjects = error.message.startsWith('No projects indexed yet.');
+        $('#empty b').textContent = noProjects ? 'Add your first project' : 'Graph unavailable';
+        $('#empty span').textContent = noProjects
+          ? 'Replace FULL_PATH_TO_PROJECT with the absolute folder path, then refresh.'
+          : error.message;
+        $('#empty-command').hidden = !noProjects;
         updateCounts([], []);
       } finally {
         if (requestId === graphRequest) $('#loading').hidden = true;
@@ -1039,6 +678,14 @@
         }
         $('#node-jump').value = selected && shown.includes(selected) ? String(selected.id) : '';
         $('#empty').hidden = shown.length > 0;
+        if (!shown.length) {
+          const noProjects = projects.length === 0 && data.nodes.length === 0;
+          $('#empty b').textContent = noProjects ? 'Add your first project' : 'No matching knowledge yet';
+          $('#empty span').textContent = noProjects
+            ? 'In another terminal, replace FULL_PATH_TO_PROJECT with the absolute folder path. Then refresh.'
+            : 'Try another search or switch project scope.';
+          $('#empty-command').hidden = !noProjects;
+        }
         const note = $('#edge-note'),
           truncated = data.nodes_truncated || data.edges_truncated;
         note.hidden = !shown.length || (!truncated && links.length > 0);

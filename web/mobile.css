@@ -1,0 +1,79 @@
+/* Reuses the desktop palette, typography, cards, pills and launch button. */
+.mobile-page { display: block; padding: 0 20px calc(110px + env(safe-area-inset-bottom)); }
+.pocket-shell { width: 100%; max-width: 600px; margin: 0 auto; }
+.pocket-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px 0; }
+.pocket-header .brand-badge { margin: 0; text-decoration: none; letter-spacing: 1.4px; }
+.pocket-mark { display: grid; place-items: center; width: 28px; height: 30px; border: 1px solid var(--purple-light); border-radius: 9px 3px 9px 3px; font-size: 18px; }
+.desktop-link { color: var(--text-secondary); font-size: 12px; padding: 12px 0; }
+.pocket-hero { padding: 25px 0 34px; }
+.pocket-hero .pill { font-size: 9px; letter-spacing: 1.3px; }
+.pocket-hero h1 { font-size: clamp(32px, 8.5vw, 48px); line-height: 1.12; letter-spacing: -1.8px; margin: 20px 0 16px; }
+.pocket-hero h1 span { color: var(--purple-light); }
+.pocket-hero p { font-size: 15px; color: var(--text-secondary); line-height: 1.7; }
+.pocket-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; font-size: 11px; color: var(--text-secondary); }
+.pocket-meta span::before { content: '✓'; color: var(--green-text); margin-right: 5px; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.section-heading h2 { font-size: 15px; }
+.section-heading > span { font: 10px var(--font-mono); color: var(--text-secondary); }
+.prompt-cards { display: grid; gap: 16px; }
+.prompt-card.connect-card { padding: 24px; border-radius: 18px; box-shadow: none; border-top: 2px solid var(--mode-accent); }
+.prompt-card { --mode-accent: var(--green-text); }
+.prompt-card.mode-pro { --mode-accent: var(--purple-light); }
+.prompt-card.mode-coding { --mode-accent: #67e8f9; }
+.mode-eyebrow { display: flex; justify-content: space-between; gap: 12px; color: var(--mode-accent); font: 10px var(--font-mono); letter-spacing: 0.5px; text-transform: uppercase; }
+.prompt-card h3 { font-size: 25px; letter-spacing: -0.7px; margin: 14px 0 8px; }
+.prompt-card p { color: var(--text-secondary); font-size: 13px; line-height: 1.7; }
+.prompt-card .best-for { padding: 12px 0 16px; font-size: 12px; }
+.mobile-page .launch-btn { width: 100%; min-height: 48px; justify-content: center; margin: 0; font: 600 14px var(--font-sans); text-align: center; text-decoration: none; cursor: pointer; }
+.prompt-card .launch-btn { color: var(--bg-page); background: var(--mode-accent); border-color: var(--mode-accent); }
+.mobile-page button:disabled { opacity: 0.45; cursor: default; }
+.prompt-card details { margin-top: 14px; }
+.prompt-card summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; min-height: 44px; padding-block: 12px; }
+.prompt-preview { font: 12px/1.75 var(--font-mono); color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; background: var(--terminal-bg); border-radius: 8px; }
+.copy-status { min-height: 24px; font-size: 12px; line-height: 1.6; color: var(--green-text); margin-top: 12px; }
+.mobile-note { margin: 18px 0; padding: 18px 0; border-top: 1px solid var(--border-card); font-size: 12px; color: var(--text-secondary); line-height: 1.8; }
+.mobile-note strong { color: var(--text-primary); }
+.mobile-page a { text-underline-offset: 4px; }
+.pocket-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 8px max(12px, calc((100% - 600px) / 2)) calc(8px + env(safe-area-inset-bottom)); background: var(--bg-card); border-top: 1px solid var(--border-card); }
+.pocket-nav button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 54px; border: 0; border-radius: 10px; background: transparent; color: var(--text-secondary); font: 11px var(--font-sans); cursor: pointer; }
+.pocket-nav button span { font-size: 21px; line-height: 28px; }
+.pocket-nav button[aria-pressed='true'] { background: var(--purple-bg); color: var(--purple-light); }
+.pocket-footer { color: var(--text-secondary); font-size: 11px; margin: 28px 0 0; line-height: 1.7; }
+.pocket-footer span { color: var(--green-text); }
+.compact { padding-top: 20px; }
+.help-steps { list-style: none; display: grid; gap: 14px; counter-reset: none; }
+.help-steps .connect-card, .benchmark-import.connect-card { padding: 22px; border-radius: 16px; box-shadow: none; }
+.step-number { color: var(--purple-light); font: 12px var(--font-mono); }
+.help-steps h2, .benchmark-import h2 { font-size: 19px; margin: 10px 0; }
+.help-steps p, .benchmark-import p, .mobile-guide p { color: var(--text-secondary); font-size: 13px; line-height: 1.8; }
+.benchmark-import label { display: flex; margin-top: 16px !important; }
+#benchmark-file { display: block; width: 100%; margin-top: 12px; color: var(--text-secondary); font-size: 12px; }
+.mobile-guide { margin: 18px 0; border-bottom: 1px solid var(--border-card); padding-bottom: 12px; }
+.mobile-guide summary { min-height: 48px; padding: 12px 0; cursor: pointer; font-size: 14px; }
+.mobile-guide code { font: 12px var(--font-mono); overflow-wrap: anywhere; }
+.benchmark-actions { display: grid; gap: 12px; margin: 20px 0; }
+.text-button { padding: 14px; min-height: 48px; color: var(--text-secondary); border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
+.metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.metric { padding: 16px 12px; background: var(--bg-card); border: 1px solid var(--border-card); border-radius: 12px; min-width: 0; }
+.metric strong { display: block; color: var(--text-primary); font-size: 22px; overflow-wrap: anywhere; }
+.metric span, .bench-caption { color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
+.benchmark-group { margin: 24px 0; padding: 18px; border: 1px solid var(--border-card); border-radius: 14px; }
+.benchmark-group h3 { font-size: 16px; overflow-wrap: anywhere; }
+.benchmark-group h4 { font-size: 13px; margin: 18px 0 8px; }
+.bar-row { margin: 12px 0; font-size: 12px; }
+.bar-label { display: flex; justify-content: space-between; gap: 10px; color: var(--text-secondary); }
+.bar-track { height: 8px; background: var(--terminal-bg); border-radius: 8px; margin-top: 7px; overflow: hidden; display: flex; }
+.bar-track span { display: block; height: 100%; background: var(--purple-light); }
+.bar-track .output-bar { background: var(--green-text); }
+.bar-track .quality-bar { background: #67e8f9; }
+.run-details { margin: 14px 0; border-top: 1px solid var(--border-card); padding-top: 10px; }
+.run-details summary { min-height: 44px; font-size: 12px; padding-block: 12px; cursor: pointer; overflow-wrap: anywhere; }
+.run-details pre, .run-details p { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 var(--font-sans); color: var(--text-secondary); }
+.mobile-page [hidden] { display: none !important; }
+.mobile-page :focus-visible { outline: 2px solid var(--purple-light); outline-offset: 4px; }
+#copy-fallback { margin: auto; width: min(560px, calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 20px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--purple-border); border-radius: 16px; }
+#copy-fallback::backdrop { background: rgba(0, 0, 0, 0.85); }
+#copy-fallback h2 { font-size: 22px; }
+#copy-fallback p { color: var(--text-secondary); font-size: 13px; line-height: 1.7; margin: 12px 0; }
+#fallback-text { width: 100%; background: var(--terminal-bg); color: var(--text-primary); font: 16px/1.6 var(--font-sans); padding: 12px; margin-bottom: 14px; border: 1px solid var(--border-card); border-radius: 8px; }
+@media (max-width: 359px) { .mobile-page { padding-inline: 14px; } .prompt-card.connect-card { padding: 20px; } }

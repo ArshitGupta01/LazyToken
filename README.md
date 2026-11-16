@@ -90,6 +90,22 @@ python kn.py add "D:\Projects\MyApp"
 python kn.py serve
 ```
 
+### Coding from a phone
+
+Tap **Open Coding mode** on the web page. Choose any AI assistant, describe your task,
+add your stack and relevant snippets, then generate and copy the prompt into your AI
+app or website. The prompt asks it to inspect existing code and dependencies, reuse
+compatible libraries and components from official sources, and test the smallest change.
+
+Coding mode runs in your browser without an account, API key or local server. It
+generates instructions; your chosen AI performs the coding. It sends no task or code
+to a server and retains drafts only while the page is open. Attach project files in
+your AI chat and run the generated changes in your development environment.
+
+The repository index and graph still run on your computer. `127.0.0.1` on a phone
+refers to that phone, so use the desktop setup commands on the computer. Prompts
+cannot enforce an AI's behavior, and token savings require measurement.
+
 ---
 
 ## 🏗️ Architecture

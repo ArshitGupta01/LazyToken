@@ -357,7 +357,7 @@ def complex_controller(default_opt=get_default_val()):
         caller = res["inbound_callers"][0]
         self.assertIn("caller_symbol_id", caller)
         self.assertIn("service.py", caller["caller_symbol_id"])
-        self.assertEqual(caller["resolution_method"], "explicit_class")
+        self.assertEqual(caller["resolution_method"], "inferred_type")
         self.assertEqual(caller["state"], "resolved")
 
     def test_additional_secret_patterns_and_security_boundary_notice(self):
@@ -886,6 +886,51 @@ export const b: () => void = () => {};
         )
         self.assertFalse(any(c["callee_name"] == "ghost" for c in calls))
         self.assertIn(("b", 8), source_index.javascript_symbols(code))
+
+    def test_python_inherited_and_shadowed_calls_are_not_exact(self):
+        code = """import os
+class Base:
+    def run(self): pass
+class Child(Base):
+    def go(self, os):
+        self.run()
+        os.remove('x')
+"""
+        calls = source_index.python_calls(code)
+        inherited = next(c for c in calls if c["callee_name"] == "run")
+        shadowed = next(c for c in calls if c["callee_name"] == "remove")
+        self.assertEqual(inherited["resolved_callee"], "Base.run")
+        self.assertNotEqual(inherited["confidence"], "exact")
+        self.assertNotEqual(shadowed["resolution_method"], "explicit_import")
+
+    def test_javascript_concise_recursive_imports_and_comment_symbols(self):
+        code = """import defaultThing, {x as y} from './mod.js';
+/*
+function phantom() {}
+*/
+const f = () => helper();
+function recur(n) { if (n) recur(n - 1); y(); defaultThing.run(); }
+class A { one() { return two(); } }
+"""
+        symbols = source_index.javascript_symbols(code)
+        self.assertNotIn(("phantom", 3), symbols)
+        self.assertIn(("A.one", 7), symbols)
+        calls = source_index.javascript_calls(code)
+        self.assertTrue(
+            any(c["caller_symbol"] == "f" and c["callee_name"] == "helper" for c in calls)
+        )
+        self.assertTrue(
+            any(c["caller_symbol"] == "recur" and c["callee_name"] == "recur" for c in calls)
+        )
+        for name in ("y", "run"):
+            self.assertTrue(
+                any(
+                    c["caller_symbol"] == "recur"
+                    and c["callee_name"] == name
+                    and c["resolution_method"] == "explicit_import"
+                    for c in calls
+                )
+            )
 
 
 if __name__ == "__main__":

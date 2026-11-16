@@ -13,7 +13,13 @@ class FrontendTests(unittest.TestCase):
     )
     def test_workspace_requests(self):
         result = subprocess.run(
-            [shutil.which("node"), "--test", str(Path(__file__).with_name("workspace.test.cjs"))],
+            [
+                shutil.which("node"),
+                "--test",
+                str(Path(__file__).with_name("workspace.test.cjs")),
+                str(Path(__file__).with_name("connection.test.cjs")),
+                str(Path(__file__).with_name("mobile.test.cjs")),
+            ],
             capture_output=True,
             text=True,
             timeout=20,
