@@ -1,4 +1,4 @@
-# LazyToken 5-Mode Empirical Retrieval Ablation Report
+# TokSmart 5-Mode Empirical Retrieval Ablation Report
 
 > **Objective**: Empirically evaluate all 5 ablation modes (Plain Grep baseline, Lexical alone,
 > Lexical + AST Graph, Verified Memory alone, and Full Pipeline) across multi-service scenarios.
@@ -41,7 +41,7 @@
 ### Finding 4: Verified Domain Memory (Mode 4) Targets Contractual Lessons
 - **Observation**: Domain lessons provide concise operational constraints (e.g., scope arguments or cascading deletions) with the smallest token footprint (~40-80 tokens).
 
-### Finding 5: Full LazyToken Pipeline (Mode 5) Delivers Maximum Recall & Token Savings
+### Finding 5: Full TokSmart Pipeline (Mode 5) Delivers Maximum Recall & Token Savings
 - **Observation**: Combines lexical search, verified memory, AST relational graph, and token budgeting. Delivers full coverage in 180–310 tokens vs 1,250+ raw repository tokens (>80% net savings).
 
 ---

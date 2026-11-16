@@ -7,7 +7,7 @@ const { join, sep } = require("node:path");
 
 if (__dirname.split(sep).some((part) => part.toLowerCase() === "_npx") &&
     process.argv[2] === "setup" && process.argv.includes("--apply")) {
-  console.error("MCP setup needs a durable installation. Run 'npm install --global lazytoken', then 'lazytoken setup --apply ...'.");
+  console.error("MCP setup needs a durable installation. Run 'npm install --global toksmart', then 'toksmart setup --apply ...'.");
   process.exit(1);
 }
 

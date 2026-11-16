@@ -499,6 +499,7 @@ export { thing } from './export';
 
         with patch.object(kn, "read_project_file", side_effect=bounded_read):
             kn.sync(self.root, self.db)
+
         def unreadable(root, path, limit=1_000_001, **kwargs):
             if path.endswith(".py"):
                 raise PermissionError("synthetic")

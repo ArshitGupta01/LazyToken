@@ -1,4 +1,4 @@
-# Working on LazyToken
+# Working on TokSmart
 
 The CLI and packaged dashboard run without separately installed Python or Node. The following tools are for contributors working on the source checkout.
 

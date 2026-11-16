@@ -115,7 +115,9 @@ def default_data_root() -> Path:
             return p_rm
         if (p_lt / "network.sqlite3").is_file():
             return p_lt
-        return p_ts
+        if p_ts.is_dir():
+            return p_ts
+        return p_lt
     home = Path.home()
     p_ts = home / ".local" / "share" / "TokSmart"
     p_rm = home / ".local" / "share" / "RepoMind"
@@ -126,7 +128,9 @@ def default_data_root() -> Path:
         return p_rm
     if (p_lt / "network.sqlite3").is_file():
         return p_lt
-    return p_ts
+    if p_ts.is_dir():
+        return p_ts
+    return p_lt
 
 
 def legacy_data_roots() -> list[Path]:
@@ -244,7 +248,7 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
         if version > 7:
             conn.close()
             raise RuntimeError(
-                "Database was created by a newer LazyToken version; upgrade the application before opening it."
+                "Database was created by a newer TokSmart version; upgrade the application before opening it."
             )
         if tables and version < 7:
             # SQLite's backup API includes committed WAL data and leaves the original intact.
@@ -1054,7 +1058,7 @@ def add_asset(args: dict[str, Any], conn: sqlite3.Connection) -> dict[str, Any]:
     kind, name, summary = (str(args.get(k, "")).strip() for k in ("kind", "name", "summary"))
     if kind in {"lesson", "decision", "pattern", "component"}:
         return {
-            "error": "Propose project memories through lazytoken/propose and approve them explicitly through review."
+            "error": "Propose project memories through toksmart/propose and approve them explicitly through review."
         }
     if kind not in {
         "library",
@@ -1365,7 +1369,7 @@ def feature_call(action: str, args: dict[str, Any], conn: sqlite3.Connection) ->
     if action == "capabilities":
         target = args.get("target") or args.get("language") or args.get("extension")
         return get_language_capabilities(target)
-    return {"error": "Unknown LazyToken action."}
+    return {"error": "Unknown TokSmart action."}
 
 
 def checkpoint_wal(conn: sqlite3.Connection | None = None, mode: str = "PASSIVE") -> dict:
@@ -1401,7 +1405,7 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
     }
     if name in direct_actions:
         return feature_call(direct_actions[name], args, conn)
-    if name == "lazytoken" and args.get("action") in (
+    if name in ("toksmart", "repomind", "lazytoken") and args.get("action") in (
         "review",
         "delete_memory",
         "retention_memories",
@@ -1409,7 +1413,7 @@ def call(name: str, args: dict[str, Any], conn: sqlite3.Connection) -> Any:
         return {
             "error": "MCP clients cannot review or delete memories. Use the local dashboard or operator CLI."
         }
-    if name == "lazytoken":
+    if name in ("toksmart", "repomind", "lazytoken"):
         payload = args.get("payload", {})
         return (
             feature_call(str(args.get("action", "")), payload, conn)
@@ -1535,7 +1539,7 @@ def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
                         requested if requested in supported_versions else supported_versions[-1]
                     ),
                     "capabilities": {"tools": {}},
-                    "serverInfo": {"name": "lazytoken-knowledge-network", "version": VERSION},
+                    "serverInfo": {"name": "toksmart-knowledge-network", "version": VERSION},
                     "instructions": WORKFLOW_INSTRUCTIONS,
                 }
             elif method == "ping":
@@ -1553,7 +1557,7 @@ def rpc_server(conn: sqlite3.Connection, compact=False) -> None:
                     if p.get("name") == "get_task_context":
                         arguments["compact_mcp"] = compact
                     elif (
-                        p.get("name") == "lazytoken"
+                        p.get("name") in ("toksmart", "repomind", "lazytoken")
                         and arguments.get("action") == "task_context"
                         and isinstance(arguments.get("payload"), dict)
                     ):
@@ -1641,7 +1645,9 @@ def main() -> None:
     )
     impact_cmd.add_argument("--project", default="")
     for cmd_name in ("toksmart", "repomind", "lazytoken"):
-        lt = sub.add_parser(cmd_name, help=f"Run a {cmd_name.capitalize()} action with JSON arguments")
+        lt = sub.add_parser(
+            cmd_name, help=f"Run a {cmd_name.capitalize()} action with JSON arguments"
+        )
         lt.add_argument(
             "action",
             choices=[
@@ -1703,7 +1709,7 @@ def main() -> None:
     remove.add_argument("--install-root", required=True)
     for name in ("update", "rollback", "uninstall"):
         lifecycle = sub.add_parser(
-            name, help="Managed installation lifecycle; use the installed lazytoken command"
+            name, help="Managed installation lifecycle; use the installed toksmart command"
         )
         lifecycle.add_argument("options", nargs=argparse.REMAINDER)
     initialize = sub.add_parser("init", help="Initialize storage and optionally index a project")
@@ -1881,7 +1887,7 @@ def main() -> None:
         print(
             json.dumps(
                 {
-                    "error": "Run this command through the installed lazytoken launcher. It manages versions without deleting a running executable. See install.ps1 for a verified package installation."
+                    "error": "Run this command through the installed toksmart launcher. It manages versions without deleting a running executable. See install.ps1 for a verified package installation."
                 }
             )
         )
@@ -2019,7 +2025,7 @@ def main() -> None:
             "note": "Only previously selected repositories are synced.",
         }
         if not roots:
-            result["next"] = "Run lazytoken add <absolute repository> first."
+            result["next"] = "Run toksmart add <absolute repository> first."
         print(json.dumps(result, indent=2))
     elif a.cmd == "seed":
         print(json.dumps(seed_project(Path(a.root), db), indent=2))

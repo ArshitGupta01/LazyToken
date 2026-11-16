@@ -1,7 +1,7 @@
 {
-  "name": "lazytoken",
+  "name": "toksmart",
   "version": "0.5.1",
-  "description": "Local repository context and memory for coding assistants - TokSmart",
+  "description": "Local-first AI coding memory, AST graph intelligence, and zero-amnesia context engine",
   "license": "MIT",
   "bin": { "toksmart": "launcher.cjs", "repomind": "launcher.cjs", "lazytoken": "launcher.cjs" },
   "files": ["launcher.cjs", "runtime"],

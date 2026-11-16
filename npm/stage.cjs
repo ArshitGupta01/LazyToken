@@ -29,4 +29,4 @@ for (const name of files) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(path.join(root, name), target);
 }
-console.log(`Staged LazyToken npm package at ${destination}`);
+console.log(`Staged TokSmart npm package at ${destination}`);

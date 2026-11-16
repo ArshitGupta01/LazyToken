@@ -78,16 +78,16 @@ def report(kn):
     checks["automatic_sync"] = watcher.status(root)
     checks["repairs"] = []
     if not database.is_file():
-        checks["repairs"].append("Run lazytoken init, then lazytoken add <absolute repository>.")
+        checks["repairs"].append("Run toksmart init, then toksmart add <absolute repository>.")
     if checks["legacy_databases"]:
         checks["repairs"].append(
-            "Legacy data detected. Preview lazytoken migrate-data --source <database>; apply only after reviewing paths."
+            "Legacy data detected. Preview toksmart migrate-data --source <database>; apply only after reviewing paths."
         )
     if not checks["data_parent_writable"]:
         checks["repairs"].append(
             "Choose a writable directory with KN_HOME; administrator privileges are not normally needed."
         )
     checks["repairs"].append(
-        "Use lazytoken setup --project <repository> --client codex to preview MCP registration; add --apply to opt in."
+        "Use toksmart setup --project <repository> --client codex to preview MCP registration; add --apply to opt in."
     )
     return checks

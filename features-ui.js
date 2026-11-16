@@ -19,7 +19,7 @@
     return project.selectedOptions[0]?.textContent || '';
   }
   async function request(action, extra = {}) {
-    const apiBase = window.API_BASE || '';
+    const apiBase = typeof window !== 'undefined' && window.API_BASE ? window.API_BASE : '';
     const query = new URLSearchParams({ action, project: project.value, ...extra });
     let r = await fetch(apiBase + '/api/toksmart?' + query);
     if (!r.ok && r.status === 404) {
@@ -33,7 +33,7 @@
     return d;
   }
   async function review(args) {
-    const apiBase = window.API_BASE || '';
+    const apiBase = typeof window !== 'undefined' && window.API_BASE ? window.API_BASE : '';
     const selectedProject = project.value;
     if (!token) {
       const response = await fetch(apiBase + '/api/session');
@@ -127,7 +127,7 @@
       if (view === 'proposals') {
         if (!d.proposals.length) {
           message(
-            'No memory proposals for this project. Agents can submit them through the LazyToken MCP tool or CLI.'
+            'No memory proposals for this project. Agents can submit them through the TokSmart MCP tool or CLI.'
           );
           return;
         }

@@ -1,6 +1,6 @@
 # CLI reference
 
-Commands below use the installed `lazytoken` launcher. For source development, use `python app_entry.py COMMAND`; update, rollback and uninstall require a managed installation. Use `--help` after a command to inspect its arguments.
+Commands below use the installed `toksmart` launcher. For source development, use `python app_entry.py COMMAND`; update, rollback and uninstall require a managed installation. Use `--help` after a command to inspect its arguments.
 
 ## Projects, context and dashboard
 
@@ -51,10 +51,10 @@ Maintenance stops the background worker before touching executable versions. An 
 ## Structured actions and measurement
 
 ```powershell
-lazytoken lazytoken proposals --json "@args.json"
+toksmart toksmart proposals --json "@args.json"
 ```
 
-The first `lazytoken` is the executable; the second is the existing structured-action subcommand. `args.json` contains the action arguments, such as `{"project":"C:\\Projects\\MyApp"}`. Quote the `@` argument in PowerShell. Inline JSON is also supported.
+The first `toksmart` is the executable; the second is the structured-action subcommand (aliases `toksmart`, `repomind`, and `lazytoken` are supported). `args.json` contains the action arguments, such as `{"project":"C:\\Projects\\MyApp"}`. Quote the `@` argument in PowerShell. Inline JSON is also supported.
 
 Actions include `search`, `context`, `task_context`, `complete_task`, `propose`, `proposals`, `review`, `dependencies`, `discover`, `checkpoint`, `clear_session`, `inspect_source`, `benchmark_record`, `benchmark_runs`, `benchmark_list`, `policy` and `audit_scopes`. The CLI and local dashboard allow explicit operator review; MCP blocks review decisions.
 

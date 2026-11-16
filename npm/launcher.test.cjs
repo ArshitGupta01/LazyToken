@@ -8,7 +8,7 @@ const { spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 
 test("transient npm cache refuses to save a temporary MCP path", () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lazytoken-launcher-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "toksmart-launcher-"));
   try {
     const cached = path.join(tmp, "_npx", "package");
     fs.mkdirSync(cached, { recursive: true });

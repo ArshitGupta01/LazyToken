@@ -1,7 +1,7 @@
 """MCP tool descriptions and catalogs; no database or CLI side effects."""
 
 WORKFLOW_INSTRUCTIONS = (
-    "LazyToken + Ponytail Senior Dev Workflow: The best code is the code you never wrote. "
+    "TokSmart + Ponytail Senior Dev Workflow: The best code is the code you never wrote. "
     "1. YAGNI: Inspect small tasks directly; do not add unrequested abstractions. "
     "2. Reuse: For unfamiliar or multi-file work, use get_task_context with a reusable session_id before editing. "
     "3. Impact: Use inspect_impact to check blast radius and inbound callers before editing shared functions. "
@@ -322,7 +322,7 @@ TOOLS = [
     },
     {
         "name": "coding_efficiency_policy",
-        "description": "Return LazyToken's built-in reuse, safety, verification and measurement "
+        "description": "Return TokSmart's built-in reuse, safety, verification and measurement "
         "guidance.",
         "inputSchema": {"type": "object", "properties": {}},
     },
