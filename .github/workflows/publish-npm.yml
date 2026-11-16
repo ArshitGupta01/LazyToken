@@ -1,0 +1,29 @@
+name: Publish TokSmart to npm
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m unittest discover -s tests -p 'test_*.py'
+      - run: python e2e/runner.py --all
+      - run: node --test tests/workspace.test.cjs
+      - run: node npm/stage.cjs "$RUNNER_TEMP/toksmart-package"
+      - run: npm publish "$RUNNER_TEMP/toksmart-package" --access public
