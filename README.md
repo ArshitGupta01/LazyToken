@@ -6,7 +6,7 @@
 
 _Precision SQLite knowledge graph, deterministic context broker, and active session recall for AI coding agents._
 
-[![Version](https://img.shields.io/badge/version-v0.5.2-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/TokSmart/releases)
+[![Version](https://img.shields.io/badge/version-v0.5.3-3b82f6.svg?style=for-the-badge&logo=git&logoColor=white)](https://github.com/ArshitGupta01/TokSmart/releases)
 [![Unit Tests](https://img.shields.io/badge/unit%20tests-256%20verified-10b981.svg?style=for-the-badge&logo=pytest&logoColor=white)](#-verification--test-readiness)
 [![E2E Tests](https://img.shields.io/badge/e2e%20tests-209%2F209%20passing-10b981.svg?style=for-the-badge&logo=checkmarx&logoColor=white)](#-verification--test-readiness)
 [![Architecture](https://img.shields.io/badge/architecture-100%25%20local%20%7C%20offline-f59e0b.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/ArshitGupta01/LazyToken)

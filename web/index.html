@@ -9,11 +9,7 @@
       content="Local-first AI coding memory, context & interactive 2D/3D knowledge graph visualizer."
     />
     <title>TokSmart · Knowledge graph</title>
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cpath d='M16 2.5L28 9.5V22.5L16 29.5L4 22.5V9.5L16 2.5Z' stroke='%2322e6f0' stroke-width='2' stroke-linejoin='round' fill='%23070a14'/%3E%3Cpath d='M16 8V16M16 16L10 19.5M16 16L22 19.5' stroke='%23818cf8' stroke-width='1.8' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='8' r='2.2' fill='%2322e6f0'/%3E%3Ccircle cx='10' cy='19.5' r='2.2' fill='%23818cf8'/%3E%3Ccircle cx='22' cy='19.5' r='2.2' fill='%23c084fc'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%2322e6f0'/%3E%3Ccircle cx='16' cy='16' r='1.3' fill='%23ffffff'/%3E%3C/svg%3E"
-    />
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
   </head>
@@ -23,57 +19,7 @@
       <main class="connect-card" role="region" aria-label="Start your local server">
         <header class="card-header">
           <div class="brand-badge">
-            <svg
-              class="toksmart-logo"
-              viewBox="0 0 32 32"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient
-                  id="rm-badge-border"
-                  x1="2"
-                  y1="2"
-                  x2="30"
-                  y2="30"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop offset="0%" stop-color="#22e6f0" />
-                  <stop offset="50%" stop-color="#818cf8" />
-                  <stop offset="100%" stop-color="#c084fc" />
-                </linearGradient>
-                <linearGradient
-                  id="rm-badge-core"
-                  x1="10"
-                  y1="10"
-                  x2="22"
-                  y2="22"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop offset="0%" stop-color="#22e6f0" />
-                  <stop offset="100%" stop-color="#a855f7" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M16 2.5L28 9.5V22.5L16 29.5L4 22.5V9.5L16 2.5Z"
-                stroke="url(#rm-badge-border)"
-                stroke-width="2"
-                stroke-linejoin="round"
-                fill="#070a14"
-              />
-              <path
-                d="M16 8V16M16 16L10 19.5M16 16L22 19.5"
-                stroke="url(#rm-badge-border)"
-                stroke-width="1.8"
-                stroke-linecap="round"
-              />
-              <circle cx="16" cy="8" r="2.2" fill="#22e6f0" />
-              <circle cx="10" cy="19.5" r="2.2" fill="#818cf8" />
-              <circle cx="22" cy="19.5" r="2.2" fill="#c084fc" />
-              <circle cx="16" cy="16" r="3.2" fill="url(#rm-badge-core)" />
-              <circle cx="16" cy="16" r="1.3" fill="#ffffff" />
-            </svg>
+            <img class="toksmart-logo" src="logo.svg" alt="" />
             <span>TOKSMART</span>
           </div>
           <h1 class="card-title">Start your local server</h1>
@@ -89,10 +35,11 @@
             <strong>Using LazyToken on your phone</strong>
           </div>
           <p class="mobile-notice-desc">
-            Open <a href="mobile.html">the mobile prompt hub</a>, copy a mode's prompt, then paste it into your AI app.
-            The steps below are for your development computer: install Node.js 18+ and Python 3.11+,
-            then run the command there. 127.0.0.1 on your phone refers to the phone, not your computer.
-            Use the local dashboard on that computer to index your repository; Coding mode needs no server.
+            Open <a href="mobile.html">the mobile prompt hub</a>, copy a mode's prompt, then paste
+            it into your AI app. The steps below are for your development computer: install Node.js
+            18+ and Python 3.11+, then run the command there. 127.0.0.1 on your phone refers to the
+            phone, not your computer. Use the local dashboard on that computer to index your
+            repository; Coding mode needs no server.
           </p>
         </div>
 
@@ -347,13 +294,21 @@
         <p class="preview-eyebrow">AFTER THE SERVER STARTS</p>
         <h2 id="preview-title">Your code, connected and searchable</h2>
         <div class="preview-grid">
-          <div><span aria-hidden="true">01</span><strong>Explore relationships</strong><p>Follow linked knowledge in a local 2D or 3D graph.</p></div>
-          <div><span aria-hidden="true">02</span><strong>Find useful context</strong><p>Search code and memory together, with evidence for each link.</p></div>
-          <div><span aria-hidden="true">03</span><strong>Review memory</strong><p>Approve or reject lessons before they become trusted context.</p></div>
+          <div>
+            <span aria-hidden="true">01</span><strong>Explore relationships</strong>
+            <p>Follow linked knowledge in a local 2D or 3D graph.</p>
+          </div>
+          <div>
+            <span aria-hidden="true">02</span><strong>Find useful context</strong>
+            <p>Search code and memory together, with evidence for each link.</p>
+          </div>
+          <div>
+            <span aria-hidden="true">03</span><strong>Review memory</strong>
+            <p>Approve or reject lessons before they become trusted context.</p>
+          </div>
         </div>
         <p class="preview-privacy">The graph and source stay on your computer.</p>
       </section>
     </div>
-
   </body>
 </html>

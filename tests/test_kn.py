@@ -79,7 +79,7 @@ class KnowledgeNetworkTests(unittest.TestCase):
         original_lstat = Path.lstat
 
         def denied(path, *args, **kwargs):
-            if path == self.root / "src.kt":
+            if path.name == "src.kt":
                 raise PermissionError("temporary discovery failure")
             return original_lstat(path, *args, **kwargs)
 

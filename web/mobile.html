@@ -9,17 +9,19 @@
       content="Copy TokSmart Lite, Pro or Coding prompts into your favorite AI assistant. No installation or API key needed."
     />
     <title>TokSmart — Pocket prompts</title>
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="mobile.css?v=2" />
+    <link rel="stylesheet" href="mobile.css?v=3" />
     <script src="prompt-metrics.js" defer></script>
     <script src="mobile.js" defer></script>
   </head>
   <body class="mobile-page">
     <div class="pocket-shell">
       <header class="pocket-header">
-        <a class="brand-badge" href="mobile.html" aria-label="TokSmart home"
-          ><span class="pocket-mark" aria-hidden="true">T</span> TOKSMART</a
-        >
+        <a class="brand-badge" href="mobile.html" aria-label="TokSmart home">
+          <img class="toksmart-logo" src="logo.svg" alt="" />
+          TOKSMART
+        </a>
         <a href="index.html?desktop=1" class="desktop-link">PC setup ↗</a>
       </header>
 
@@ -69,7 +71,8 @@
               Run the benchmark on your computer, export its JSON report, then open it here. Reports
               stay in this browser. No API keys go into this page.
             </p>
-            <label class="launch-btn">Import benchmark JSON
+            <label class="launch-btn"
+              >Import benchmark JSON
               <input id="benchmark-file" type="file" accept="application/json,.json" />
             </label>
             <p id="benchmark-status" class="copy-status" role="status" aria-live="polite">
@@ -96,8 +99,10 @@
               On your computer, use the runner in this repository:
               <code>python -m benchmark.prompt_modes plan</code> previews the experiment. Configure
               your provider key in your computer’s environment, then run
-              <code>python -m benchmark.prompt_modes run --model YOUR_MODEL --confirm-calls COUNT_FROM_PLAN</code>. Export with the
-              runner’s export command.
+              <code
+                >python -m benchmark.prompt_modes run --model YOUR_MODEL --confirm-calls
+                COUNT_FROM_PLAN</code
+              >. Export with the runner’s export command.
             </p>
             <p>
               The suite has 36 cases across 12 categories and defaults to three trials. It uses the

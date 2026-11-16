@@ -28,7 +28,7 @@ if ($LASTEXITCODE -ne 0 -or $TokenizerVersion -ne '0.23.3') { throw 'This build 
 $Output = [System.IO.Path]::GetFullPath($Output)
 if (Test-Path -LiteralPath (Join-Path $Output 'LazyToken')) { throw 'Output already exists. Select a new -Output directory to preserve the previous build.' }
 if (Test-Path -LiteralPath (Join-Path $Output 'install.ps1')) { throw 'Output installer already exists. Select a new -Output directory.' }
-$Assets = @('index.html','styles.css','app.js','features-ui.js','graph3d.js','POLICY.md','README.md','THIRD_PARTY_NOTICES.md','RELEASING.md','LICENSE')
+$Assets = @('index.html','styles.css','logo.svg','app.js','features-ui.js','graph3d.js','POLICY.md','README.md','THIRD_PARTY_NOTICES.md','RELEASING.md','LICENSE')
 $PyArgs = @('--noconfirm','--onedir','--name','LazyToken','--distpath',$Output,'--workpath',(Join-Path $PSScriptRoot 'build\pyinstaller'),'--specpath',(Join-Path $PSScriptRoot 'build'))
 foreach ($Asset in $Assets) {
     $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot $Asset);.")

@@ -316,6 +316,17 @@ test('mobile HTML uses existing components, local assets and no graph engine', (
   assert.match(html, /id="benchmark-file"/);
 });
 
+test('website, mobile page and local dashboard use the same logo', () => {
+  const root = join(__dirname, '..');
+  const logo = readFileSync(join(root, 'logo.svg'), 'utf8');
+  assert.equal(readFileSync(join(root, 'web/logo.svg'), 'utf8'), logo);
+  for (const name of ['index.html', 'web/index.html', 'web/mobile.html']) {
+    const html = readFileSync(join(root, name), 'utf8');
+    assert.match(html, /rel="icon" type="image\/svg\+xml" href="logo\.svg"/);
+    assert.match(html, /class="toksmart-logo" src="logo\.svg"/);
+  }
+});
+
 for (const device of [
   { userAgent: 'iPhone', platform: 'iPhone', maxTouchPoints: 5 },
   { userAgent: 'Android', platform: 'Linux arm', maxTouchPoints: 5 },

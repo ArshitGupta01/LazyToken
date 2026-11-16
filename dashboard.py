@@ -226,6 +226,7 @@ class Handler(BaseHTTPRequestHandler):
             "/app.js",
             "/features-ui.js",
             "/styles.css",
+            "/logo.svg",
             "/graph3d.js",
             "/vendor/three.module.js",
             "/vendor/three.core.js",
@@ -249,6 +250,7 @@ class Handler(BaseHTTPRequestHandler):
             ".html": "text/html; charset=utf-8",
             ".js": "text/javascript; charset=utf-8",
             ".css": "text/css; charset=utf-8",
+            ".svg": "image/svg+xml",
         }[target.suffix]
         self.send_response(200)
         self.send_header("Content-Type", mime)
