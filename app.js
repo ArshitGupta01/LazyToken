@@ -680,9 +680,8 @@
         $('#empty').hidden = shown.length > 0;
         if (!shown.length) {
           const noProjects = projects.length === 0 && data.nodes.length === 0;
-          $('#empty b').textContent = noProjects
-            ? 'Add your first project'
-            : 'No matching knowledge yet';
+          const emptyLabel = noProjects ? 'Add your first project' : 'No matching knowledge yet';
+          $('#empty b').textContent = emptyLabel;
           $('#empty span').textContent = noProjects
             ? 'In another terminal, replace FULL_PATH_TO_PROJECT with the absolute folder path. Then refresh.'
             : 'Try another search or switch project scope.';
