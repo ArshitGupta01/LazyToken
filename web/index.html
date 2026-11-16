@@ -103,6 +103,35 @@
           </p>
         </header>
 
+        <!-- Mobile Device Detection Alert -->
+        <div class="mobile-notice" id="mobile-notice" style="display: none">
+          <div class="mobile-notice-header">
+            <span class="mobile-notice-icon">📱</span>
+            <strong>Mobile Device Detected</strong>
+          </div>
+          <p class="mobile-notice-desc">
+            The TokSmart indexing engine runs on your development PC/Mac. You can explore the full
+            2D/3D knowledge graph in Demo Mode below, or connect to your PC's IP over Wi-Fi.
+          </p>
+        </div>
+
+        <!-- Demo Mode Quick Launch CTA -->
+        <div class="demo-banner" id="demo-banner">
+          <div class="demo-banner-content">
+            <div class="demo-banner-title">
+              <span class="sparkle">✨</span>
+              <span>Want to preview the knowledge graph right now?</span>
+            </div>
+            <p class="demo-banner-subtitle">
+              Explore the full interactive 2D &amp; 3D knowledge visualizer with sample code
+              intelligence.
+            </p>
+          </div>
+          <button type="button" class="btn-demo-graph" id="btn-demo-graph">
+            Explore Demo Graph ➔
+          </button>
+        </div>
+
         <div class="stepper" role="list">
           <!-- Step 1: Copy Command -->
           <div class="step-row step-done" id="step-1" role="listitem">
@@ -288,6 +317,28 @@
                   </div>
                 </div>
               </div>
+              <details class="custom-host-details" id="custom-host-details">
+                <summary class="custom-host-summary">
+                  <span>Connect via custom IP or port (e.g. mobile to PC on Wi-Fi)</span>
+                </summary>
+                <div class="custom-host-content">
+                  <div class="custom-host-row">
+                    <input
+                      type="text"
+                      id="custom-host-input"
+                      class="custom-host-input"
+                      placeholder="e.g. 192.168.1.5:8765"
+                    />
+                    <button type="button" id="btn-custom-connect" class="btn-custom-connect">
+                      Connect
+                    </button>
+                  </div>
+                  <span class="custom-host-hint"
+                    >Enter your development machine's LAN IP if viewing on a phone or other device
+                    on the same network.</span
+                  >
+                </div>
+              </details>
             </div>
           </div>
 
@@ -440,6 +491,16 @@
           title="Connected to local server at 127.0.0.1:8765"
         >
           <span class="live-dot"></span> <span id="header-port-label">127.0.0.1:8765</span>
+        </div>
+        <div class="demo-indicator" id="demo-indicator" style="display: none">
+          <span class="demo-pill">✨ DEMO MODE</span>
+          <button
+            id="exit-demo-btn"
+            class="header-exit-demo-btn"
+            title="Exit demo mode and connect to local server"
+          >
+            Connect Local Server
+          </button>
         </div>
         <button
           id="disconnect-btn"
