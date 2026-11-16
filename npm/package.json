@@ -3,7 +3,7 @@
   "version": "0.5.1",
   "description": "Local repository context and memory for coding assistants",
   "license": "MIT",
-  "bin": { "lazytoken": "launcher.cjs" },
+  "bin": { "repomind": "launcher.cjs", "lazytoken": "launcher.cjs" },
   "files": ["launcher.cjs", "runtime"],
   "engines": { "node": ">=18" }
 }

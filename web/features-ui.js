@@ -21,7 +21,10 @@
   async function request(action, extra = {}) {
     const apiBase = window.API_BASE || '';
     const query = new URLSearchParams({ action, project: project.value, ...extra });
-    const r = await fetch(apiBase + '/api/lazytoken?' + query);
+    let r = await fetch(apiBase + '/api/repomind?' + query);
+    if (!r.ok && r.status === 404) {
+      r = await fetch(apiBase + '/api/lazytoken?' + query);
+    }
     const d = await r.json();
     if (!r.ok) throw Error(d.error || 'Unable to load');
     return d;
@@ -35,7 +38,11 @@
     }
     const response = await fetch(apiBase + '/api/review', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-LazyToken-Review': token },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-RepoMind-Review': token,
+        'X-LazyToken-Review': token
+      },
       body: JSON.stringify({ project: selectedProject, ...args })
     });
     const result = await response.json();

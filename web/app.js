@@ -1,18 +1,23 @@
-// LazyToken Web Client & Server Connection Manager
+// RepoMind Web Client & Server Connection Manager
 (() => {
   'use strict';
 
   const DEFAULT_PORT = 8765;
   const POLL_INTERVAL = 3000;
-  const STORAGE_KEY = 'lazytoken_connected';
-  const DISCONNECT_KEY = 'lazytoken_disconnected';
+  const STORAGE_KEY = 'repomind_connected';
+  const DISCONNECT_KEY = 'repomind_disconnected';
+  const LEGACY_STORAGE_KEY = 'lazytoken_connected';
+  const LEGACY_DISCONNECT_KEY = 'lazytoken_disconnected';
 
   function getApiBase() {
     const isLocal =
       window.location.protocol === 'http:' &&
       (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
     if (isLocal) return '';
-    const port = localStorage.getItem('lazytoken_port') || String(DEFAULT_PORT);
+    const port =
+      localStorage.getItem('repomind_port') ||
+      localStorage.getItem('lazytoken_port') ||
+      String(DEFAULT_PORT);
     return 'http://127.0.0.1:' + port;
   }
   window.API_BASE = getApiBase();
@@ -26,7 +31,9 @@
   let isConnected = false;
   let isManuallyDisconnected = false;
   try {
-    isManuallyDisconnected = localStorage.getItem(DISCONNECT_KEY) === 'true';
+    isManuallyDisconnected =
+      localStorage.getItem(DISCONNECT_KEY) === 'true' ||
+      localStorage.getItem(LEGACY_DISCONNECT_KEY) === 'true';
   } catch (e) {}
 
   let consecutiveFailures = 0;
@@ -134,14 +141,14 @@
         step2Indicator.classList.add('badge-green', 'checked');
       }
       if (step2Title) {
-        step2Title.textContent = 'Server available on port ' + DEFAULT_PORT;
+        step2Title.textContent = 'RepoMind server ready on port ' + DEFAULT_PORT;
         step2Title.classList.remove('text-white');
         step2Title.classList.add('text-green');
       }
       if (listeningBox) listeningBox.classList.add('connected');
-      if (listeningPrimary) listeningPrimary.textContent = 'Server ready (Disconnected)';
+      if (listeningPrimary) listeningPrimary.textContent = 'Server detected (Disconnected)';
       if (listeningSecondary)
-        listeningSecondary.textContent = 'Click below to reconnect to your dashboard';
+        listeningSecondary.textContent = 'Click below to connect to your RepoMind dashboard';
 
       if (manualBtn) manualBtn.style.display = 'inline-flex';
 
@@ -154,12 +161,12 @@
         step3Indicator.classList.add('badge-purple', 'checked');
       }
       if (step3Title) {
-        step3Title.textContent = 'Ready to open graph';
+        step3Title.textContent = 'Ready to open knowledge graph';
         step3Title.classList.remove('text-muted');
         step3Title.classList.add('text-white');
       }
       if (step3Desc) {
-        step3Desc.textContent = 'Click "Connect to Dashboard" to view your knowledge graph.';
+        step3Desc.textContent = 'Click "Connect to Dashboard" to launch your RepoMind visualizer.';
       }
     } else {
       if (step2Indicator) {
@@ -229,7 +236,8 @@
     try {
       localStorage.setItem(STORAGE_KEY, 'true');
       localStorage.removeItem(DISCONNECT_KEY);
-      localStorage.setItem('lazytoken_last_seen', Date.now().toString());
+      localStorage.removeItem(LEGACY_DISCONNECT_KEY);
+      localStorage.setItem('repomind_last_seen', Date.now().toString());
     } catch (e) {}
 
     window.API_BASE = getApiBase();
@@ -248,7 +256,7 @@
       step2Indicator.classList.add('badge-green', 'checked');
     }
     if (step2Title) {
-      step2Title.textContent = 'Server connected';
+      step2Title.textContent = 'RepoMind server connected';
       step2Title.classList.remove('text-white');
       step2Title.classList.add('text-green');
     }
@@ -289,6 +297,7 @@
     try {
       localStorage.setItem(DISCONNECT_KEY, 'true');
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch (e) {}
 
     document.documentElement.classList.remove('server-connected');
@@ -301,6 +310,7 @@
     isManuallyDisconnected = false;
     try {
       localStorage.removeItem(DISCONNECT_KEY);
+      localStorage.removeItem(LEGACY_DISCONNECT_KEY);
       localStorage.setItem(STORAGE_KEY, 'true');
     } catch (e) {}
     checkServer(true);
@@ -327,8 +337,10 @@
     let wasConnected = false;
     try {
       wasConnected =
-        localStorage.getItem(STORAGE_KEY) === 'true' &&
-        localStorage.getItem(DISCONNECT_KEY) !== 'true';
+        (localStorage.getItem(STORAGE_KEY) === 'true' ||
+          localStorage.getItem(LEGACY_STORAGE_KEY) === 'true') &&
+        localStorage.getItem(DISCONNECT_KEY) !== 'true' &&
+        localStorage.getItem(LEGACY_DISCONNECT_KEY) !== 'true';
     } catch (e) {}
 
     if (wasConnected) {
@@ -348,7 +360,7 @@
   }
 })();
 
-// --- Interactive Knowledge Graph & Visualizer Dashboard ---
+// --- RepoMind Interactive Knowledge Graph & Visualizer Dashboard ---
 (() => {
   let initialized = false;
 
@@ -364,7 +376,9 @@
   try {
     canAutoStart =
       (document.documentElement.classList.contains('server-connected') ||
+        localStorage.getItem('repomind_connected') === 'true' ||
         localStorage.getItem('lazytoken_connected') === 'true') &&
+      localStorage.getItem('repomind_disconnected') !== 'true' &&
       localStorage.getItem('lazytoken_disconnected') !== 'true';
   } catch (e) {}
 
@@ -778,6 +792,9 @@
       placeholder.hidden = !!node;
       detail.hidden = !node;
       if (!node) {
+        detail.innerHTML = '';
+        const jump = $('#node-jump');
+        if (jump) jump.value = '';
         draw();
         return;
       }
@@ -835,9 +852,13 @@
       canvas.setPointerCapture(event.pointerId);
       const p = screenPoint(event),
         node = hit(p);
-      drag = { x: p.x, y: p.y, lastX: p.x, lastY: p.y, node, moved: false };
+      const isSameNode = !!(node && selected && String(selected.id) === String(node.id));
+      drag = { x: p.x, y: p.y, lastX: p.x, lastY: p.y, node, moved: false, toggleOff: isSameNode };
       canvas.classList.add('dragging');
-      if (node) inspector(node);
+      if (node && !isSameNode) {
+        setInspectorMinimized(false);
+        inspector(node);
+      }
     });
     canvas.addEventListener('pointermove', (event) => {
       const p = screenPoint(event);
@@ -882,6 +903,11 @@
     });
     for (const name of ['pointerup', 'pointercancel'])
       canvas.addEventListener(name, () => {
+        if (drag && drag.toggleOff && !drag.moved) {
+          // Clicking on the currently open node closes the node inspector
+          inspector(null);
+          setInspectorMinimized(true);
+        }
         drag = null;
         canvas.classList.remove('dragging');
       });
@@ -926,7 +952,21 @@
                 gl = null;
               }
             },
-            onSelect: (node) => inspector(nodes.find((n) => n.id === node.id) || null),
+            onSelect: (node) => {
+              if (!node) {
+                inspector(null);
+                setInspectorMinimized(true);
+                return;
+              }
+              const found = nodes.find((n) => String(n.id) === String(node.id)) || null;
+              if (selected && found && String(selected.id) === String(found.id)) {
+                inspector(null);
+                setInspectorMinimized(true);
+              } else if (found) {
+                setInspectorMinimized(false);
+                inspector(found);
+              }
+            },
             onHover: (node) => {
               hover = node ? nodes.find((n) => n.id === node.id) || null : null;
               draw();

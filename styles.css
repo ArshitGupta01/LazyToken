@@ -68,21 +68,27 @@ textarea:focus-visible {
 }
 .brand-mark {
   position: relative;
-  display: block;
-  width: 27px;
-  height: 27px;
-  transform: rotate(45deg);
-  border: 2px solid var(--cyan);
-  border-radius: 4px;
-  box-shadow:
-    0 0 14px #06d8ff70,
-    inset 0 0 10px #415bff50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
 }
-.brand-mark i {
-  position: absolute;
-  inset: 5px;
-  border: 1px solid #a985ff;
-  border-radius: 2px;
+.brand-mark .repomind-logo {
+  width: 28px;
+  height: 28px;
+}
+.repomind-logo {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.3s ease;
+}
+.brand:hover .repomind-logo {
+  transform: rotate(18deg) scale(1.1);
+  filter: drop-shadow(0 0 10px rgba(34, 230, 240, 0.65));
 }
 .brand-mark i:nth-child(n + 2) {
   display: none;
@@ -450,7 +456,8 @@ kbd {
   flex: 1;
   min-height: 200px;
   overflow: hidden;
-  background: radial-gradient(ellipse at center, #0b2139a8 0, #050c1ad9 65%),
+  background:
+    radial-gradient(ellipse at center, #0b2139a8 0, #050c1ad9 65%),
     radial-gradient(#32537b55 0.8px, transparent 0.8px);
   background-size:
     auto,

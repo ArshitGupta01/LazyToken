@@ -99,10 +99,30 @@ body {
   margin-bottom: 12px;
 }
 
-.sparkle-icon {
-  width: 15px;
-  height: 15px;
-  color: var(--purple-brand);
+.sparkle-icon,
+.repomind-logo {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.3s ease;
+}
+
+.brand-mark .repomind-logo {
+  width: 26px;
+  height: 26px;
+}
+
+.brand-badge .repomind-logo {
+  width: 19px;
+  height: 19px;
+}
+
+.brand:hover .repomind-logo,
+.brand-badge:hover .repomind-logo {
+  transform: rotate(18deg) scale(1.1);
+  filter: drop-shadow(0 0 10px rgba(34, 230, 240, 0.65));
 }
 
 .card-title {
@@ -704,24 +724,15 @@ textarea:focus-visible {
 }
 .brand-mark {
   position: relative;
-  display: block;
-  width: 27px;
-  height: 27px;
-  transform: rotate(45deg);
-  border: 2px solid var(--cyan);
-  border-radius: 4px;
-  box-shadow:
-    0 0 14px #06d8ff70,
-    inset 0 0 10px #415bff50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
 }
-.brand-mark i {
-  position: absolute;
-  inset: 5px;
-  border: 1px solid #a985ff;
-  border-radius: 2px;
-}
-.brand-mark i:nth-child(n + 2) {
-  display: none;
+.brand-mark .repomind-logo {
+  width: 28px;
+  height: 28px;
 }
 .brand-subtitle {
   color: #a2b2ce;

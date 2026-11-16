@@ -4,15 +4,73 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#050a16" />
-    <title>LazyToken · Knowledge graph</title>
-    <link rel="stylesheet" href="/styles.css?v=4" />
+    <title>RepoMind · Knowledge graph</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cpath d='M16 2.5L28 9.5V22.5L16 29.5L4 22.5V9.5L16 2.5Z' stroke='%2322e6f0' stroke-width='2' stroke-linejoin='round' fill='%23070a14'/%3E%3Cpath d='M16 8V16M16 16L10 19.5M16 16L22 19.5' stroke='%23818cf8' stroke-width='1.8' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='8' r='2.2' fill='%2322e6f0'/%3E%3Ccircle cx='10' cy='19.5' r='2.2' fill='%23818cf8'/%3E%3Ccircle cx='22' cy='19.5' r='2.2' fill='%23c084fc'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%2322e6f0'/%3E%3Ccircle cx='16' cy='16' r='1.3' fill='%23ffffff'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/styles.css?v=5" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="/"
-          ><span class="brand-mark"><i></i><i></i><i></i></span><span>LazyToken</span></a
-        >
+        <a class="brand" href="/" aria-label="RepoMind home">
+          <span class="brand-mark">
+            <svg
+              class="repomind-logo"
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient
+                  id="rm-root-border"
+                  x1="2"
+                  y1="2"
+                  x2="30"
+                  y2="30"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0%" stop-color="#22e6f0" />
+                  <stop offset="50%" stop-color="#818cf8" />
+                  <stop offset="100%" stop-color="#c084fc" />
+                </linearGradient>
+                <linearGradient
+                  id="rm-root-core"
+                  x1="10"
+                  y1="10"
+                  x2="22"
+                  y2="22"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0%" stop-color="#22e6f0" />
+                  <stop offset="100%" stop-color="#a855f7" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M16 2.5L28 9.5V22.5L16 29.5L4 22.5V9.5L16 2.5Z"
+                stroke="url(#rm-root-border)"
+                stroke-width="2"
+                stroke-linejoin="round"
+                fill="#070a14"
+              />
+              <path
+                d="M16 8V16M16 16L10 19.5M16 16L22 19.5"
+                stroke="url(#rm-root-border)"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+              <circle cx="16" cy="8" r="2.2" fill="#22e6f0" />
+              <circle cx="10" cy="19.5" r="2.2" fill="#818cf8" />
+              <circle cx="22" cy="19.5" r="2.2" fill="#c084fc" />
+              <circle cx="16" cy="16" r="3.2" fill="url(#rm-root-core)" />
+              <circle cx="16" cy="16" r="1.3" fill="#ffffff" />
+            </svg>
+          </span>
+          <span>RepoMind</span>
+        </a>
         <span class="brand-subtitle">Local-first AI coding memory &amp; context</span>
         <nav class="topnav" aria-label="Main navigation">
           <button class="active" data-workspace-view="graph" aria-label="Graph">

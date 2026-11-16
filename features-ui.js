@@ -19,21 +19,30 @@
     return project.selectedOptions[0]?.textContent || '';
   }
   async function request(action, extra = {}) {
+    const apiBase = window.API_BASE || '';
     const query = new URLSearchParams({ action, project: project.value, ...extra });
-    const r = await fetch('/api/lazytoken?' + query);
+    let r = await fetch(apiBase + '/api/repomind?' + query);
+    if (!r.ok && r.status === 404) {
+      r = await fetch(apiBase + '/api/lazytoken?' + query);
+    }
     const d = await r.json();
     if (!r.ok) throw Error(d.error || 'Unable to load');
     return d;
   }
   async function review(args) {
+    const apiBase = window.API_BASE || '';
     const selectedProject = project.value;
     if (!token) {
-      const response = await fetch('/api/session');
+      const response = await fetch(apiBase + '/api/session');
       token = (await response.json()).token;
     }
-    const response = await fetch('/api/review', {
+    const response = await fetch(apiBase + '/api/review', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-LazyToken-Review': token },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-RepoMind-Review': token,
+        'X-LazyToken-Review': token
+      },
       body: JSON.stringify({ project: selectedProject, ...args })
     });
     const result = await response.json();

@@ -55,7 +55,7 @@ def read_projects() -> list[dict]:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LazyTokenLocal/0.4"
+    server_version = "RepoMindLocal/0.5"
 
     def _cors_headers(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -104,7 +104,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path in ("/api/health", "/api/ping"):
             return self._json({
                 "status": "ok",
-                "service": "lazytoken",
+                "service": "repomind",
+                "legacy_service": "lazytoken",
                 "version": kn.VERSION,
                 "port": self.server.server_port,
             })
@@ -157,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             finally:
                 conn.close()
-        if parsed.path == "/api/lazytoken":
+        if parsed.path in ("/api/repomind", "/api/lazytoken"):
             params = parse_qs(parsed.query)
             action = params.get("action", [""])[0]
             if action not in {"search", "proposals", "benchmark_list", "dependencies", "discover"}:
@@ -235,11 +236,15 @@ class Handler(BaseHTTPRequestHandler):
             f"http://{host}",
             f"http://127.0.0.1:{self.server.server_port}",
             f"http://localhost:{self.server.server_port}",
+            "https://repomind-live.vercel.app",
+            "https://repomind-graph.vercel.app",
+            "https://repomind.vercel.app",
             "https://lazytoken-steel.vercel.app",
         }
         origin_valid = origin in allowed_origins or origin.endswith(".vercel.app")
+        review_token = self.headers.get("X-RepoMind-Review", "") or self.headers.get("X-LazyToken-Review", "")
         if not origin_valid or not secrets.compare_digest(
-            self.headers.get("X-LazyToken-Review", ""), self.server.review_token
+            review_token, self.server.review_token
         ):
             return self._json({"error": "Invalid review request"}, 403)
         if self.headers.get_content_type() != "application/json":
@@ -303,14 +308,14 @@ def main() -> None:
             or "10048" in str(err)
         ):
             url = f"http://127.0.0.1:{args.port}"
-            print(f"LazyToken server is already running on port {args.port}!", flush=True)
+            print(f"RepoMind server is already running on port {args.port}!", flush=True)
             print(f"Dashboard: {url} (loopback only)", flush=True)
             if not args.no_browser:
                 threading.Timer(0.2, lambda: webbrowser.open(url)).start()
             return
         raise
     url = f"http://127.0.0.1:{server.server_address[1]}"
-    print(f"LazyToken dashboard: {url} (loopback only; Ctrl+C to stop)", flush=True)
+    print(f"RepoMind dashboard: {url} (loopback only; Ctrl+C to stop)", flush=True)
     if not args.no_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:

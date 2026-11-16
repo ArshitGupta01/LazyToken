@@ -8,7 +8,12 @@
       name="description"
       content="Local-first AI coding memory, context & interactive 2D/3D knowledge graph visualizer."
     />
-    <title>LazyToken · Knowledge graph</title>
+    <title>RepoMind · Knowledge graph</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cpath d='M16 2.5L28 9.5V22.5L16 29.5L4 22.5V9.5L16 2.5Z' stroke='%2322e6f0' stroke-width='2' stroke-linejoin='round' fill='%23070a14'/%3E%3Cpath d='M16 8V16M16 16L10 19.5M16 16L22 19.5' stroke='%23818cf8' stroke-width='1.8' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='8' r='2.2' fill='%2322e6f0'/%3E%3Ccircle cx='10' cy='19.5' r='2.2' fill='%23818cf8'/%3E%3Ccircle cx='22' cy='19.5' r='2.2' fill='%23c084fc'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%2322e6f0'/%3E%3Ccircle cx='16' cy='16' r='1.3' fill='%23ffffff'/%3E%3C/svg%3E"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -18,10 +23,12 @@
     <link rel="stylesheet" href="styles.css" />
     <script>
       try {
-        if (
-          localStorage.getItem('lazytoken_connected') === 'true' &&
-          localStorage.getItem('lazytoken_disconnected') !== 'true'
-        ) {
+        const isConn =
+          (localStorage.getItem('repomind_connected') === 'true' ||
+            localStorage.getItem('lazytoken_connected') === 'true') &&
+          localStorage.getItem('repomind_disconnected') !== 'true' &&
+          localStorage.getItem('lazytoken_disconnected') !== 'true';
+        if (isConn) {
           document.documentElement.classList.add('server-connected');
         }
       } catch (e) {}
@@ -35,14 +42,62 @@
       <main class="connect-card" role="region" aria-label="Start your local server">
         <header class="card-header">
           <div class="brand-badge">
-            <svg class="sparkle-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+            <svg
+              class="repomind-logo"
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient
+                  id="rm-badge-border"
+                  x1="2"
+                  y1="2"
+                  x2="30"
+                  y2="30"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0%" stop-color="#22e6f0" />
+                  <stop offset="50%" stop-color="#818cf8" />
+                  <stop offset="100%" stop-color="#c084fc" />
+                </linearGradient>
+                <linearGradient
+                  id="rm-badge-core"
+                  x1="10"
+                  y1="10"
+                  x2="22"
+                  y2="22"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0%" stop-color="#22e6f0" />
+                  <stop offset="100%" stop-color="#a855f7" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M16 2.5L28 9.5V22.5L16 29.5L4 22.5V9.5L16 2.5Z"
+                stroke="url(#rm-badge-border)"
+                stroke-width="2"
+                stroke-linejoin="round"
+                fill="#070a14"
+              />
+              <path
+                d="M16 8V16M16 16L10 19.5M16 16L22 19.5"
+                stroke="url(#rm-badge-border)"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+              <circle cx="16" cy="8" r="2.2" fill="#22e6f0" />
+              <circle cx="10" cy="19.5" r="2.2" fill="#818cf8" />
+              <circle cx="22" cy="19.5" r="2.2" fill="#c084fc" />
+              <circle cx="16" cy="16" r="3.2" fill="url(#rm-badge-core)" />
+              <circle cx="16" cy="16" r="1.3" fill="#ffffff" />
             </svg>
-            <span>LAZYTOKEN</span>
+            <span>REPOMIND</span>
           </div>
           <h1 class="card-title">Start your local server</h1>
           <p class="card-subtitle">
-            One command is all it takes. The knowledge graph opens right here automatically.
+            One command is all it takes. RepoMind connects and opens right here automatically.
           </p>
         </header>
 
@@ -82,7 +137,7 @@
                   <span class="terminal-tab-title">Terminal</span>
                   <button
                     class="copy-button"
-                    data-command="npx lazytoken@latest serve"
+                    data-command="npx repomind@latest serve"
                     aria-label="Copy npx command"
                     title="Copy command"
                   >
@@ -115,7 +170,7 @@
                 </div>
                 <div class="terminal-body">
                   <span class="terminal-prompt">$</span>
-                  <code class="terminal-code">npx lazytoken@latest serve</code>
+                  <code class="terminal-code">npx repomind@latest serve</code>
                 </div>
               </div>
 
@@ -135,7 +190,7 @@
                   <span class="terminal-tab-title">Global install</span>
                   <button
                     class="copy-button"
-                    data-command="npm install -g lazytoken && lazytoken serve"
+                    data-command="npm install -g repomind && repomind serve"
                     aria-label="Copy global install command"
                     title="Copy command"
                   >
@@ -169,7 +224,7 @@
                 <div class="terminal-body">
                   <span class="terminal-prompt">$</span>
                   <code class="terminal-code"
-                    >npm install -g lazytoken &amp;&amp; lazytoken serve</code
+                    >npm install -g repomind &amp;&amp; repomind serve</code
                   >
                 </div>
               </div>
@@ -310,9 +365,61 @@
     <!-- Main Dashboard Application Shell -->
     <div class="app-shell" id="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="LazyToken home">
-          <span class="brand-mark"><i></i><i></i><i></i></span>
-          <span>LazyToken</span>
+        <a class="brand" href="/" aria-label="RepoMind home">
+          <span class="brand-mark">
+            <svg
+              class="repomind-logo"
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient
+                  id="rm-top-border"
+                  x1="2"
+                  y1="2"
+                  x2="30"
+                  y2="30"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0%" stop-color="#22e6f0" />
+                  <stop offset="50%" stop-color="#818cf8" />
+                  <stop offset="100%" stop-color="#c084fc" />
+                </linearGradient>
+                <linearGradient
+                  id="rm-top-core"
+                  x1="10"
+                  y1="10"
+                  x2="22"
+                  y2="22"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0%" stop-color="#22e6f0" />
+                  <stop offset="100%" stop-color="#a855f7" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M16 2.5L28 9.5V22.5L16 29.5L4 22.5V9.5L16 2.5Z"
+                stroke="url(#rm-top-border)"
+                stroke-width="2"
+                stroke-linejoin="round"
+                fill="#070a14"
+              />
+              <path
+                d="M16 8V16M16 16L10 19.5M16 16L22 19.5"
+                stroke="url(#rm-top-border)"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+              <circle cx="16" cy="8" r="2.2" fill="#22e6f0" />
+              <circle cx="10" cy="19.5" r="2.2" fill="#818cf8" />
+              <circle cx="22" cy="19.5" r="2.2" fill="#c084fc" />
+              <circle cx="16" cy="16" r="3.2" fill="url(#rm-top-core)" />
+              <circle cx="16" cy="16" r="1.3" fill="#ffffff" />
+            </svg>
+          </span>
+          <span>RepoMind</span>
         </a>
         <span class="brand-subtitle">Local-first AI coding memory &amp; context</span>
         <nav class="topnav" aria-label="Main navigation">
@@ -497,7 +604,7 @@
           </div>
           <div class="inspector-empty">
             <span class="inspect-orbit">✣</span>
-            <div class="eyebrow">EXPLORE THE NETWORK</div>
+            <div class="eyebrow">EXPLORE REPOMIND NETWORK</div>
             <h2>Select a node<br />to inspect it.</h2>
             <p>See its summary, relationships, and the evidence behind them.</p>
           </div>
@@ -533,7 +640,7 @@
     >
       <header>
         <div>
-          <span class="eyebrow">LAZYTOKEN</span>
+          <span class="eyebrow">REPOMIND</span>
           <h2>Knowledge workspace</h2>
         </div>
         <button id="workspace-close" aria-label="Close workspace">✕</button>

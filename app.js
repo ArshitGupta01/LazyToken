@@ -397,6 +397,9 @@
     placeholder.hidden = !!node;
     detail.hidden = !node;
     if (!node) {
+      detail.innerHTML = '';
+      const jump = $('#node-jump');
+      if (jump) jump.value = '';
       draw();
       return;
     }
@@ -454,9 +457,13 @@
     canvas.setPointerCapture(event.pointerId);
     const p = screenPoint(event),
       node = hit(p);
-    drag = { x: p.x, y: p.y, lastX: p.x, lastY: p.y, node, moved: false };
+    const isSameNode = !!(node && selected && String(selected.id) === String(node.id));
+    drag = { x: p.x, y: p.y, lastX: p.x, lastY: p.y, node, moved: false, toggleOff: isSameNode };
     canvas.classList.add('dragging');
-    if (node) inspector(node);
+    if (node && !isSameNode) {
+      setInspectorMinimized(false);
+      inspector(node);
+    }
   });
   canvas.addEventListener('pointermove', (event) => {
     const p = screenPoint(event);
@@ -501,6 +508,11 @@
   });
   for (const name of ['pointerup', 'pointercancel'])
     canvas.addEventListener(name, () => {
+      if (drag && drag.toggleOff && !drag.moved) {
+        // Clicking on the currently open node closes the node inspector
+        inspector(null);
+        setInspectorMinimized(true);
+      }
       drag = null;
       canvas.classList.remove('dragging');
     });
@@ -545,7 +557,21 @@
               gl = null;
             }
           },
-          onSelect: (node) => inspector(nodes.find((n) => n.id === node.id) || null),
+          onSelect: (node) => {
+            if (!node) {
+              inspector(null);
+              setInspectorMinimized(true);
+              return;
+            }
+            const found = nodes.find((n) => String(n.id) === String(node.id)) || null;
+            if (selected && found && String(selected.id) === String(found.id)) {
+              inspector(null);
+              setInspectorMinimized(true);
+            } else if (found) {
+              setInspectorMinimized(false);
+              inspector(found);
+            }
+          },
           onHover: (node) => {
             hover = node ? nodes.find((n) => n.id === node.id) || null : null;
             draw();
