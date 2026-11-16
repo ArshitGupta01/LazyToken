@@ -8,7 +8,7 @@
       name="description"
       content="Local-first AI coding memory, context & interactive 2D/3D knowledge graph visualizer."
     />
-    <title>RepoMind · Knowledge graph</title>
+    <title>TokSmart · Knowledge graph</title>
     <link
       rel="icon"
       type="image/svg+xml"
@@ -24,8 +24,10 @@
     <script>
       try {
         const isConn =
-          (localStorage.getItem('repomind_connected') === 'true' ||
+          (localStorage.getItem('toksmart_connected') === 'true' ||
+            localStorage.getItem('repomind_connected') === 'true' ||
             localStorage.getItem('lazytoken_connected') === 'true') &&
+          localStorage.getItem('toksmart_disconnected') !== 'true' &&
           localStorage.getItem('repomind_disconnected') !== 'true' &&
           localStorage.getItem('lazytoken_disconnected') !== 'true';
         if (isConn) {
@@ -43,7 +45,7 @@
         <header class="card-header">
           <div class="brand-badge">
             <svg
-              class="repomind-logo"
+              class="repomind-logo toksmart-logo"
               viewBox="0 0 32 32"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -93,11 +95,11 @@
               <circle cx="16" cy="16" r="3.2" fill="url(#rm-badge-core)" />
               <circle cx="16" cy="16" r="1.3" fill="#ffffff" />
             </svg>
-            <span>REPOMIND</span>
+            <span>TOKSMART</span>
           </div>
           <h1 class="card-title">Start your local server</h1>
           <p class="card-subtitle">
-            One command is all it takes. RepoMind connects and opens right here automatically.
+            One command is all it takes. TokSmart connects and opens right here automatically.
           </p>
         </header>
 
@@ -137,7 +139,7 @@
                   <span class="terminal-tab-title">Terminal</span>
                   <button
                     class="copy-button"
-                    data-command="npx repomind@latest serve"
+                    data-command="npx toksmart@latest serve"
                     aria-label="Copy npx command"
                     title="Copy command"
                   >
@@ -170,7 +172,7 @@
                 </div>
                 <div class="terminal-body">
                   <span class="terminal-prompt">$</span>
-                  <code class="terminal-code">npx repomind@latest serve</code>
+                  <code class="terminal-code">npx toksmart@latest serve</code>
                 </div>
               </div>
 
@@ -190,7 +192,7 @@
                   <span class="terminal-tab-title">Global install</span>
                   <button
                     class="copy-button"
-                    data-command="npm install -g repomind && repomind serve"
+                    data-command="npm install -g toksmart && toksmart serve"
                     aria-label="Copy global install command"
                     title="Copy command"
                   >
@@ -224,7 +226,7 @@
                 <div class="terminal-body">
                   <span class="terminal-prompt">$</span>
                   <code class="terminal-code"
-                    >npm install -g repomind &amp;&amp; repomind serve</code
+                    >npm install -g toksmart &amp;&amp; toksmart serve</code
                   >
                 </div>
               </div>
@@ -365,7 +367,7 @@
     <!-- Main Dashboard Application Shell -->
     <div class="app-shell" id="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="RepoMind home">
+        <a class="brand" href="/" aria-label="TokSmart home">
           <span class="brand-mark">
             <svg
               class="repomind-logo"
@@ -419,7 +421,7 @@
               <circle cx="16" cy="16" r="1.3" fill="#ffffff" />
             </svg>
           </span>
-          <span>RepoMind</span>
+          <span>TokSmart</span>
         </a>
         <span class="brand-subtitle">Local-first AI coding memory &amp; context</span>
         <nav class="topnav" aria-label="Main navigation">
@@ -604,7 +606,7 @@
           </div>
           <div class="inspector-empty">
             <span class="inspect-orbit">✣</span>
-            <div class="eyebrow">EXPLORE REPOMIND NETWORK</div>
+            <div class="eyebrow">EXPLORE TOKSMART NETWORK</div>
             <h2>Select a node<br />to inspect it.</h2>
             <p>See its summary, relationships, and the evidence behind them.</p>
           </div>
@@ -640,7 +642,7 @@
     >
       <header>
         <div>
-          <span class="eyebrow">REPOMIND</span>
+          <span class="eyebrow">TOKSMART</span>
           <h2>Knowledge workspace</h2>
         </div>
         <button id="workspace-close" aria-label="Close workspace">✕</button>

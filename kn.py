@@ -106,28 +106,39 @@ def search_words(value: str) -> set[str]:
 def default_data_root() -> Path:
     local = os.environ.get("LOCALAPPDATA")
     if local:
+        p_ts = Path(local) / "TokSmart"
         p_rm = Path(local) / "RepoMind"
         p_lt = Path(local) / "LazyToken"
+        if (p_ts / "network.sqlite3").is_file():
+            return p_ts
         if (p_rm / "network.sqlite3").is_file():
             return p_rm
         if (p_lt / "network.sqlite3").is_file():
             return p_lt
-        return p_rm
+        return p_ts
     home = Path.home()
+    p_ts = home / ".local" / "share" / "TokSmart"
     p_rm = home / ".local" / "share" / "RepoMind"
     p_lt = home / ".local" / "share" / "LazyToken"
+    if (p_ts / "network.sqlite3").is_file():
+        return p_ts
     if (p_rm / "network.sqlite3").is_file():
         return p_rm
     if (p_lt / "network.sqlite3").is_file():
         return p_lt
-    return p_rm
+    return p_ts
 
 
 def legacy_data_roots() -> list[Path]:
-    candidates = [Path.home() / ".theekhai-knowledge", Path.home() / ".local" / "share" / "LazyToken"]
+    candidates = [
+        Path.home() / ".theekhai-knowledge",
+        Path.home() / ".local" / "share" / "LazyToken",
+        Path.home() / ".local" / "share" / "RepoMind",
+    ]
     if os.environ.get("LOCALAPPDATA"):
-        candidates.insert(0, Path(os.environ["LOCALAPPDATA"]) / "LazyToken")
-        candidates.insert(1, Path(os.environ["LOCALAPPDATA"]) / "TheekHai" / "KnowledgeNetwork")
+        candidates.insert(0, Path(os.environ["LOCALAPPDATA"]) / "RepoMind")
+        candidates.insert(1, Path(os.environ["LOCALAPPDATA"]) / "LazyToken")
+        candidates.insert(2, Path(os.environ["LOCALAPPDATA"]) / "TheekHai" / "KnowledgeNetwork")
     return [path for path in candidates if (path / "network.sqlite3").is_file()]
 
 
@@ -1629,7 +1640,7 @@ def main() -> None:
         help="Symbol name (e.g. 'Class.method' or 'func') or project-relative file path",
     )
     impact_cmd.add_argument("--project", default="")
-    for cmd_name in ("lazytoken", "repomind"):
+    for cmd_name in ("toksmart", "repomind", "lazytoken"):
         lt = sub.add_parser(cmd_name, help=f"Run a {cmd_name.capitalize()} action with JSON arguments")
         lt.add_argument(
             "action",
@@ -2021,7 +2032,7 @@ def main() -> None:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         if isinstance(result, dict) and "error" in result:
             raise SystemExit(1)
-    elif a.cmd in ("lazytoken", "repomind"):
+    elif a.cmd in ("toksmart", "repomind", "lazytoken"):
         raw = Path(a.json[1:]).read_text(encoding="utf-8-sig") if a.json.startswith("@") else a.json
         args = json.loads(raw)
         if not isinstance(args, dict):

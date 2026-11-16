@@ -1,13 +1,13 @@
-// RepoMind Web Client & Server Connection Manager
+// TokSmart Web Client & Server Connection Manager
 (() => {
   'use strict';
 
   const DEFAULT_PORT = 8765;
   const POLL_INTERVAL = 3000;
-  const STORAGE_KEY = 'repomind_connected';
-  const DISCONNECT_KEY = 'repomind_disconnected';
-  const LEGACY_STORAGE_KEY = 'lazytoken_connected';
-  const LEGACY_DISCONNECT_KEY = 'lazytoken_disconnected';
+  const STORAGE_KEY = 'toksmart_connected';
+  const DISCONNECT_KEY = 'toksmart_disconnected';
+  const LEGACY_STORAGE_KEYS = ['repomind_connected', 'lazytoken_connected'];
+  const LEGACY_DISCONNECT_KEYS = ['repomind_disconnected', 'lazytoken_disconnected'];
 
   function getApiBase() {
     const isLocal =
@@ -15,6 +15,7 @@
       (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
     if (isLocal) return '';
     const port =
+      localStorage.getItem('toksmart_port') ||
       localStorage.getItem('repomind_port') ||
       localStorage.getItem('lazytoken_port') ||
       String(DEFAULT_PORT);
@@ -33,7 +34,7 @@
   try {
     isManuallyDisconnected =
       localStorage.getItem(DISCONNECT_KEY) === 'true' ||
-      localStorage.getItem(LEGACY_DISCONNECT_KEY) === 'true';
+      LEGACY_DISCONNECT_KEYS.some((k) => localStorage.getItem(k) === 'true');
   } catch (e) {}
 
   let consecutiveFailures = 0;
@@ -141,14 +142,14 @@
         step2Indicator.classList.add('badge-green', 'checked');
       }
       if (step2Title) {
-        step2Title.textContent = 'RepoMind server ready on port ' + DEFAULT_PORT;
+        step2Title.textContent = 'TokSmart server ready on port ' + DEFAULT_PORT;
         step2Title.classList.remove('text-white');
         step2Title.classList.add('text-green');
       }
       if (listeningBox) listeningBox.classList.add('connected');
       if (listeningPrimary) listeningPrimary.textContent = 'Server detected (Disconnected)';
       if (listeningSecondary)
-        listeningSecondary.textContent = 'Click below to connect to your RepoMind dashboard';
+        listeningSecondary.textContent = 'Click below to connect to your TokSmart dashboard';
 
       if (manualBtn) manualBtn.style.display = 'inline-flex';
 
@@ -166,7 +167,7 @@
         step3Title.classList.add('text-white');
       }
       if (step3Desc) {
-        step3Desc.textContent = 'Click "Connect to Dashboard" to launch your RepoMind visualizer.';
+        step3Desc.textContent = 'Click "Connect to Dashboard" to launch your TokSmart visualizer.';
       }
     } else {
       if (step2Indicator) {
@@ -236,8 +237,8 @@
     try {
       localStorage.setItem(STORAGE_KEY, 'true');
       localStorage.removeItem(DISCONNECT_KEY);
-      localStorage.removeItem(LEGACY_DISCONNECT_KEY);
-      localStorage.setItem('repomind_last_seen', Date.now().toString());
+      LEGACY_DISCONNECT_KEYS.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem('toksmart_last_seen', Date.now().toString());
     } catch (e) {}
 
     window.API_BASE = getApiBase();
@@ -256,7 +257,7 @@
       step2Indicator.classList.add('badge-green', 'checked');
     }
     if (step2Title) {
-      step2Title.textContent = 'RepoMind server connected';
+      step2Title.textContent = 'TokSmart server connected';
       step2Title.classList.remove('text-white');
       step2Title.classList.add('text-green');
     }
@@ -297,7 +298,7 @@
     try {
       localStorage.setItem(DISCONNECT_KEY, 'true');
       localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      LEGACY_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
     } catch (e) {}
 
     document.documentElement.classList.remove('server-connected');
@@ -310,7 +311,7 @@
     isManuallyDisconnected = false;
     try {
       localStorage.removeItem(DISCONNECT_KEY);
-      localStorage.removeItem(LEGACY_DISCONNECT_KEY);
+      LEGACY_DISCONNECT_KEYS.forEach((k) => localStorage.removeItem(k));
       localStorage.setItem(STORAGE_KEY, 'true');
     } catch (e) {}
     checkServer(true);
@@ -319,7 +320,7 @@
   function bootstrap() {
     setupCopyButtons();
 
-    // Event delegation on document guarantees button clicks work 100% of the time
+    // Event delegation guarantees button clicks work 100% of the time
     document.addEventListener('click', (e) => {
       const target = e.target;
       if (!target) return;
@@ -336,11 +337,13 @@
 
     let wasConnected = false;
     try {
-      wasConnected =
-        (localStorage.getItem(STORAGE_KEY) === 'true' ||
-          localStorage.getItem(LEGACY_STORAGE_KEY) === 'true') &&
-        localStorage.getItem(DISCONNECT_KEY) !== 'true' &&
-        localStorage.getItem(LEGACY_DISCONNECT_KEY) !== 'true';
+      const hasConn =
+        localStorage.getItem(STORAGE_KEY) === 'true' ||
+        LEGACY_STORAGE_KEYS.some((k) => localStorage.getItem(k) === 'true');
+      const hasDisc =
+        localStorage.getItem(DISCONNECT_KEY) === 'true' ||
+        LEGACY_DISCONNECT_KEYS.some((k) => localStorage.getItem(k) === 'true');
+      wasConnected = hasConn && !hasDisc;
     } catch (e) {}
 
     if (wasConnected) {
@@ -360,7 +363,7 @@
   }
 })();
 
-// --- RepoMind Interactive Knowledge Graph & Visualizer Dashboard ---
+// --- TokSmart Interactive Knowledge Graph & Visualizer Dashboard ---
 (() => {
   let initialized = false;
 
@@ -374,12 +377,16 @@
   // If already connected on script execution and not manually disconnected, start immediately
   let canAutoStart = false;
   try {
-    canAutoStart =
-      (document.documentElement.classList.contains('server-connected') ||
-        localStorage.getItem('repomind_connected') === 'true' ||
-        localStorage.getItem('lazytoken_connected') === 'true') &&
-      localStorage.getItem('repomind_disconnected') !== 'true' &&
-      localStorage.getItem('lazytoken_disconnected') !== 'true';
+    const hasConn =
+      document.documentElement.classList.contains('server-connected') ||
+      localStorage.getItem('toksmart_connected') === 'true' ||
+      localStorage.getItem('repomind_connected') === 'true' ||
+      localStorage.getItem('lazytoken_connected') === 'true';
+    const hasDisc =
+      localStorage.getItem('toksmart_disconnected') === 'true' ||
+      localStorage.getItem('repomind_disconnected') === 'true' ||
+      localStorage.getItem('lazytoken_disconnected') === 'true';
+    canAutoStart = hasConn && !hasDisc;
   } catch (e) {}
 
   if (canAutoStart) {

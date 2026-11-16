@@ -21,7 +21,10 @@
   async function request(action, extra = {}) {
     const apiBase = window.API_BASE || '';
     const query = new URLSearchParams({ action, project: project.value, ...extra });
-    let r = await fetch(apiBase + '/api/repomind?' + query);
+    let r = await fetch(apiBase + '/api/toksmart?' + query);
+    if (!r.ok && r.status === 404) {
+      r = await fetch(apiBase + '/api/repomind?' + query);
+    }
     if (!r.ok && r.status === 404) {
       r = await fetch(apiBase + '/api/lazytoken?' + query);
     }
@@ -40,6 +43,7 @@
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-TokSmart-Review': token,
         'X-RepoMind-Review': token,
         'X-LazyToken-Review': token
       },

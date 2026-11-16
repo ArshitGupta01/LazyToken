@@ -1,9 +1,9 @@
 {
   "name": "lazytoken",
   "version": "0.5.1",
-  "description": "Local repository context and memory for coding assistants",
+  "description": "Local repository context and memory for coding assistants - TokSmart",
   "license": "MIT",
-  "bin": { "repomind": "launcher.cjs", "lazytoken": "launcher.cjs" },
+  "bin": { "toksmart": "launcher.cjs", "repomind": "launcher.cjs", "lazytoken": "launcher.cjs" },
   "files": ["launcher.cjs", "runtime"],
   "engines": { "node": ">=18" }
 }

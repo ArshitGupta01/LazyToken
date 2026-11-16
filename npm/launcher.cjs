@@ -20,7 +20,7 @@ const python = candidates.find(([command, ...prefix]) =>
 );
 
 if (!python) {
-  console.error("RepoMind needs Python 3.11 or newer. Install Python, then run this command again.");
+  console.error("TokSmart needs Python 3.11 or newer. Install Python, then run this command again.");
   process.exit(1);
 }
 
@@ -38,7 +38,7 @@ const result = spawnSync(command, [...prefix, entryPath, ...cliArgs], {
   windowsHide: true,
 });
 if (result.error) {
-  console.error(`Unable to start RepoMind: ${result.error.message}`);
+  console.error(`Unable to start TokSmart: ${result.error.message}`);
   process.exit(1);
 }
 if (result.signal) process.kill(process.pid, result.signal);

@@ -100,7 +100,8 @@ body {
 }
 
 .sparkle-icon,
-.repomind-logo {
+.repomind-logo,
+.toksmart-logo {
   display: inline-block;
   vertical-align: middle;
   flex-shrink: 0;
@@ -109,18 +110,22 @@ body {
     filter 0.3s ease;
 }
 
-.brand-mark .repomind-logo {
+.brand-mark .repomind-logo,
+.brand-mark .toksmart-logo {
   width: 26px;
   height: 26px;
 }
 
-.brand-badge .repomind-logo {
+.brand-badge .repomind-logo,
+.brand-badge .toksmart-logo {
   width: 19px;
   height: 19px;
 }
 
 .brand:hover .repomind-logo,
-.brand-badge:hover .repomind-logo {
+.brand-badge:hover .repomind-logo,
+.brand:hover .toksmart-logo,
+.brand-badge:hover .toksmart-logo {
   transform: rotate(18deg) scale(1.1);
   filter: drop-shadow(0 0 10px rgba(34, 230, 240, 0.65));
 }

@@ -74,11 +74,13 @@ textarea:focus-visible {
   width: 28px;
   height: 28px;
 }
-.brand-mark .repomind-logo {
+.brand-mark .repomind-logo,
+.brand-mark .toksmart-logo {
   width: 28px;
   height: 28px;
 }
-.repomind-logo {
+.repomind-logo,
+.toksmart-logo {
   display: inline-block;
   vertical-align: middle;
   flex-shrink: 0;
@@ -86,7 +88,8 @@ textarea:focus-visible {
     transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
     filter 0.3s ease;
 }
-.brand:hover .repomind-logo {
+.brand:hover .repomind-logo,
+.brand:hover .toksmart-logo {
   transform: rotate(18deg) scale(1.1);
   filter: drop-shadow(0 0 10px rgba(34, 230, 240, 0.65));
 }

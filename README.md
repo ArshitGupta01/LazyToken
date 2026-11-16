@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ RepoMind
+# ⚡ TokSmart
 
 ### **Precision Context Broker & Active Session Recall for AI Coding Agents**
 
