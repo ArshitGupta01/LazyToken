@@ -41,7 +41,7 @@ class SetupTests(unittest.TestCase):
         parsed = tomllib.loads(config.read_text())
         self.assertEqual(parsed["model"], "fixture")
         self.assertIn("other", parsed["mcp_servers"])
-        self.assertIn("lazytoken", parsed["mcp_servers"])
+        self.assertIn("toksmart", parsed["mcp_servers"])
         self.assertTrue((self.root / "data/network.sqlite3").exists())
         restored = onboarding.rollback(result["receipt"])
         self.assertEqual(restored["restored"], 2)
@@ -85,7 +85,7 @@ class SetupTests(unittest.TestCase):
         onboarding.apply(kn, plan)
         env = {**os.environ, "CODEX_HOME": str(self.profile / ".codex")}
         result = subprocess.run(
-            ["codex", "mcp", "get", "--json", "lazytoken"],
+            ["codex", "mcp", "get", "--json", "toksmart"],
             env=env,
             capture_output=True,
             text=True,

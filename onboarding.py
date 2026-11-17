@@ -67,8 +67,9 @@ def server_entries(data, client):
     if not isinstance(data, dict) or not isinstance(data.get(key, {}), dict):
         raise ValueError("Invalid client configuration.")
     servers = data.get(key, {})
-    if "lazytoken" in servers and not isinstance(servers["lazytoken"], dict):
-        raise ValueError("Invalid LazyToken registration.")
+    for name in ("toksmart", "lazytoken"):
+        if name in servers and not isinstance(servers[name], dict):
+            raise ValueError("Invalid TokSmart registration.")
     return servers
 
 
@@ -86,13 +87,14 @@ def preview(kn, project, clients=(), profile=None):
         text = before.decode("utf-8-sig")
         if client == "codex":
             parsed = tomllib.loads(text)
-            existing = server_entries(parsed, client).get("lazytoken")
+            entries = server_entries(parsed, client)
+            existing = entries.get("toksmart", entries.get("lazytoken"))
             addition = (
-                "\n[mcp_servers.lazytoken]\ncommand = "
+                "\n[mcp_servers.toksmart]\ncommand = "
                 + json.dumps(server["command"])
                 + "\nargs = "
                 + json.dumps(server["args"])
-                + "\n[mcp_servers.lazytoken.env]\nKN_HOME = "
+                + "\n[mcp_servers.toksmart.env]\nKN_HOME = "
                 + json.dumps(server["env"]["KN_HOME"])
                 + "\n"
             )
@@ -103,9 +105,15 @@ def preview(kn, project, clients=(), profile=None):
                 after = before
         else:
             parsed = json.loads(text) if text.strip() else {}
-            existing = server_entries(parsed, client).get("lazytoken")
-            parsed.setdefault("mcpServers", {})["lazytoken"] = server
-            after = json.dumps(parsed, ensure_ascii=False, indent=2).encode("utf-8")
+            entries = server_entries(parsed, client)
+            existing = entries.get("toksmart", entries.get("lazytoken"))
+            if existing is None:
+                parsed.setdefault("mcpServers", {})["toksmart"] = server
+            after = (
+                json.dumps(parsed, ensure_ascii=False, indent=2).encode("utf-8")
+                if existing is None
+                else before
+            )
         changes.append(
             {
                 "client": client,
@@ -208,7 +216,7 @@ def apply(kn, plan):
         "configured": True,
         "index": indexed,
         "receipt": str(receipt),
-        "note": "Existing LazyToken entries are preserved. Restart selected clients. Rerun setup after changing executable location.",
+        "note": "Existing TokSmart or legacy registrations are preserved. Restart selected clients. Rerun setup after changing executable location.",
     }
 
 
@@ -255,7 +263,8 @@ def diagnose(kn):
             try:
                 text = path.read_text(encoding="utf-8-sig")
                 data = tomllib.loads(text) if name == "codex" else json.loads(text)
-                result["registered"] = "lazytoken" in server_entries(data, name)
+                entries = server_entries(data, name)
+                result["registered"] = "toksmart" in entries or "lazytoken" in entries
                 result["configuration_valid"] = True
             except (ValueError, OSError, TypeError, AttributeError):
                 result["configuration_valid"] = False

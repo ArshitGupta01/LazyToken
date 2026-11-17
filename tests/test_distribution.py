@@ -30,7 +30,7 @@ class StorageAndCommands(unittest.TestCase):
             db.commit()
             db.close()
             before = source.read_bytes()
-            destination = Path(temp) / "LazyToken/network.sqlite3"
+            destination = Path(temp) / "TokSmart/network.sqlite3"
             self.assertEqual(kn.data_root(), destination.parent)
             self.assertIn(legacy, kn.legacy_data_roots())
             self.assertTrue(migration.migrate(source, destination)["preview"])
@@ -102,7 +102,7 @@ class StorageAndCommands(unittest.TestCase):
 
             for _ in range(2):
                 self.assertTrue(run("init")["initialized"])
-            db = sqlite3.connect(Path(temp) / "LazyToken/network.sqlite3")
+            db = sqlite3.connect(Path(temp) / "TokSmart/network.sqlite3")
             self.assertEqual(db.execute("SELECT count(*) FROM projects").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT count(*) FROM assets").fetchone()[0], 0)
             db.close()

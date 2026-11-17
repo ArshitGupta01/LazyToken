@@ -38,7 +38,7 @@ jobs:
         shell: powershell
         run: ./build_release.ps1 -Output ./release/ci-candidate
       - if: runner.os == 'Windows'
-        run: ./release/ci-candidate/LazyToken/LazyToken.exe doctor
+        run: ./release/ci-candidate/TokSmart/TokSmart.exe doctor
       - if: runner.os == 'Windows'
         run: python tests/smoke_release.py release/ci-candidate
       - if: runner.os == 'Windows'

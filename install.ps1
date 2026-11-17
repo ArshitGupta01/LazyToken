@@ -1,5 +1,6 @@
-param([string]$Version='latest',[string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Programs\LazyToken'),[string]$PackagePath,[string]$ExpectedSha256,[string]$PublisherThumbprint,[switch]$Upgrade,[switch]$NoPathRegistration)
+param([string]$Version='latest',[string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'Programs\TokSmart'),[string]$PackagePath,[string]$ExpectedSha256,[string]$PublisherThumbprint,[switch]$Upgrade,[switch]$NoPathRegistration)
 $ErrorActionPreference='Stop'
+if ($Upgrade -and -not $PSBoundParameters.ContainsKey('InstallRoot') -and (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'Programs\LazyToken\.lazytoken-install'))) { $InstallRoot=Join-Path $env:LOCALAPPDATA 'Programs\LazyToken' }
 function Get-Sha256([string]$Path) {
     # Keep bootstrap hashing independent of optional PowerShell modules.
     $Stream = [IO.File]::OpenRead($Path)
@@ -30,10 +31,10 @@ New-Item -ItemType Directory -Path $Stage | Out-Null
 try {
     if (-not $PackagePath) {
         if ($Version -ne 'latest' -and $Version -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?$') { throw 'Invalid version tag.' }
-        $Api=if ($Version -eq 'latest') {'https://api.github.com/repos/ArshitGupta01/LazyToken/releases/latest'} else {'https://api.github.com/repos/ArshitGupta01/LazyToken/releases/tags/'+$Version}
-        try {$Release=Invoke-RestMethod -Uri $Api -Headers @{Accept='application/vnd.github+json';'User-Agent'='LazyToken-installer'}} catch {throw 'No accessible verified release. Nothing installed. Publication of a tested release is required.'}
+        $Api=if ($Version -eq 'latest') {'https://api.github.com/repos/ArshitGupta01/TokSmart/releases/latest'} else {'https://api.github.com/repos/ArshitGupta01/TokSmart/releases/tags/'+$Version}
+        try {$Release=Invoke-RestMethod -Uri $Api -Headers @{Accept='application/vnd.github+json';'User-Agent'='TokSmart-installer'}} catch {throw 'No accessible verified release. Nothing installed. Publication of a tested release is required.'}
         if ($Release.draft -or $Release.tag_name -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?$') {throw 'Unsupported release metadata.'}
-        $Name='lazytoken-'+$Release.tag_name+'-windows-x64.zip'
+        $Name='toksmart-'+$Release.tag_name+'-windows-x64.zip'
         $Assets=@($Release.assets | Where-Object {$_.name -eq $Name})
         if ($Assets.Count -ne 1) {throw "Missing unique artifact: $Name"}
         $Asset=$Assets[0]
@@ -42,7 +43,7 @@ try {
         if ($ExpectedSha256 -and $ExpectedSha256 -ne $PublishedHash) {throw 'Independent checksum differs from release metadata.'}
         $ExpectedSha256=$PublishedHash
         if ($Asset.size -le 0 -or $Asset.size -gt 268435456) {throw 'Unsupported artifact size.'}
-        $Prefix='https://github.com/ArshitGupta01/LazyToken/releases/download/'+$Release.tag_name+'/'
+        $Prefix='https://github.com/ArshitGupta01/TokSmart/releases/download/'+$Release.tag_name+'/'
         if (-not $Asset.browser_download_url.StartsWith($Prefix,[StringComparison]::Ordinal)) {throw 'Unexpected download location.'}
         $PackagePath=Join-Path $Stage $Name
         Invoke-WebRequest -UseBasicParsing -Uri $Asset.browser_download_url -OutFile $PackagePath
@@ -75,22 +76,23 @@ try {
             }
         }
     } finally {$Archive.Dispose()}
-    foreach ($Required in @('install.ps1','LazyToken\release-manifest.json','LazyToken\LazyToken.exe','LazyToken\_internal\index.html','LazyToken\_internal\vendor\three.module.js')) {if (-not (Test-Path -LiteralPath (Join-Path $Extract $Required) -PathType Leaf)) {throw "Incomplete artifact: $Required"}}
-    if (-not ((Test-Path -LiteralPath (Join-Path $Extract 'LazyToken\_internal\python311.dll') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $Extract 'LazyToken\_internal\python314.dll') -PathType Leaf))) {throw 'Incomplete artifact: supported Python runtime DLL missing'}
+    $PackageName=if (Test-Path -LiteralPath (Join-Path $Extract 'TokSmart\TokSmart.exe')) {'TokSmart'} else {'LazyToken'}
+    foreach ($Required in @('install.ps1',"$PackageName\release-manifest.json","$PackageName\$PackageName.exe","$PackageName\_internal\index.html","$PackageName\_internal\vendor\three.module.js")) {if (-not (Test-Path -LiteralPath (Join-Path $Extract $Required) -PathType Leaf)) {throw "Incomplete artifact: $Required"}}
+    if (-not ((Test-Path -LiteralPath (Join-Path $Extract "$PackageName\_internal\python311.dll") -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $Extract "$PackageName\_internal\python314.dll") -PathType Leaf))) {throw 'Incomplete artifact: supported Python runtime DLL missing'}
     if ($PublisherThumbprint) {
         if (-not (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue)) {throw 'Authenticode verification unavailable; refusing the publisher-pinned install.'}
-        foreach ($SignedFile in @('install.ps1','LazyToken\LazyToken.exe')) {
+        foreach ($SignedFile in @('install.ps1',"$PackageName\$PackageName.exe")) {
             $Signature=Get-AuthenticodeSignature -LiteralPath (Join-Path $Extract $SignedFile)
             if ($Signature.Status -ne 'Valid' -or $Signature.SignerCertificate.Thumbprint -ne $PublisherThumbprint) {throw 'Trusted publisher signature verification failed.'}
         }
     }
-    $Options=@{Action=$(if ($Upgrade) {'upgrade'} else {'install'});InstallRoot=$InstallRoot;Source=(Join-Path $Extract 'LazyToken')}
+    $Options=@{Action=$(if ($Upgrade) {'upgrade'} else {'install'});InstallRoot=$InstallRoot;Source=(Join-Path $Extract $PackageName)}
     $PreviouslyRegistered=Test-Path -LiteralPath (Join-Path $InstallRoot '.path-registration.json')
     if (-not $NoPathRegistration -and (-not $Upgrade -or $PreviouslyRegistered)) {$Options.RegisterPath=$true}
     & (Join-Path $Extract 'install.ps1') @Options
     if (-not $?) {throw 'Managed install failed; prior version retained.'}
     if ($PublisherThumbprint) {@{thumbprint=$PublisherThumbprint} | ConvertTo-Json | Set-Content -LiteralPath $PublisherRecord -Encoding UTF8}
-    Write-Host 'Open a new terminal. Run lazytoken init, then lazytoken add <repository>.'
+    Write-Host 'Open a new terminal. Run toksmart init, then toksmart add <repository>.'
 } finally {
     $Resolved=[IO.Path]::GetFullPath($Stage)
     if ($Resolved.StartsWith($TempRoot,[StringComparison]::OrdinalIgnoreCase) -and (Split-Path -Leaf $Resolved) -match '^LazyToken-install-[a-f0-9]{32}$' -and (Test-Path -LiteralPath $Resolved) -and -not ((Get-Item -LiteralPath $Resolved).Attributes -band [IO.FileAttributes]::ReparsePoint)) {Remove-Item -LiteralPath $Resolved -Recurse -Force}

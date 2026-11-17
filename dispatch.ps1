@@ -1,13 +1,15 @@
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$CliArgs)
 $ErrorActionPreference = 'Stop'
 $Root = $PSScriptRoot
-if (-not (Test-Path -LiteralPath (Join-Path $Root '.lazytoken-install'))) {
-    throw 'Unrecognized LazyToken installation.'
+if (-not ((Test-Path -LiteralPath (Join-Path $Root '.toksmart-install')) -or (Test-Path -LiteralPath (Join-Path $Root '.lazytoken-install')))) {
+    throw 'Unrecognized TokSmart installation.'
 }
 function Get-CurrentExecutable {
     $Version = (Get-Content -Raw -LiteralPath (Join-Path $Root 'current.txt')).Trim()
     if ($Version -notmatch '^[a-f0-9]{32}$') { throw 'Invalid installed version marker.' }
-    return Join-Path $Root ('versions\' + $Version + '\LazyToken.exe')
+    $Folder = Join-Path (Join-Path $Root 'versions') $Version
+    if (Test-Path -LiteralPath (Join-Path $Folder 'TokSmart.exe')) { return Join-Path $Folder 'TokSmart.exe' }
+    return Join-Path $Folder 'LazyToken.exe'
 }
 $Exe = Get-CurrentExecutable
 $RestartWatch = $false
@@ -28,7 +30,7 @@ function Resume-BackgroundWatch {
     # Older compatible versions may predate automatic sync.
     if ((& $ActiveExe --help | Out-String) -match '\bwatch\b') {
         & $ActiveExe watch start
-        if ($LASTEXITCODE -ne 0) { throw 'Application selected, but automatic sync could not restart. Run lazytoken watch start.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Application selected, but automatic sync could not restart. Run toksmart watch start.' }
     }
 }
 
@@ -38,7 +40,7 @@ switch ($CliArgs[0]) {
         for ($i = 1; $i -lt $CliArgs.Count; $i++) {
             $Flag = $CliArgs[$i]
             if ($Flag -notin @('--version', '--package', '--sha256') -or $i + 1 -ge $CliArgs.Count) {
-                throw 'Usage: lazytoken update [--version vX.Y.Z] [--package file.zip --sha256 HASH]'
+                throw 'Usage: toksmart update [--version vX.Y.Z] [--package file.zip --sha256 HASH]'
             }
             $i++
             $Key = @{ '--version' = 'Version'; '--package' = 'PackagePath'; '--sha256' = 'ExpectedSha256' }[$Flag]
@@ -49,7 +51,7 @@ switch ($CliArgs[0]) {
         finally { Resume-BackgroundWatch }
     }
     'rollback' {
-        if ($CliArgs.Count -ne 1) { throw 'Usage: lazytoken rollback' }
+        if ($CliArgs.Count -ne 1) { throw 'Usage: toksmart rollback' }
         Stop-BackgroundWatch
         try { & (Join-Path $Root 'manage_install.ps1') -Action rollback -InstallRoot $Root }
         finally { Resume-BackgroundWatch }
@@ -57,11 +59,11 @@ switch ($CliArgs[0]) {
     'uninstall' {
         foreach ($Flag in @($CliArgs | Select-Object -Skip 1)) {
             if ($Flag -notin @('--yes', '--remove-clients')) {
-                throw 'Usage: lazytoken uninstall --yes [--remove-clients]'
+                throw 'Usage: toksmart uninstall --yes [--remove-clients]'
             }
         }
         if ($CliArgs -notcontains '--yes') {
-            throw 'Run lazytoken uninstall --yes to remove managed application files. Knowledge data is preserved.'
+            throw 'Run toksmart uninstall --yes to remove managed application files. Knowledge data is preserved.'
         }
         Stop-BackgroundWatch
         try {

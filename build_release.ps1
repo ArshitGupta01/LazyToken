@@ -26,10 +26,10 @@ if ($Version -ne '6.19.0') { throw "Expected PyInstaller 6.19.0; found $Version"
 $TokenizerVersion = (& $Python -c "from importlib.metadata import version; print(version('tokenizers'))").Trim()
 if ($LASTEXITCODE -ne 0 -or $TokenizerVersion -ne '0.23.3') { throw 'This build requires tokenizers==0.23.3 to match the bundled license and tested adapter.' }
 $Output = [System.IO.Path]::GetFullPath($Output)
-if (Test-Path -LiteralPath (Join-Path $Output 'LazyToken')) { throw 'Output already exists. Select a new -Output directory to preserve the previous build.' }
+if (Test-Path -LiteralPath (Join-Path $Output 'TokSmart')) { throw 'Output already exists. Select a new -Output directory to preserve the previous build.' }
 if (Test-Path -LiteralPath (Join-Path $Output 'install.ps1')) { throw 'Output installer already exists. Select a new -Output directory.' }
 $Assets = @('index.html','styles.css','logo.svg','app.js','features-ui.js','graph3d.js','POLICY.md','README.md','THIRD_PARTY_NOTICES.md','RELEASING.md','LICENSE')
-$PyArgs = @('--noconfirm','--onedir','--name','LazyToken','--distpath',$Output,'--workpath',(Join-Path $PSScriptRoot 'build\pyinstaller'),'--specpath',(Join-Path $PSScriptRoot 'build'))
+$PyArgs = @('--noconfirm','--onedir','--name','TokSmart','--distpath',$Output,'--workpath',(Join-Path $PSScriptRoot 'build\pyinstaller'),'--specpath',(Join-Path $PSScriptRoot 'build'))
 foreach ($Asset in $Assets) {
     $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot $Asset);.")
 }
@@ -42,24 +42,24 @@ foreach ($Support in @('install.ps1','manage_install.ps1','dispatch.ps1')) { $Py
 $PyArgs += (Join-Path $PSScriptRoot 'app_entry.py')
 & $Python -m PyInstaller @PyArgs
 if ($LASTEXITCODE -ne 0) { throw 'Packaging failed.' }
-Copy-Item -LiteralPath $PythonLicense -Destination (Join-Path $Output 'LazyToken\_internal\vendor\PYTHON-LICENSE.txt')
+Copy-Item -LiteralPath $PythonLicense -Destination (Join-Path $Output 'TokSmart\_internal\vendor\PYTHON-LICENSE.txt')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'manage_install.ps1') -Destination (Join-Path $Output 'install.ps1')
-Write-Host "Built $Output\LazyToken\LazyToken.exe"
+Write-Host "Built $Output\TokSmart\TokSmart.exe"
 
 # Hash every file in the onedir package, then produce a versioned zip and checksums.
-$PackageRoot = Join-Path $Output 'LazyToken'
-$Manifest = [ordered]@{format='lazytoken-files-v1';files=[ordered]@{}}
+$PackageRoot = Join-Path $Output 'TokSmart'
+$Manifest = [ordered]@{format='toksmart-files-v1';files=[ordered]@{}}
 foreach ($File in (Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Sort-Object FullName)) {
     $Relative = $File.FullName.Substring($PackageRoot.Length+1).Replace('\','/')
     $Manifest.files[$Relative] = (Get-Sha256 $File.FullName).ToLowerInvariant()
 }
 $Manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $PackageRoot 'release-manifest.json') -Encoding UTF8
 $AppVersion = (& $Python -c "import sys; sys.path.insert(0, sys.argv[1]); import kn; print(kn.VERSION)" $PSScriptRoot).Trim()
-$ZipName = 'lazytoken-v'+$AppVersion+'-windows-x64.zip'
+$ZipName = 'toksmart-v'+$AppVersion+'-windows-x64.zip'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $Staging = Join-Path $Output 'archive-stage'
 New-Item -ItemType Directory -Path $Staging | Out-Null
-Copy-Item -LiteralPath $PackageRoot -Destination (Join-Path $Staging 'LazyToken') -Recurse
+Copy-Item -LiteralPath $PackageRoot -Destination (Join-Path $Staging 'TokSmart') -Recurse
 Copy-Item -LiteralPath (Join-Path $Output 'install.ps1') -Destination (Join-Path $Staging 'install.ps1')
 [IO.Compression.ZipFile]::CreateFromDirectory($Staging,(Join-Path $Output $ZipName))
 $Hash = (Get-Sha256 (Join-Path $Output $ZipName)).ToLowerInvariant()

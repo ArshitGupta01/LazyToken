@@ -117,7 +117,7 @@ def default_data_root() -> Path:
             return p_lt
         if p_ts.is_dir():
             return p_ts
-        return p_lt
+        return p_ts
     home = Path.home()
     p_ts = home / ".local" / "share" / "TokSmart"
     p_rm = home / ".local" / "share" / "RepoMind"
@@ -130,7 +130,7 @@ def default_data_root() -> Path:
         return p_lt
     if p_ts.is_dir():
         return p_ts
-    return p_lt
+    return p_ts
 
 
 def legacy_data_roots() -> list[Path]:
