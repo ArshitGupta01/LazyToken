@@ -285,7 +285,7 @@ def smoke(package):
                 str(Path(os.environ["SystemRoot"]) / "System32/cmd.exe"),
                 "/d",
                 "/c",
-                "lazytoken",
+                "toksmart",
                 "doctor",
             ],
             env=command_env,
