@@ -28,6 +28,19 @@ class SetupTests(unittest.TestCase):
                 self.assertEqual(onboarding.managed_root(), root.resolve())
                 path.unlink()
 
+    def test_client_cleanup_recognizes_new_and_legacy_markers(self):
+        root = self.root / "managed"
+        root.mkdir()
+        with self.assertRaises(ValueError):
+            onboarding.remove_managed_clients(kn, root)
+        for marker in (".toksmart-install", ".lazytoken-install"):
+            path = root / marker
+            path.touch()
+            self.assertEqual(
+                onboarding.remove_managed_clients(kn, root)["removed_managed_entries"], 0
+            )
+            path.unlink()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
