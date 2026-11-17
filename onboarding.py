@@ -28,7 +28,7 @@ def managed_root():
     executable = Path(sys.executable).resolve()
     if getattr(sys, "frozen", False) and executable.parent.parent.name == "versions":
         root = executable.parent.parent.parent
-        if (root / ".lazytoken-install").is_file():
+        if (root / ".toksmart-install").is_file() or (root / ".lazytoken-install").is_file():
             return root
     return None
 
