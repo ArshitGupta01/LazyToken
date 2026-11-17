@@ -58,7 +58,7 @@ def download(url, maximum):
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "LazyToken-public-retrieval",
+            "User-Agent": "TokSmart-public-retrieval",
             "Accept": "application/vnd.github+json",
         },
     )
@@ -200,5 +200,5 @@ if __name__ == "__main__":
         fn=public_context,
         inputs=[gr.Textbox(label="Public GitHub owner/repository"), gr.Textbox(label="Task")],
         outputs=gr.JSON(),
-        title="LazyToken public repository context",
+        title="TokSmart public repository context",
     ).launch(mcp_server=True)
