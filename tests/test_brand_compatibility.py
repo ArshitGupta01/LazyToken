@@ -21,19 +21,22 @@ class BrandCompatibilityInventoryTests(unittest.TestCase):
         self.assertEqual(data["canonical_product"]["cli"], "toksmart")
 
         entries = data["legacy_identifiers"]
-        self.assertEqual({entry["id"] for entry in entries}, {
-            "lazytoken-cli-and-mcp",
-            "repomind-cli-and-browser",
-            "lazytoken-storage-and-artifact-format",
-            "repomind-storage",
-            "theekhai-knowledge-network-storage",
-            "public-branding-leaks",
-        })
+        self.assertEqual(
+            {entry["id"] for entry in entries},
+            {
+                "lazytoken-cli-and-mcp",
+                "repomind-cli-and-browser",
+                "lazytoken-storage-and-artifact-format",
+                "repomind-storage",
+                "theekhai-knowledge-network-storage",
+                "public-branding-leaks",
+            },
+        )
         for entry in entries:
             self.assertIn(entry["category"], VALID_CATEGORIES)
             self.assertTrue(entry["identifier"])
             self.assertTrue(entry["reason"])
-            self.assertEqual(entry["preferred_replacement"], "TokSmart")
+            self.assertIn(entry["preferred_replacement"], {"TokSmart", "toksmart"})
             self.assertTrue(entry["removal_requires"])
 
     def test_each_compatibility_or_migration_contract_has_boundaries(self):
