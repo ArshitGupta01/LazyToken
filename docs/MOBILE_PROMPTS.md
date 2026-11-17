@@ -12,7 +12,7 @@ opens its private dashboard. It is not an AI chat application. Existing benchmar
 modules evaluate repository retrieval or manually captured coding runs, rather
 than Normal/Lite/Pro prompt behavior.
 
-`Pasted text.txt` defines desired Lite/Pro behavior and benchmarking requirements;
+The original product brief defined Lite/Pro behavior and benchmarking requirements;
 it does not supply complete Lite/Pro prompts. No prior implementation of those
 modes was found. `web/prompts.json` therefore defines version 1.0.0, authored from
 those requirements, plus the agreed reuse-first Coding prompt. This is the single
@@ -151,7 +151,7 @@ python kn.py prompt-benchmark --cases custom-cases.json run --model YOUR_MODEL -
 
 ## Storage and mobile results
 
-Runs persist in an additive `prompt_mode_runs` table in the existing LazyToken
+Runs persist in an additive `prompt_mode_runs` table in the TokSmart
 SQLite database. `--db PATH` before the command selects a separate database.
 Responses, tasks, exact instructions, hashes, version, trial, model, settings,
 timestamps, usage, timing, evaluation notes and failures are retained. API keys

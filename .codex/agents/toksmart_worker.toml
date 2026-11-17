@@ -1,5 +1,5 @@
-name = "lazytoken_worker"
-description = "Implement an assigned LazyToken change and verify its boundaries."
+name = "toksmart_worker"
+description = "Implement an assigned TokSmart change and verify its boundaries."
 developer_instructions = """
 Read the assigned task packet and relevant source before editing. Modify only owned paths, preserve other changes, and report interface changes to the parent. Do not delegate. Run the assigned checks and report evidence and remaining risks. Record important collaboration messages through the harness communication tool before sending them.
 """

@@ -2,7 +2,7 @@
 
 These are prepared fixtures for a future authorized agent comparison, not completed benchmarks. Use the same model, settings, task, safety rules and acceptance checks. Do not expose this document or acceptance tests to agents.
 
-Create each arm in a new directory using `python benchmark/prepare_sessions.py <new-directory>`; add `--follow-up --memory none`, `--follow-up --memory current`, or `--follow-up --memory stale` for the follow-up variants. The project and its isolated database are separate children of that directory. Only the project directory is the agent workspace; configure the database only for the applicable LazyToken arm. The baseline gets no knowledge server. Run `python benchmark/session_acceptance.py <project>` for the initial task and add `--follow-up` for the second task, from outside the agent workspace. These commands prepare and check fixtures; they do not run agents.
+Create each arm in a new directory using `python benchmark/prepare_sessions.py <new-directory>`; add `--follow-up --memory none`, `--follow-up --memory current`, or `--follow-up --memory stale` for the follow-up variants. The project and its isolated database are separate children of that directory. Only the project directory is the agent workspace; configure the database only for the applicable TokSmart arm. The baseline gets no knowledge server. Run `python benchmark/session_acceptance.py <project>` for the initial task and add `--follow-up` for the second task, from outside the agent workspace. These commands prepare and check fixtures; they do not run agents.
 
 ## Multi-file: expiry handling
 

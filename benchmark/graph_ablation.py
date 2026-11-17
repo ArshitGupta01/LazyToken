@@ -747,11 +747,11 @@ def format_comparative_table(eval_summary: dict, raw_repo_tokens: int = 1250) ->
         f"{'NDCG@'+str(k):<8} | "
         f"{'Abstention':<10} | "
         f"{'Tokens':<8} | "
-        f"{'Savings vs Raw':<14}"
+        f"{'Payload vs Raw':<14}"
     )
     separator = "-" * len(header)
     rows = [
-        f"LazyToken 5-Mode Retrieval Ablation Evaluation (k={k})",
+        f"TokSmart 5-Mode Retrieval Ablation Evaluation (k={k})",
         separator,
         header,
         separator,
@@ -787,7 +787,7 @@ def generate_markdown_report(
     raw_repo_tokens = getattr(results, "raw_repo_tokens", 1250)
 
     md = [
-        "# LazyToken 5-Mode Empirical Retrieval Ablation Report",
+        "# TokSmart 5-Mode Synthetic Retrieval Ablation Report",
         "",
         "> **Objective**: Empirically evaluate all 5 ablation modes (Plain Grep baseline, Lexical alone,",
         "> Lexical + AST Graph, Verified Memory alone, and Full Pipeline) across multi-service scenarios.",
@@ -880,7 +880,7 @@ def generate_markdown_report(
             "### Finding 4: Verified Domain Memory (Mode 4) Targets Contractual Lessons",
             "- Synthetic reviewed lessons are seeded with indexed evidence; inspect the scenario metrics above for their estimated payload size.",
             "",
-            "### Finding 5: Full LazyToken Pipeline (Mode 5)",
+            "### Finding 5: Full TokSmart Pipeline (Mode 5)",
             "- Estimated payloads include both broker and impact responses. These synthetic payload comparisons do not measure provider usage or task success.",
             "",
             "---",
@@ -917,7 +917,7 @@ def generate_markdown_report(
             f"{r['modes']['full_pipeline']['tokens']} |"
         )
         md.append(
-            f"| Net Token Savings | "
+            f"| Estimated payload reduction vs raw | "
             f"-{r['modes']['grep_baseline']['savings_vs_raw']}% | "
             f"-{r['modes']['lexical_no_graph']['savings_vs_raw']}% | "
             f"-{r['modes']['lexical_with_graph']['savings_vs_raw']}% | "
@@ -930,13 +930,13 @@ def generate_markdown_report(
 
 
 def main():
-    print("Running LazyToken 5-Mode Graph Ablation Benchmark...")
+    print("Running TokSmart 5-Mode Graph Ablation Benchmark...")
     results = run_ablation()
     table = format_comparative_table(results.eval_summary, results.raw_repo_tokens)
     print("\n" + table + "\n")
 
     report = generate_markdown_report(results, results.eval_summary)
-    out_path = ROOT / "docs" / "GRAPH_ABLATION_ASSESSMENT.md"
+    out_path = ROOT / "benchmark" / "results" / "graph_ablation.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
     print(f"Ablation complete! Report generated at: {out_path}")

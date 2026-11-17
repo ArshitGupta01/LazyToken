@@ -39,8 +39,8 @@ Rollback refuses a changed destination or one with active WAL/SHM sidecars. It r
 
 ## Backup, restore and uninstall
 
-`lazytoken backup NEW_FILE` creates a verified independent SQLite copy, including committed WAL data, and refuses an existing target. `lazytoken restore BACKUP --to DIRECTORY` restores into a new database file without overwriting it.
+`toksmart backup NEW_FILE` creates a verified independent SQLite copy, including committed WAL data, and refuses an existing target. `toksmart restore BACKUP --to DIRECTORY` restores into a new database file without overwriting it.
 
 Application rollback changes binaries, not schema. If an older binary refuses a newer schema, restore a verified pre-upgrade backup to a new location; never replace a live database.
 
-`lazytoken uninstall --yes` retains knowledge data. Database removal is a separate explicit operator command, `data-delete --confirm-directory ABSOLUTE_DEFAULT_DIRECTORY`; it removes only the inactive identified default database and refuses legacy or overridden stores. Other user files and backups are preserved.
+`toksmart uninstall --yes` retains knowledge data. Database removal is a separate explicit operator command, `toksmart data-delete --confirm-directory ABSOLUTE_DEFAULT_DIRECTORY`; it removes only the inactive TokSmart database and refuses legacy or overridden stores. Other user files and backups are preserved.

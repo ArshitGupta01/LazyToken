@@ -343,7 +343,7 @@ class TestRetrievalAblation5Modes(unittest.TestCase):
         results = run_ablation()
         table = format_comparative_table(results.eval_summary, results.raw_repo_tokens)
         self.assertIsInstance(table, str)
-        self.assertIn("LazyToken 5-Mode Retrieval Ablation Evaluation (k=5)", table)
+        self.assertIn("TokSmart 5-Mode Retrieval Ablation Evaluation (k=5)", table)
         for mode in MODES:
             self.assertIn(mode, table)
         self.assertIn("Precision@5", table)
@@ -352,10 +352,10 @@ class TestRetrievalAblation5Modes(unittest.TestCase):
         self.assertIn("NDCG@5", table)
         self.assertIn("Abstention", table)
         self.assertIn("Tokens", table)
-        self.assertIn("Savings vs Raw", table)
+        self.assertIn("Payload vs Raw", table)
 
         report = generate_markdown_report(results, results.eval_summary)
-        self.assertIn("# LazyToken 5-Mode Empirical Retrieval Ablation Report", report)
+        self.assertIn("# TokSmart 5-Mode Synthetic Retrieval Ablation Report", report)
         self.assertIn("## 1. Executive Summary & Comparative Matrix", report)
         self.assertIn("## 2. Standard IR Evaluation Metrics Across All 5 Modes", report)
         self.assertIn("## 3. Key Empirical Findings", report)

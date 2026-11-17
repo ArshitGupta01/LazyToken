@@ -40,12 +40,12 @@
       "id": "lazytoken-storage-and-artifact-format",
       "identifier": "LazyToken / lazytoken-*",
       "category": "migration-contract",
-      "reason": "Existing default stores, receipt/manifest formats, installer markers, executable layout, and release assets use this identifier.",
+      "reason": "Legacy database paths, receipt and manifest formats, installer markers and executable layouts must remain readable; new packages use TokSmart names.",
       "allowed_surfaces": [
-        "kn.py default and legacy data roots",
-        "migration.py receipt format",
-        "install.ps1, manage_install.ps1, dispatch.ps1, build_release.ps1",
-        "tests/test_distribution.py fixtures",
+        "kn.py legacy data roots",
+        "migration.py and onboarding.py receipt formats",
+        "install.ps1, manage_install.ps1 and dispatch.ps1 legacy package support",
+        "tests/test_distribution.py legacy fixtures",
         "docs/MIGRATION.md historical-store instructions"
       ],
       "preferred_replacement": "TokSmart",
@@ -55,7 +55,7 @@
       "id": "repomind-storage",
       "identifier": "RepoMind",
       "category": "migration-contract",
-      "reason": "A historical data root is discovered but never silently selected or overwritten.",
+      "reason": "An existing historical database may be selected when no TokSmart database exists; migration remains explicit and preserves the source.",
       "allowed_surfaces": [
         "kn.py legacy_data_roots",
         "docs/MIGRATION.md"
@@ -79,15 +79,12 @@
       "id": "public-branding-leaks",
       "identifier": "LazyToken / RepoMind in product titles, public metadata, new user messages, or current release instructions",
       "category": "user-facing-bug",
-      "reason": "These locations present legacy branding as the current product and can make a fresh TokSmart installation, release, or public page misleading.",
+      "reason": "Legacy names used as current product labels are corrected as they are found; historical records and compatibility identifiers remain explicit.",
       "known_surfaces": [
-        ".codex/agents/lazytoken_worker.toml",
-        ".codex/agents/lazytoken_reviewer.toml",
-        "e2e/runner.py and e2e package descriptions",
-        "hf_space/README.md",
-        "THIRD_PARTY_NOTICES.md narrative",
-        "install.ps1 GitHub release source and User-Agent",
-        "RELEASING.md current release asset name"
+        "web/index.html phone banner (corrected)",
+        "docs/MIGRATION.md current CLI commands (corrected)",
+        "hf_space/app.py current title (corrected)",
+        ".codex/agents/ role filenames and descriptions (corrected)"
       ],
       "preferred_replacement": "TokSmart",
       "removal_requires": "None when the identifier is not a persisted format, supported command, configured endpoint, or verified artifact path."
@@ -111,8 +108,8 @@
     },
     {
       "id": "release-artifact-safety",
-      "assertion": "Existing LazyToken artifact layouts are not renamed until a versioned migration is implemented.",
-      "verification": "Run Windows build_release.ps1 plus tests/smoke_release.py before any artifact rename."
+      "assertion": "New TokSmart packages build and install; existing LazyToken artifact layouts remain accepted for upgrades and rollback.",
+      "verification": "Windows build_release.ps1, doctor, and tests/smoke_release.py in GitHub Actions run 44003685415."
     }
   ]
 }
