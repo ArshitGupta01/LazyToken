@@ -11,6 +11,7 @@
   const historyKey = 'toksmart_prompt_benchmarks_v1';
   let history = { schema: 'toksmart-prompt-benchmark-v1', runs: [] };
   let copying = false;
+  let fallbackOpener = null;
 
   async function copyPrompt(prompt, button) {
     if (copying) return;
@@ -22,6 +23,7 @@
       } catch {
         const input = get('fallback-text');
         input.value = prompt;
+        fallbackOpener = button;
         if (!get('copy-fallback').open) get('copy-fallback').showModal();
         input.focus();
         input.select();
@@ -102,8 +104,17 @@
         tab.setAttribute('aria-pressed', String(tab === button));
         get(`${tab.dataset.panel}-panel`).hidden = tab.dataset.panel !== selected;
       });
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      get(
+        { prompts: 'pocket-title', benchmarks: 'benchmarks-title', help: 'help-title' }[selected]
+      ).focus({
+        preventScroll: true
+      });
+      window.scrollTo({ top: 0, behavior: 'auto' });
     });
+  });
+  get('copy-fallback').addEventListener('close', () => {
+    fallbackOpener?.focus();
+    fallbackOpener = null;
   });
   get('close-fallback').addEventListener('click', () => get('copy-fallback').close());
   get('retry-prompts').addEventListener('click', loadPrompts);

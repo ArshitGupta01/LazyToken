@@ -74,6 +74,7 @@ class Element {
   }
   close() {
     this.open = false;
+    this.listeners.close?.();
   }
   focus() {
     this.focused = true;
@@ -167,6 +168,7 @@ test('each of the three modes has one copy button using the exact canonical prom
   for (const [index, mode] of ['lite', 'pro', 'coding'].entries()) {
     const buttons = cards[index].children.filter((node) => node.tag === 'button');
     assert.equal(buttons.length, 1);
+    assert.equal(buttons[0].attributes['aria-label'], `Copy ${prompts.modes[mode].name} prompt`);
     await buttons[0].click();
     assert.equal(page.copied[index], prompts.modes[mode].prompt);
   }
@@ -185,10 +187,23 @@ test('clipboard denial reveals selected prompt and failure to load is retryable'
   assert.equal(page.node('fallback-text').selected, true);
   page.node('close-fallback').click();
   assert.equal(page.node('copy-fallback').open, false);
+  assert.equal(
+    page.node('prompt-cards').children[0].children.find((n) => n.tag === 'button').focused,
+    true
+  );
   const failed = setup({ failFetch: true });
   await flush();
   assert.equal(failed.node('retry-prompts').hidden, false);
   assert.equal(failed.node('prompt-cards').attributes['aria-busy'], 'false');
+});
+
+test('closing the fallback dialog with a native close returns focus to Copy', async () => {
+  const page = setup({ denyClipboard: true });
+  await flush();
+  const copy = page.node('prompt-cards').children[0].children.find((n) => n.tag === 'button');
+  await copy.click();
+  page.node('copy-fallback').close();
+  assert.equal(copy.focused, true);
 });
 
 test('navigation updates the selected section and touch-friendly button state', async () => {
@@ -197,9 +212,11 @@ test('navigation updates the selected section and touch-friendly button state', 
   assert.equal(page.node('benchmarks-panel').hidden, false);
   assert.equal(page.node('prompts-panel').hidden, true);
   assert.equal(page.tabs[1].attributes['aria-pressed'], 'true');
+  assert.equal(page.node('benchmarks-title').focused, true);
   page.tabs[2].click();
   assert.equal(page.node('help-panel').hidden, false);
   assert.equal(page.tabs[1].attributes['aria-pressed'], 'false');
+  assert.equal(page.node('help-title').focused, true);
 });
 
 test('benchmark imports persist, deduplicate, export and require reset confirmation', async () => {
