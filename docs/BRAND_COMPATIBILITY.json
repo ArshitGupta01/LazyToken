@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "canonical_product": {
+    "display_name": "TokSmart",
+    "cli": "toksmart",
+    "repository": "ArshitGupta01/TokSmart"
+  },
+  "legacy_identifiers": [
+    {
+      "id": "lazytoken-cli-and-mcp",
+      "identifier": "lazytoken",
+      "category": "compatibility-only",
+      "reason": "Existing npm/CLI and MCP registrations must continue to resolve while users migrate to toksmart.",
+      "allowed_surfaces": [
+        "npm/package.json bin alias",
+        "kn.py structured-action alias",
+        "onboarding.py MCP registration compatibility",
+        "app.js legacy browser storage keys",
+        "dashboard.py legacy API route and review header"
+      ],
+      "preferred_replacement": "toksmart",
+      "removal_requires": "A published deprecation window, migration guidance, and compatibility test replacement."
+    },
+    {
+      "id": "repomind-cli-and-browser",
+      "identifier": "repomind",
+      "category": "compatibility-only",
+      "reason": "Earlier CLI registrations, API routes, browser storage keys, and hosted health origins still need a safe migration path.",
+      "allowed_surfaces": [
+        "npm/package.json bin alias",
+        "kn.py structured-action alias",
+        "app.js legacy browser storage keys",
+        "dashboard.py legacy API route, review header, and health-origin allowlist",
+        "features-ui.js legacy fallback route"
+      ],
+      "preferred_replacement": "toksmart",
+      "removal_requires": "A published deprecation window, migration guidance, and compatibility test replacement."
+    },
+    {
+      "id": "lazytoken-storage-and-artifact-format",
+      "identifier": "LazyToken / lazytoken-*",
+      "category": "migration-contract",
+      "reason": "Existing default stores, receipt/manifest formats, installer markers, executable layout, and release assets use this identifier.",
+      "allowed_surfaces": [
+        "kn.py default and legacy data roots",
+        "migration.py receipt format",
+        "install.ps1, manage_install.ps1, dispatch.ps1, build_release.ps1",
+        "tests/test_distribution.py fixtures",
+        "docs/MIGRATION.md historical-store instructions"
+      ],
+      "preferred_replacement": "TokSmart",
+      "removal_requires": "Versioned migration that preserves data, verifies rollback, and accepts existing verified release artifacts."
+    },
+    {
+      "id": "repomind-storage",
+      "identifier": "RepoMind",
+      "category": "migration-contract",
+      "reason": "A historical data root is discovered but never silently selected or overwritten.",
+      "allowed_surfaces": [
+        "kn.py legacy_data_roots",
+        "docs/MIGRATION.md"
+      ],
+      "preferred_replacement": "TokSmart",
+      "removal_requires": "A separately reviewed data-retention and migration policy."
+    },
+    {
+      "id": "theekhai-knowledge-network-storage",
+      "identifier": "TheekHai / KnowledgeNetwork",
+      "category": "migration-contract",
+      "reason": "A historical data root is only a migration source and must remain opt-in.",
+      "allowed_surfaces": [
+        "kn.py legacy_data_roots",
+        "tests/test_distribution.py migration fixture"
+      ],
+      "preferred_replacement": "TokSmart",
+      "removal_requires": "A separately reviewed data-retention and migration policy."
+    },
+    {
+      "id": "public-branding-leaks",
+      "identifier": "LazyToken / RepoMind in product titles, public metadata, new user messages, or current release instructions",
+      "category": "user-facing-bug",
+      "reason": "These locations present legacy branding as the current product and can make a fresh TokSmart installation, release, or public page misleading.",
+      "known_surfaces": [
+        ".codex/agents/lazytoken_worker.toml",
+        ".codex/agents/lazytoken_reviewer.toml",
+        "e2e/runner.py and e2e package descriptions",
+        "hf_space/README.md",
+        "THIRD_PARTY_NOTICES.md narrative",
+        "install.ps1 GitHub release source and User-Agent",
+        "RELEASING.md current release asset name"
+      ],
+      "preferred_replacement": "TokSmart",
+      "removal_requires": "None when the identifier is not a persisted format, supported command, configured endpoint, or verified artifact path."
+    }
+  ],
+  "test_matrix": [
+    {
+      "id": "canonical-identity",
+      "assertion": "Documentation and new user-facing output introduce the product as TokSmart.",
+      "verification": "Review changed text; run the documentation and relevant UI tests."
+    },
+    {
+      "id": "legacy-cli-compatibility",
+      "assertion": "toksmart, repomind, and lazytoken aliases remain accepted where documented.",
+      "verification": "python -m unittest discover -s tests -p 'test_*.py'; python e2e/runner.py --all"
+    },
+    {
+      "id": "legacy-storage-safety",
+      "assertion": "Historical roots are discovered only for explicit migration and source data remains unchanged.",
+      "verification": "python -m unittest tests.test_distribution"
+    },
+    {
+      "id": "release-artifact-safety",
+      "assertion": "Existing LazyToken artifact layouts are not renamed until a versioned migration is implemented.",
+      "verification": "Run Windows build_release.ps1 plus tests/smoke_release.py before any artifact rename."
+    }
+  ]
+}
