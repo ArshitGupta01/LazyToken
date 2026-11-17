@@ -1,6 +1,6 @@
 # Data, backup and legacy migration
 
-Fresh Windows storage defaults to `%LOCALAPPDATA%\LazyToken\network.sqlite3`. `KN_HOME` selects an explicit alternative directory. No repository or prototype seed data is imported automatically. The deprecated `seed` command is retained as a no-op.
+Fresh Windows storage defaults to `%LOCALAPPDATA%\TokSmart\network.sqlite3`. Existing RepoMind and LazyToken databases remain selected when no TokSmart database exists; they are never moved automatically. `KN_HOME` selects an explicit alternative directory. No repository or prototype seed data is imported automatically. The deprecated `seed` command is retained as a no-op.
 
 ## Existing users
 
@@ -9,20 +9,20 @@ Legacy locations are detected for compatibility:
 - `%LOCALAPPDATA%\TheekHai\KnowledgeNetwork`
 - `~/.theekhai-knowledge`
 
-These names are historical storage identifiers, not product branding or required repositories. They are never silently selected, merged, overwritten or deleted. Existing client configurations specifying `KN_HOME` continue using that store. `lazytoken doctor` and `lazytoken migrate-data` show detected locations.
+The TheekHai locations are historical storage identifiers; they are never silently selected, merged, overwritten or deleted. Existing client configurations specifying `KN_HOME` continue using that store. `toksmart doctor` and `toksmart migrate-data` show detected locations.
 
 ## Explicit migration
 
 Stop processes using the source and destination stores before migrating. Preview the actual paths first:
 
 ```powershell
-lazytoken migrate-data --source "C:\path\to\legacy\network.sqlite3"
+toksmart migrate-data --source "C:\path\to\legacy\network.sqlite3"
 ```
 
 To approve that copy:
 
 ```powershell
-lazytoken migrate-data --source "C:\path\to\legacy\network.sqlite3" --apply
+toksmart migrate-data --source "C:\path\to\legacy\network.sqlite3" --apply
 ```
 
 Migration targets the new default directory. It creates an integrity-checked independent backup, copies that consistent snapshot to a new destination and records a rollback receipt. It never merges data, never overwrites an existing destination and leaves the legacy database untouched. A collision must be resolved by the operator without replacing a live store. If a copy step fails, retain the reported backup and inspect the result before retrying.
@@ -32,7 +32,7 @@ Migration does not rewrite existing assistant registrations or environment varia
 To undo an unused migration copy:
 
 ```powershell
-lazytoken migrate-data --rollback "C:\path\to\migration-receipt.json"
+toksmart migrate-data --rollback "C:\path\to\migration-receipt.json"
 ```
 
 Rollback refuses a changed destination or one with active WAL/SHM sidecars. It retains the original source and verified backup.

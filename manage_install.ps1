@@ -1,7 +1,7 @@
 param(
     [ValidateSet('install','upgrade','rollback','uninstall')][string]$Action = 'install',
-    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'Programs\LazyToken'),
-    [string]$Source = (Join-Path $PSScriptRoot 'LazyToken'),
+    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'Programs\TokSmart'),
+    [string]$Source = (Join-Path $PSScriptRoot 'TokSmart'),
     [switch]$ConfirmUninstall,
     [switch]$RegisterPath,
     [string]$PathStateFile
@@ -28,11 +28,11 @@ while ($Ancestor) {
     $Parent=Split-Path -Parent $Ancestor
     if ($Parent -eq $Ancestor) { break };$Ancestor=$Parent
 }
-$Marker = Join-Path $Root '.lazytoken-install'
+$Marker = if (Test-Path -LiteralPath (Join-Path $Root '.lazytoken-install')) { Join-Path $Root '.lazytoken-install' } else { Join-Path $Root '.toksmart-install' }
 $Versions = Join-Path $Root 'versions'
 $Current = Join-Path $Root 'current.txt'
 $Previous = Join-Path $Root 'previous.txt'
-$Launcher = Join-Path $Root 'LazyToken.cmd'
+$Launcher = Join-Path $Root 'TokSmart.cmd'
 $Bin = Join-Path $Root 'bin'
 $PathReceipt = Join-Path $Root '.path-registration.json'
 function Read-UserPath {
@@ -64,14 +64,14 @@ function Remove-UserPath {
 function Assert-Installation {
     $Item = Get-Item -LiteralPath $Root -Force
     if (($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or (Resolve-Path -LiteralPath $Root).Path -ne $Root) { throw 'Installation root must be a regular local directory.' }
-    if (-not (Test-Path -LiteralPath $Marker -PathType Leaf) -or (Get-Content -Raw -LiteralPath $Marker).Trim() -ne 'LazyToken-managed-install-v1') { throw 'This is not a recognized LazyToken installation.' }
+    if (-not (Test-Path -LiteralPath $Marker -PathType Leaf) -or (Get-Content -Raw -LiteralPath $Marker).Trim() -notin @('LazyToken-managed-install-v1','TokSmart-managed-install-v1')) { throw 'This is not a recognized TokSmart installation.' }
     foreach ($Managed in @($Versions,$Bin,$Launcher,$Current,$Previous,$PathReceipt)) { if ((Test-Path -LiteralPath $Managed) -and ((Get-Item -LiteralPath $Managed -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Managed installation paths cannot be links or junctions.' } }
 }
 function Verify-Package([string]$Directory) {
     $ManifestPath=Join-Path $Directory 'release-manifest.json'
     if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) { throw 'Package integrity manifest is missing.' }
     $Manifest=Get-Content -Raw -LiteralPath $ManifestPath | ConvertFrom-Json
-    if ($Manifest.format -ne 'lazytoken-files-v1' -or -not $Manifest.files.'LazyToken.exe') { throw 'Invalid package manifest.' }
+    if (-not (($Manifest.format -eq 'lazytoken-files-v1' -and $Manifest.files.'LazyToken.exe') -or ($Manifest.format -eq 'toksmart-files-v1' -and $Manifest.files.'TokSmart.exe'))) { throw 'Invalid package manifest.' }
     $Base=[IO.Path]::GetFullPath($Directory).TrimEnd('\')
     foreach ($File in (Get-ChildItem -LiteralPath $Directory -Recurse -File -Force)) {
         $Relative=$File.FullName.Substring($Base.Length+1).Replace('\','/')
@@ -97,21 +97,22 @@ function Read-Version([string]$Path) {
     return $Value
 }
 function Set-Launcher([string]$Version) {
-    $Exe = Join-Path (Join-Path $Versions $Version) 'LazyToken.exe'
+    $Selected = Join-Path $Versions $Version
+    $Exe = if (Test-Path -LiteralPath (Join-Path $Selected 'TokSmart.exe')) { Join-Path $Selected 'TokSmart.exe' } else { Join-Path $Selected 'LazyToken.exe' }
     if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) { throw 'The selected version is incomplete.' }
     $Lines = @('@echo off','"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -File "%~dp0dispatch.ps1" %*')
     [IO.File]::WriteAllLines($Launcher,$Lines,[Text.Encoding]::ASCII)
     New-Item -ItemType Directory -Force -Path $Bin | Out-Null
-    [IO.File]::WriteAllLines((Join-Path $Bin 'lazytoken.cmd'),@('@echo off','"%~dp0..\LazyToken.cmd" %*'),[Text.Encoding]::ASCII)
+    [IO.File]::WriteAllLines((Join-Path $Bin 'toksmart.cmd'),@('@echo off','"%~dp0..\TokSmart.cmd" %*'),[Text.Encoding]::ASCII)
     Write-AtomicText $Current $Version
 }
 if ($Action -in @('install','upgrade')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $Source 'LazyToken.exe') -PathType Leaf)) { throw 'Source must be a built LazyToken distribution.' }
+    if (-not ((Test-Path -LiteralPath (Join-Path $Source 'TokSmart.exe') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $Source 'LazyToken.exe') -PathType Leaf))) { throw 'Source must be a built TokSmart distribution.' }
     foreach ($Item in @(Get-Item -LiteralPath $Source) + @(Get-ChildItem -LiteralPath $Source -Recurse -Force)) { if ($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Package directories must not contain links or junctions.' } }
     Verify-Package $Source
     if (Test-Path -LiteralPath $Root) { Assert-Installation } else {
         New-Item -ItemType Directory -Path $Root | Out-Null
-        [IO.File]::WriteAllText($Marker,'LazyToken-managed-install-v1',[Text.Encoding]::ASCII)
+        [IO.File]::WriteAllText($Marker,'TokSmart-managed-install-v1',[Text.Encoding]::ASCII)
     }
     New-Item -ItemType Directory -Force -Path $Versions | Out-Null
     $Old = Read-Version $Current
@@ -119,7 +120,7 @@ if ($Action -in @('install','upgrade')) {
     $Target = Join-Path $Versions $Version
     New-Item -ItemType Directory -Path $Target | Out-Null
     Get-ChildItem -LiteralPath $Source -Force | Copy-Item -Destination $Target -Recurse -Force
-    if (-not (Test-Path -LiteralPath (Join-Path $Target 'LazyToken.exe') -PathType Leaf)) { throw 'Copy failed; existing version remains selected.' }
+    if (-not ((Test-Path -LiteralPath (Join-Path $Target 'TokSmart.exe') -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $Target 'LazyToken.exe') -PathType Leaf))) { throw 'Copy failed; existing version remains selected.' }
     Verify-Package $Target
     if ($Old) { [IO.File]::WriteAllText($Previous,$Old,[Text.Encoding]::ASCII) }
     $Support = Join-Path $Source '_internal\distribution'
@@ -127,11 +128,11 @@ if ($Action -in @('install','upgrade')) {
         foreach ($Name in @('dispatch.ps1','manage_install.ps1','install.ps1')) { Copy-Item -LiteralPath (Join-Path $Support $Name) -Destination (Join-Path $Root $Name) -Force }
     } elseif (-not (Test-Path -LiteralPath (Join-Path $Root 'dispatch.ps1'))) {
         # Unit fixtures and older local packages retain their direct executable launcher.
-        [IO.File]::WriteAllLines((Join-Path $Root 'dispatch.ps1'),@('param([Parameter(ValueFromRemainingArguments=$true)][string[]]$CliArgs)','$v=(Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "current.txt")).Trim()','& (Join-Path $PSScriptRoot ("versions\"+$v+"\LazyToken.exe")) @CliArgs','exit $LASTEXITCODE'),[Text.Encoding]::UTF8)
+        [IO.File]::WriteAllLines((Join-Path $Root 'dispatch.ps1'),@('param([Parameter(ValueFromRemainingArguments=$true)][string[]]$CliArgs)','$v=(Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "current.txt")).Trim()','$d=Join-Path (Join-Path $PSScriptRoot "versions") $v','$exe=if (Test-Path -LiteralPath (Join-Path $d "TokSmart.exe")) {Join-Path $d "TokSmart.exe"} else {Join-Path $d "LazyToken.exe"}','& $exe @CliArgs','exit $LASTEXITCODE'),[Text.Encoding]::UTF8)
     }
     Set-Launcher $Version
     if ($RegisterPath) { Register-UserPath }
-    Write-Host "LazyToken installed at $Root. Run $Launcher dashboard"
+    Write-Host "TokSmart installed at $Root. Run $Launcher dashboard"
 } elseif ($Action -eq 'rollback') {
     Assert-Installation
     $Old = Read-Version $Current; $Version = Read-Version $Previous
@@ -139,7 +140,7 @@ if ($Action -in @('install','upgrade')) {
     Verify-Package (Join-Path $Versions $Version)
     Set-Launcher $Version
     if ($Old) { [IO.File]::WriteAllText($Previous,$Old,[Text.Encoding]::ASCII) }
-    Write-Host 'LazyToken rolled back to the previous installed version.'
+    Write-Host 'TokSmart rolled back to the previous installed version.'
 } else {
     Assert-Installation
     if (-not $ConfirmUninstall) { throw 'Use -ConfirmUninstall to remove the installed application files. The knowledge database is retained.' }
@@ -158,10 +159,9 @@ if ($Action -in @('install','upgrade')) {
         Remove-Item -LiteralPath $Versions -Force
     }
     Remove-UserPath
-    $BinLauncher = Join-Path $Bin 'lazytoken.cmd'
-    if (Test-Path -LiteralPath $BinLauncher) { Remove-Item -LiteralPath $BinLauncher -Force }
+    foreach ($Name in @('toksmart.cmd','lazytoken.cmd')) { $BinLauncher=Join-Path $Bin $Name; if (Test-Path -LiteralPath $BinLauncher) { Remove-Item -LiteralPath $BinLauncher -Force } }
     if ((Test-Path -LiteralPath $Bin) -and -not (Get-ChildItem -LiteralPath $Bin -Force)) { Remove-Item -LiteralPath $Bin -Force }
-    foreach ($Path in @($Launcher,$Current,$Previous,$Marker,$PathReceipt,(Join-Path $Root '.publisher.json'),(Join-Path $Root 'dispatch.ps1'),(Join-Path $Root 'manage_install.ps1'),(Join-Path $Root 'install.ps1'))) { if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force } }
+    foreach ($Path in @($Launcher,(Join-Path $Root 'LazyToken.cmd'),$Current,$Previous,$Marker,$PathReceipt,(Join-Path $Root '.publisher.json'),(Join-Path $Root 'dispatch.ps1'),(Join-Path $Root 'manage_install.ps1'),(Join-Path $Root 'install.ps1'))) { if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force } }
     if (-not (Get-ChildItem -LiteralPath $Root -Force)) { Remove-Item -LiteralPath $Root -Force }
-    Write-Host 'LazyToken application files removed. The knowledge database was retained.'
+    Write-Host 'TokSmart application files removed. The knowledge database was retained.'
 }

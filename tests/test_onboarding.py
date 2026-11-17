@@ -12,6 +12,22 @@ import onboarding
 
 
 class SetupTests(unittest.TestCase):
+    def test_managed_root_recognizes_new_and_legacy_markers(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root)
+        executable = root / "versions" / "v1" / "TokSmart.exe"
+        executable.parent.mkdir(parents=True)
+        with (
+            patch.object(onboarding.sys, "frozen", True, create=True),
+            patch.object(onboarding.sys, "executable", str(executable)),
+        ):
+            self.assertIsNone(onboarding.managed_root())
+            for marker in (".toksmart-install", ".lazytoken-install"):
+                path = root / marker
+                path.touch()
+                self.assertEqual(onboarding.managed_root(), root)
+                path.unlink()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -41,7 +57,7 @@ class SetupTests(unittest.TestCase):
         parsed = tomllib.loads(config.read_text())
         self.assertEqual(parsed["model"], "fixture")
         self.assertIn("other", parsed["mcp_servers"])
-        self.assertIn("lazytoken", parsed["mcp_servers"])
+        self.assertIn("toksmart", parsed["mcp_servers"])
         self.assertTrue((self.root / "data/network.sqlite3").exists())
         restored = onboarding.rollback(result["receipt"])
         self.assertEqual(restored["restored"], 2)
@@ -85,7 +101,7 @@ class SetupTests(unittest.TestCase):
         onboarding.apply(kn, plan)
         env = {**os.environ, "CODEX_HOME": str(self.profile / ".codex")}
         result = subprocess.run(
-            ["codex", "mcp", "get", "--json", "lazytoken"],
+            ["codex", "mcp", "get", "--json", "toksmart"],
             env=env,
             capture_output=True,
             text=True,

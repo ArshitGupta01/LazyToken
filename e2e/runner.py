@@ -1,4 +1,4 @@
-"""Standalone CLI runner for LazyToken E2E tests."""
+"""Standalone CLI runner for TokSmart E2E tests."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def build_suite(tier: int | None = None, run_all: bool = False) -> unittest.Test
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="LazyToken E2E Test Runner")
+    parser = argparse.ArgumentParser(description="TokSmart E2E Test Runner")
     parser.add_argument(
         "--tier",
         type=int,
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tier_label = f"Tier {args.tier}" if args.tier is not None else "All Tiers"
     print("\n" + "=" * 60)
-    print(f"LazyToken E2E Test Suite Summary ({tier_label})")
+    print(f"TokSmart E2E Test Suite Summary ({tier_label})")
     print("=" * 60)
     print(f"Total Tests:    {total}")
     print(f"Passed:         {passed}")

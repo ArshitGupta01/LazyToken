@@ -141,12 +141,16 @@ class LazyTokenFeaturesTests(unittest.TestCase):
             patch.dict(os.environ, {"LOCALAPPDATA": str(local)}, clear=True),
             patch.object(Path, "home", return_value=home),
         ):
-            self.assertEqual(kn.data_root(), local / "LazyToken")
+            self.assertEqual(kn.data_root(), local / "TokSmart")
             self.assertIn(legacy, kn.legacy_data_roots())
             preferred = local / "TheekHai" / "KnowledgeNetwork"
             preferred.mkdir(parents=True)
             (preferred / "network.sqlite3").touch()
-            self.assertEqual(kn.data_root(), local / "LazyToken")
+            self.assertEqual(kn.data_root(), local / "TokSmart")
+            old = local / "LazyToken"
+            old.mkdir(parents=True)
+            (old / "network.sqlite3").touch()
+            self.assertEqual(kn.data_root(), old)
             self.assertIn(preferred, kn.legacy_data_roots())
 
     def test_existing_database_gets_backup_before_migration(self):

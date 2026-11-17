@@ -13,11 +13,11 @@ import urllib.request
 
 def smoke(package):
     package = Path(package).resolve()
-    executable = package / "LazyToken" / "LazyToken.exe"
+    executable = package / "TokSmart" / "TokSmart.exe"
     installer = package / "install.ps1"
     shell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
-    assert (package / "LazyToken" / "_internal" / "vendor" / "PYTHON-LICENSE.txt").is_file()
-    assert (package / "LazyToken" / "_internal" / "docs" / "CLIENT_COMPATIBILITY.md").is_file()
+    assert (package / "TokSmart" / "_internal" / "vendor" / "PYTHON-LICENSE.txt").is_file()
+    assert (package / "TokSmart" / "_internal" / "docs" / "CLIENT_COMPATIBILITY.md").is_file()
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
         project = root / "project"
@@ -206,7 +206,7 @@ def smoke(package):
 
         manage("install")
         first = (target / "current.txt").read_text()
-        installed = target / "versions" / first / "LazyToken.exe"
+        installed = target / "versions" / first / "TokSmart.exe"
         assert (
             subprocess.run(
                 [str(installed), "doctor"], env=env, capture_output=True, timeout=20
@@ -228,7 +228,7 @@ def smoke(package):
         # The bootstrap validates the versioned zip before executing its managed helper.
         import hashlib
 
-        archive = next(package.glob("lazytoken-v*-windows-x64.zip"))
+        archive = next(package.glob("toksmart-v*-windows-x64.zip"))
         checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
 
         def user_path():
@@ -285,7 +285,7 @@ def smoke(package):
                 str(Path(os.environ["SystemRoot"]) / "System32/cmd.exe"),
                 "/d",
                 "/c",
-                "lazytoken",
+                "toksmart",
                 "doctor",
             ],
             env=command_env,

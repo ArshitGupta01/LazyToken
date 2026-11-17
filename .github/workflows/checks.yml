@@ -38,13 +38,13 @@ jobs:
         shell: powershell
         run: ./build_release.ps1 -Output ./release/ci-candidate
       - if: runner.os == 'Windows'
-        run: ./release/ci-candidate/LazyToken/LazyToken.exe doctor
+        run: ./release/ci-candidate/TokSmart/TokSmart.exe doctor
       - if: runner.os == 'Windows'
         run: python tests/smoke_release.py release/ci-candidate
       - if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: lazytoken-windows-candidate
+          name: toksmart-windows-candidate
           path: |
             release/ci-candidate/*.zip
             release/ci-candidate/SHA256SUMS
