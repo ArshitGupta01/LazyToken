@@ -1,6 +1,6 @@
 # Working on TokSmart
 
-The optional Windows executable bundles Python and Node-free runtime assets. The npm launcher and source checkout require a separately installed Python interpreter; npm also requires Node. The following tools are for contributors working on the source checkout.
+The optional Windows executable bundles Python and needs no separately installed Node. The npm launcher and source checkout require a separately installed Python interpreter; npm also requires Node. The following tools are for contributors working on the source checkout.
 
 ## Source map
 
