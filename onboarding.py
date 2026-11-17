@@ -318,7 +318,7 @@ def connection_test(kn):
 
 def remove_managed_clients(kn, root):
     root = Path(root).resolve()
-    if not (root / ".lazytoken-install").is_file():
+    if not ((root / ".toksmart-install").is_file() or (root / ".lazytoken-install").is_file()):
         raise ValueError("Select a managed installation root.")
     count = 0
     for receipt in sorted(kn.data_root().glob("setup-*.json"), reverse=True):
