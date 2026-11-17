@@ -12,6 +12,22 @@ import onboarding
 
 
 class SetupTests(unittest.TestCase):
+    def test_managed_root_recognizes_new_and_legacy_markers(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root)
+        executable = root / "versions" / "v1" / "TokSmart.exe"
+        executable.parent.mkdir(parents=True)
+        with (
+            patch.object(onboarding.sys, "frozen", True, create=True),
+            patch.object(onboarding.sys, "executable", str(executable)),
+        ):
+            self.assertIsNone(onboarding.managed_root())
+            for marker in (".toksmart-install", ".lazytoken-install"):
+                path = root / marker
+                path.touch()
+                self.assertEqual(onboarding.managed_root(), root)
+                path.unlink()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
