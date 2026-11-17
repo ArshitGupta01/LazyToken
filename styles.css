@@ -1309,6 +1309,9 @@ kbd {
 .empty code[hidden] {
   display: none;
 }
+.empty .small-button {
+  margin-top: 2px;
+}
 .edge-note {
   position: absolute;
   z-index: 3;

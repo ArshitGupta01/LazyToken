@@ -45,7 +45,7 @@ Each session must take the next unfinished item, avoid unrelated edits, and fini
 | 2 | Fix the most visible safe naming defect. **Completed 2026-11-17.** | One narrow user-facing rename or compatibility message improvement, retaining old commands/config/database behavior. | Old and new supported entrypoints work; docs/tests cover both where promised. |
 | 3 | Tighten publish CI parity. **Completed 2026-11-17.** | Publish workflow invokes all relevant static/mobile checks or shares a reusable verify workflow. | A release cannot publish if formatting, browser syntax, or mobile tests fail; workflow remains least-privilege. |
 | 4 | Add one end-to-end accessibility regression layer. **Completed 2026-11-17.** | Lightweight browser-free semantic checks first (labels, button names, landmarks, live region/focus contract); use Playwright only if it adds real coverage. | Desktop and mobile primary flows are keyboard-operable by design; failure is caught in CI. |
-| 5 | Improve first-run/empty-state UX. | One clear, tested path from “no indexed projects” to successful `serve → add → graph/context`. | No ambiguous localhost/phone language; error state names the next command and does not leak a local path. |
+| 5 | Improve first-run/empty-state UX. **Completed 2026-11-17.** | One clear, tested path from “no indexed projects” to successful `serve → add → graph/context`. | No ambiguous localhost/phone language; error state names the next command and does not leak a local path. |
 | 6 | Create a reproducible performance fixture. | Script/data format that records index count, elapsed time, retrieval latency, platform and warm/cold status without fabricating results. | No network/model calls; output validates; baseline is reproducible locally and documented. |
 | 7 | Add evidence-grade retrieval evaluation. | Independently reviewable real-repository case format and report fields for recall, precision, MRR, abstention, latency and token budget. | Existing synthetic cases remain clearly labeled; no “savings” result without provider usage plus correctness. |
 | 8 | Release-readiness pass. | Changelog/release checklist, support matrix, final all-suite run, and a concise known-limitations statement. | All required checks pass; version/docs/package surfaces agree; remaining unproven claims are explicitly marked unknown. |
@@ -69,10 +69,10 @@ Run the smallest relevant command while developing, then run the full release ga
 
 ```sh
 python -m black --check .
-npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css tests/workspace.test.cjs
+npx --yes prettier@3.4.2 --check app.js features-ui.js graph3d.js index.html styles.css web/index.html web/mobile.html web/mobile.js tests/first_run.test.cjs tests/mobile.test.cjs tests/workspace.test.cjs
 python -m unittest discover -s tests -p 'test_*.py'
 python e2e/runner.py --all
-node --test tests/mobile.test.cjs tests/workspace.test.cjs
+node --test tests/first_run.test.cjs tests/mobile.test.cjs tests/workspace.test.cjs
 node --check app.js
 node --check graph3d.js
 node --check features-ui.js
@@ -81,6 +81,8 @@ node --check features-ui.js
 On Windows release work, also run the existing CI-equivalent `build_release.ps1`, `doctor` on the generated executable, and `tests/smoke_release.py`.
 
 ## Session log
+
+- 2026-11-17 — Session 5 completed: the dashboard's Refresh action now reloads indexed repositories before selecting and loading a graph, including the transition from zero to one repository. The empty state gives an explicit `add` command and refresh action; a successfully indexed repository with no knowledge nodes points to Search and a bounded `context` command, rather than implying indexing failed. Generic graph failures offer a retry without rendering server error text that may contain a local path. README now distinguishes the code index from knowledge nodes. Three new browser-free runtime regressions run in both CI workflows. Verification: 304 Python tests (11 skipped), 209 E2E tests, 20 Node tests, Black (80 files), Prettier, `node --check app.js`, and `git diff --check` passed. An isolated loopback server and temporary repository confirmed empty projects, `add`, repository discovery, empty graph, and a working `context` call. **Remaining risks:** Chromium could not launch in this sandbox (`socket() failed: Operation not permitted`), so visual and real keyboard/browser behavior remain unverified; Windows release CI has not yet run for this change. **Exact next task:** Session 6 — add a reproducible local performance fixture that records corpus size, cold/warm indexing, retrieval latency, platform and memory without network/model calls, with validated machine-readable output and a documented command.
 
 - 2026-11-17 — Session 4 completed: restored the desktop setup page's native `main` landmark, gave phone panel headings programmatic focus targets, moved focus to newly selected panel content, and returned focus to Copy when the fallback dialog closes. Added static semantic checks for names, labels, landmarks and mobile panel targets, plus runtime tests for dynamic Copy labels and focus transitions. The normal and npm verification workflows now run both Node test files and check formatting of the mobile source. Local verification: 304 Python tests (11 skipped), 209 E2E tests, 17 Node tests, Black (80 files), Prettier, `node --check web/mobile.js`, and `git diff --check` passed. **Remaining risk:** these browser-free tests cannot prove screen-reader announcements, visual contrast, responsive behavior, or focus order in real browsers; no live device test was run. **Exact next task:** Session 5 — improve the first-run empty state so a user can get from `serve` to adding a repository and seeing a graph or bounded context, with a focused regression for the no-project path.
 
