@@ -44,7 +44,7 @@ jobs:
       - if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: lazytoken-windows-candidate
+          name: toksmart-windows-candidate
           path: |
             release/ci-candidate/*.zip
             release/ci-candidate/SHA256SUMS
