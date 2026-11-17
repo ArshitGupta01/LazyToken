@@ -25,7 +25,7 @@ class SetupTests(unittest.TestCase):
             for marker in (".toksmart-install", ".lazytoken-install"):
                 path = root / marker
                 path.touch()
-                self.assertEqual(onboarding.managed_root(), root)
+                self.assertEqual(onboarding.managed_root(), root.resolve())
                 path.unlink()
 
     def setUp(self):
