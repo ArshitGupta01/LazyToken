@@ -80,6 +80,21 @@ class StorageAndCommands(unittest.TestCase):
             self.assertIn("deleted", migration.delete_default_store(kn, str(root)))
             self.assertEqual(neighbor.read_text(), "keep")
 
+    def test_explicit_data_deletion_refuses_legacy_default(self):
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            patch.dict(os.environ, {"LOCALAPPDATA": temp, "KN_HOME": ""}),
+        ):
+            legacy = Path(temp) / "LazyToken"
+            legacy.mkdir()
+            connection = sqlite3.connect(legacy / "network.sqlite3")
+            connection.execute("CREATE TABLE lazytoken_migrations(version INTEGER)")
+            connection.commit()
+            connection.close()
+            self.assertEqual(kn.default_data_root(), legacy)
+            self.assertIn("error", migration.delete_default_store(kn, str(legacy)))
+            self.assertTrue((legacy / "network.sqlite3").is_file())
+
     def test_init_reruns_without_seeds_and_sync_selected_only(self):
         with tempfile.TemporaryDirectory() as temp:
             env = {
