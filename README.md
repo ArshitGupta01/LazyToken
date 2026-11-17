@@ -15,6 +15,8 @@ Local code graph, search, and reviewed memory for AI coding work.
 
 TokSmart indexes a repository **on your computer** and builds a SQLite graph of files, symbols, imports, and some statically detected calls. Browse the graph, search indexed names, and give an AI assistant a bounded task brief. Approved project lessons can appear in later briefs. Retrieval is deterministic lexical and graph search; TokSmart does not use embeddings or call an AI model to index your code.
 
+The desktop app handles local repositories. The phone page supplies copyable Lite, Pro, and Coding prompts; it cannot inspect your files. Both are TokSmart experiences, with different capabilities.
+
 ## Requirements
 
 - Node.js 18 or newer for `npx` or the npm launcher.
@@ -22,6 +24,8 @@ TokSmart indexes a repository **on your computer** and builds a SQLite graph of 
 - An existing local repository. Give TokSmart its **absolute folder path**.
 
 The npm package includes the Python source, but does not install Python. The graph server runs on loopback (`127.0.0.1`). The phone page is a separate prompt tool and does not index repositories.
+
+The optional Windows executable bundles its runtime; see [release instructions](RELEASING.md). No verified public Windows release is available yet, so the npm/source instructions below are the current installation paths.
 
 ## Start in three steps
 
@@ -110,6 +114,12 @@ The [website](https://toksmart.vercel.app) hosts the interface. On a desktop, yo
 
 The [phone page](https://toksmart.vercel.app/mobile.html) offers Lite, Pro, and Coding prompts to copy into an AI assistant. It works without the desktop server, an account, or an API key. Its benchmark viewer imports a JSON report into browser storage. It does not grant the AI access to your repository, run the graph on a phone, or guarantee token savings. See [mobile usage and benchmarks](docs/MOBILE_PROMPTS.md).
 
+## Evidence and limits
+
+The current retrieval tests use small authored fixtures. A separate [agent pilot](docs/BENCHMARK_PILOT.md) recorded provider token usage on a few isolated tasks, but some runs never called TokSmart's MCP tools and one cold-start comparison used more tokens than its baseline. These results cannot establish general savings. The [retrieval assessment](docs/RETRIEVAL_ASSESSMENT.md) explains its labels and metrics. Run `python benchmark/graph_ablation.py` to generate a local synthetic ablation report; its payload estimates are not provider token counts or task outcomes.
+
+Earlier names such as LazyToken and RepoMind still occur in compatibility aliases, database paths, and historical benchmark records. New users should use `toksmart`; the [migration guide](docs/MIGRATION.md) explains existing data and configuration.
+
 ## Troubleshooting
 
 | Symptom                       | What to do                                                                                                                            |
@@ -134,6 +144,8 @@ node --test tests/mobile.test.cjs tests/workspace.test.cjs
 ```
 
 You can run the source CLI as `python kn.py COMMAND` without installing npm. CI runs unit and end-to-end suites on Linux and Windows. Benchmark reports and limitations are in [docs](docs/); passing tests or a large graph do not prove token savings for a particular user.
+
+Contributor setup and architecture are in [development notes](docs/DEVELOPMENT.md). The [CLI reference](docs/CLI.md) covers commands, [mobile guide](docs/MOBILE_PROMPTS.md) covers prompts and their measurement protocol, and the [two-day plan](docs/TOKSMART_10_OF_10_EXECUTION_PLAN.md) tracks remaining work.
 
 ## License
 

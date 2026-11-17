@@ -1,6 +1,6 @@
 # Working on TokSmart
 
-The CLI and packaged dashboard run without separately installed Python or Node. The following tools are for contributors working on the source checkout.
+The optional Windows executable bundles Python and needs no separately installed Node. The npm launcher and source checkout require a separately installed Python interpreter; npm also requires Node. The following tools are for contributors working on the source checkout.
 
 ## Source map
 
