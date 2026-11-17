@@ -118,6 +118,10 @@ The [phone page](https://toksmart.vercel.app/mobile.html) offers Lite, Pro, and 
 
 The current retrieval tests use small authored fixtures. A separate [agent pilot](docs/BENCHMARK_PILOT.md) recorded provider token usage on a few isolated tasks, but some runs never called TokSmart's MCP tools and one cold-start comparison used more tokens than its baseline. These results cannot establish general savings. The [retrieval assessment](docs/RETRIEVAL_ASSESSMENT.md) explains its labels and metrics. Run `python benchmark/graph_ablation.py` to generate a local synthetic ablation report; its payload estimates are not provider token counts or task outcomes.
 
+### Reproduce a local performance probe
+
+Run `python benchmark/performance_fixture.py --files 200 --repeats 5`, then `python benchmark/performance_fixture.py --validate benchmark/results/performance_report.json`. The report is generated under ignored `benchmark/results/` and records the generated corpus hash and byte count, indexed file/symbol/import counts, platform/Python version, cold and unchanged warm indexing time, Python allocation peaks, and first/warm bounded-context latency. The fixture is deterministic and uses a temporary local SQLite database; it makes no network or model calls and does not touch your indexed repositories. Measurements vary by machine and include tracing overhead. Python allocation peaks omit SQLite/native memory; latency and result counts do not establish retrieval quality or token savings.
+
 Earlier names such as LazyToken and RepoMind still occur in compatibility aliases, database paths, and historical benchmark records. New users should use `toksmart`; the [migration guide](docs/MIGRATION.md) explains existing data and configuration.
 
 ## Troubleshooting
