@@ -103,7 +103,7 @@
     },
     {
       "id": "legacy-storage-safety",
-      "assertion": "Historical roots are discovered only for explicit migration and source data remains unchanged.",
+      "assertion": "Existing RepoMind/LazyToken stores may be selected for compatibility; TheekHai remains an explicit migration source, and migration preserves source data.",
       "verification": "python -m unittest tests.test_distribution"
     },
     {
