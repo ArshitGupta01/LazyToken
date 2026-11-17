@@ -355,7 +355,7 @@ def start(kn, force=False, interval=2.0, debounce=1.0):
         if process.poll() is not None:
             return {
                 "running": False,
-                "error": "Watcher did not start; run lazytoken watch run to see local errors.",
+                "error": "Watcher did not start; run toksmart watch run to see local errors.",
             }
         time.sleep(0.05)
     return {
