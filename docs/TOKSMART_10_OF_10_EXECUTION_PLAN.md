@@ -41,7 +41,7 @@ Each session must take the next unfinished item, avoid unrelated edits, and fini
 
 | Session | Objective | Required deliverable | Minimum acceptance criteria |
 | --- | --- | --- | --- |
-| 1 | Build a naming-compatibility inventory. | A machine-readable mapping of user-visible TokSmart vs legacy aliases, plus a regression test or test matrix. | Every legacy name is categorized as compatibility-only, user-facing bug, or migration contract; no removal yet. |
+| 1 | Build a naming-compatibility inventory. **Completed 2026-11-17.** | `docs/BRAND_COMPATIBILITY.json` plus `tests/test_brand_compatibility.py`. | Every legacy name is categorized as compatibility-only, user-facing bug, or migration contract; no removal yet. |
 | 2 | Fix the most visible safe naming defect. | One narrow user-facing rename or compatibility message improvement, retaining old commands/config/database behavior. | Old and new supported entrypoints work; docs/tests cover both where promised. |
 | 3 | Tighten publish CI parity. | Publish workflow invokes all relevant static/mobile checks or shares a reusable verify workflow. | A release cannot publish if formatting, browser syntax, or mobile tests fail; workflow remains least-privilege. |
 | 4 | Add one end-to-end accessibility regression layer. | Lightweight browser-free semantic checks first (labels, button names, landmarks, live region/focus contract); use Playwright only if it adds real coverage. | Desktop and mobile primary flows are keyboard-operable by design; failure is caught in CI. |
@@ -83,3 +83,5 @@ On Windows release work, also run the existing CI-equivalent `build_release.ps1`
 ## Session log
 
 - 2026-11-16 — Planning audit completed. No product code was changed. Baseline verification is recorded above.
+
+- 2026-11-17 — Session 1 completed. Added a machine-readable compatibility inventory covering LazyToken, RepoMind, and TheekHai/KnowledgeNetwork identifiers, separating supported aliases and migration contracts from user-facing defects. Added a schema/coverage regression test. Local execution was unavailable for this session; verify with `python -m unittest tests.test_brand_compatibility` and the full CI gate before release. **Next task:** Session 2 — fix the safest public branding leak first (the Hugging Face public-context metadata or E2E runner labels), without altering persisted formats, aliases, or installer artifact paths.
