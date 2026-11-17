@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import time
 import data_ops
@@ -95,7 +96,12 @@ def rollback(receipt):
 
 def delete_default_store(kn, confirmation):
     # A separate operator command. Never recursively delete directories or legacy/overridden stores.
-    root = kn.default_data_root().absolute()
+    # The active default may point at a legacy store for compatibility. Only
+    # the canonical TokSmart directory is eligible for explicit deletion.
+    local = os.environ.get("LOCALAPPDATA")
+    root = (
+        Path(local) / "TokSmart" if local else Path.home() / ".local" / "share" / "TokSmart"
+    ).absolute()
     from onboarding import regular_path
 
     if (
@@ -104,7 +110,7 @@ def delete_default_store(kn, confirmation):
         or kn.data_root().absolute() != root
     ):
         return {
-            "error": "Confirm the exact default LazyToken directory. Legacy and KN_HOME override stores cannot be deleted by this command."
+            "error": "Confirm the exact TokSmart directory. Legacy and KN_HOME override stores cannot be deleted by this command."
         }
     try:
         regular_path(root)
@@ -115,7 +121,7 @@ def delete_default_store(kn, confirmation):
         return {"error": "Default database not found."}
     if any(Path(str(database) + suffix).exists() for suffix in ("-wal", "-shm")):
         return {
-            "error": "Database may be active. Stop LazyToken processes before explicit data deletion."
+            "error": "Database may be active. Stop TokSmart processes before explicit data deletion."
         }
     import sqlite3
 
