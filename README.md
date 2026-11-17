@@ -49,7 +49,7 @@ npx toksmart@latest add "C:\Projects\MyApp"
 npx toksmart@latest add "$HOME/projects/myapp"
 ```
 
-**3. Open the graph** in your browser. Select your project and click a node to inspect relationships and evidence. Check what was indexed with:
+**3. Explore the index** in your browser. Refresh the dashboard after `add`, select your repository, and open **Search** to find indexed code. The graph may be empty after indexing because code files alone do not create knowledge nodes; use `context` for a bounded task brief. When knowledge nodes are present, click one to inspect its relationships and evidence. Check what was indexed with:
 
 ```sh
 npx toksmart@latest projects

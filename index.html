@@ -423,8 +423,20 @@
             </div>
             <div id="empty" class="empty" hidden>
               <b>No matching knowledge yet</b>
-              <span>Try another search or switch project scope.</span>
-              <code id="empty-command" hidden>npx toksmart@latest add "FULL_PATH_TO_PROJECT"</code>
+              <span>Select a repository or try another search and scope.</span>
+              <code id="empty-command" hidden
+                >npx toksmart@latest add "ABSOLUTE_PATH_TO_REPOSITORY"</code
+              >
+              <button id="empty-refresh" type="button" class="small-button" hidden>
+                Refresh projects
+              </button>
+              <button id="empty-search" type="button" class="small-button" hidden>
+                Search indexed code
+              </button>
+              <code id="empty-context-command" hidden
+                >npx toksmart@latest context --project "ABSOLUTE_PATH_TO_REPOSITORY" --task
+                "YOUR_TASK" --budget 600</code
+              >
             </div>
             <div id="edge-note" class="edge-note" role="status" hidden></div>
             <span id="graph-keyboard-help" class="sr-only">

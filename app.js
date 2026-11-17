@@ -421,7 +421,8 @@
       glLoading = null;
     let searchVisible = null,
       graphRequest = 0,
-      jumpSignature = '';
+      jumpSignature = '',
+      projectsLoaded = false;
 
     // Keep the selection intact while giving the graph the inspector's space.
     function setInspectorMinimized(minimized) {
@@ -439,6 +440,7 @@
         const response = await fetch((window.API_BASE || '') + '/api/projects');
         if (!response.ok) throw Error('Projects unavailable');
         projects = await response.json();
+        projectsLoaded = true;
         $('#project').innerHTML =
           '<option value="">Choose a project…</option>' +
           projects
@@ -449,7 +451,47 @@
             .join('');
       } catch {
         projects = [];
+        projectsLoaded = false;
       }
+    }
+    function showEmptyState(noProjects, unavailable = false, indexedEmpty = false) {
+      $('#empty').hidden = false;
+      $('#empty b').textContent = noProjects
+        ? 'Add your first repository'
+        : unavailable
+          ? 'Graph unavailable'
+          : indexedEmpty
+            ? 'Code indexed; graph has no knowledge yet'
+            : 'No matching knowledge yet';
+      $('#empty span').textContent = noProjects
+        ? 'Keep the server running. In another terminal, run this command with your repository’s absolute folder path. Then refresh to search its code.'
+        : unavailable
+          ? 'Check that TokSmart is running, then refresh.'
+          : indexedEmpty
+            ? 'Your files are indexed. Search code in the workspace, or run a bounded task brief. Graph nodes appear when knowledge is recorded.'
+            : projects.length
+              ? 'Select a repository or try another search and scope.'
+              : 'Refresh to check for indexed repositories.';
+      $('#empty-command').hidden = !noProjects;
+      $('#empty-refresh').hidden = !noProjects && !unavailable;
+      $('#empty-search').hidden = !indexedEmpty;
+      $('#empty-context-command').hidden = !indexedEmpty;
+    }
+    async function refreshGraph() {
+      const hadProjects = projects.length > 0;
+      await loadProjects();
+      const nextScope =
+        (!scope && !hadProjects) ||
+        (scope && scope !== '@workspace' && !projects.some((p) => p.id === scope))
+          ? projects.length > 1
+            ? '@workspace'
+            : projects[0]?.id || ''
+          : scope;
+      $('#project').value = nextScope === '@workspace' ? '' : nextScope;
+      document.querySelectorAll('.scope').forEach((button) => {
+        button.classList.toggle('active', button.dataset.project === nextScope);
+      });
+      await loadGraph(nextScope);
     }
     async function loadGraph(project = '', background = false) {
       const requestId = ++graphRequest;
@@ -498,13 +540,12 @@
         data = { nodes: [], edges: [] };
         nodes = [];
         edges = [];
-        $('#empty').hidden = false;
-        const noProjects = error.message.startsWith('No projects indexed yet.');
-        $('#empty b').textContent = noProjects ? 'Add your first project' : 'Graph unavailable';
-        $('#empty span').textContent = noProjects
-          ? 'Replace FULL_PATH_TO_PROJECT with the absolute folder path, then refresh.'
-          : error.message;
-        $('#empty-command').hidden = !noProjects;
+        showEmptyState(
+          projectsLoaded &&
+            projects.length === 0 &&
+            error.message.startsWith('No projects indexed yet.'),
+          true
+        );
         updateCounts([], []);
       } finally {
         if (requestId === graphRequest) $('#loading').hidden = true;
@@ -677,15 +718,14 @@
             shown.map((n) => `<option value="${n.id}">${esc(n.name)}</option>`).join('');
         }
         $('#node-jump').value = selected && shown.includes(selected) ? String(selected.id) : '';
-        $('#empty').hidden = shown.length > 0;
         if (!shown.length) {
-          const noProjects = projects.length === 0 && data.nodes.length === 0;
-          const emptyLabel = noProjects ? 'Add your first project' : 'No matching knowledge yet';
-          $('#empty b').textContent = emptyLabel;
-          $('#empty span').textContent = noProjects
-            ? 'In another terminal, replace FULL_PATH_TO_PROJECT with the absolute folder path. Then refresh.'
-            : 'Try another search or switch project scope.';
-          $('#empty-command').hidden = !noProjects;
+          showEmptyState(
+            projectsLoaded && projects.length === 0 && data.nodes.length === 0,
+            false,
+            projects.length > 0 && scope && data.nodes.length === 0 && !query
+          );
+        } else {
+          $('#empty').hidden = true;
         }
         const note = $('#edge-note'),
           truncated = data.nodes_truncated || data.edges_truncated;
@@ -1069,7 +1109,9 @@
         draw();
       }
     };
-    $('#refresh').onclick = () => loadGraph(scope);
+    $('#refresh').onclick = refreshGraph;
+    $('#empty-refresh').onclick = refreshGraph;
+    $('#empty-search').onclick = () => $('#workspace-open').click();
     $('#clear-filters').onclick = () => {
       $('#filters')
         .querySelectorAll('input')
@@ -1109,18 +1151,6 @@
     setInterval(() => {
       if (!view3d && !document.hidden && !reduced.matches && edges.length <= 150) draw();
     }, 100);
-    loadProjects().then(() => {
-      const initial =
-        projects.length > 1 ? '@workspace' : projects.length === 1 ? projects[0].id : '';
-      if (initial) {
-        $('#project').value = initial === '@workspace' ? '' : initial;
-        document
-          .querySelectorAll('.scope')
-          .forEach((button) =>
-            button.classList.toggle('active', button.dataset.project === initial)
-          );
-      }
-      return loadGraph(initial);
-    });
+    refreshGraph();
   }
 })();
