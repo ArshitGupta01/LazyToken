@@ -915,6 +915,10 @@ def ranked_search(kn, args, conn):
         return {"error": "An indexed project is required."}
     query = str(args.get("query", ""))[:2000]
     words = [t for t in kn.split_words(query) if len(t) > 1 or not t.isascii()]
+    # In task-shaped queries, the initial instruction is not evidence about source code.
+    # Preserve a direct search for a symbol literally named "find".
+    if len(words) > 1 and words[0] == "find":
+        words = words[1:]
     # Keep the limited search budget for meaningful terms in natural-language tasks.
     stop_words = set(
         "the and for with that this from while into where which what when how does its "

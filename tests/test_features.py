@@ -48,6 +48,16 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         )
         self.assertTrue(any(item.get("name") == "AuthClient" for item in result["results"]))
 
+    def test_leading_find_instruction_does_not_create_false_lexical_matches(self):
+        (self.root / "finder.py").write_text("def find():\n    return True\n")
+        kn.sync(self.root, self.db)
+        unrelated = self.run_action(
+            "search", project=self.project, query="Find zyzzyva orbital teleportation"
+        )
+        self.assertEqual(unrelated["results"], [])
+        direct = self.run_action("search", project=self.project, query="find")
+        self.assertTrue(any(item.get("path") == "finder.py" for item in direct["results"]))
+
     def test_search_prioritizes_project_code_but_keeps_tests_and_vendor_searchable(self):
         (self.root / "vendor").mkdir()
         (self.root / "vendor" / "auth.py").write_text("class AuthClient: pass\n")

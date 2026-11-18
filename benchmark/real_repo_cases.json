@@ -1,0 +1,60 @@
+{
+  "schema": "toksmart-real-repo-cases-v1",
+  "revision": "9cbd87034c0b496a69dfca9d01950a4547214e45",
+  "label_provenance": "Agent-authored from the TokSmart source at the pinned commit; file-level labels and rationales are inspectable, but not independently human reviewed or exhaustive.",
+  "review_status": "unreviewed",
+  "cases": [
+    {
+      "id": "cli-add",
+      "task": "Find where the add command validates a repository path and starts indexing",
+      "relevant": [
+        "kn.py"
+      ],
+      "rationale": "kn.py main defines add and handles it by checking an absolute directory then calling sync.",
+      "expected_abstention": false,
+      "forbidden": [
+        "benchmark/fixture_notebook/notebook.py"
+      ]
+    },
+    {
+      "id": "dashboard-origin",
+      "task": "Find the dashboard Host and Origin validation for local review requests",
+      "relevant": [
+        "dashboard.py"
+      ],
+      "rationale": "dashboard.py Handler checks Host and Origin before serving the local API and review mutation.",
+      "expected_abstention": false,
+      "forbidden": []
+    },
+    {
+      "id": "memory-review",
+      "task": "Find the function that approves or rejects proposed project memory",
+      "relevant": [
+        "features.py"
+      ],
+      "rationale": "features.py defines review and writes memory proposal status after validation.",
+      "expected_abstention": false,
+      "forbidden": []
+    },
+    {
+      "id": "compact-schema",
+      "task": "Find the compact MCP tool catalog selection",
+      "relevant": [
+        "mcp_schema.py"
+      ],
+      "rationale": "mcp_schema.py defines mcp_tools and selects the compact catalog.",
+      "expected_abstention": false,
+      "forbidden": []
+    },
+    {
+      "id": "negative-unknown",
+      "task": "Find the zyzzyva quantum teleportation orbital engine",
+      "relevant": [],
+      "rationale": "No such feature or identifiers occur in the pinned TokSmart source; this tests conservative abstention.",
+      "expected_abstention": true,
+      "forbidden": [
+        "benchmark/fixture_notebook/notebook.py"
+      ]
+    }
+  ]
+}
