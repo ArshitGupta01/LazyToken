@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1019" />
+    <meta name="theme-color" content="#f4efe5" />
     <meta
       name="description"
       content="Copy TokSmart Lite, Pro or Coding prompts into your favorite AI assistant. No installation or API key needed."
@@ -11,7 +11,7 @@
     <title>TokSmart · Phone prompts</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="mobile.css?v=4" />
+    <link rel="stylesheet" href="mobile.css" />
     <script src="prompt-metrics.js" defer></script>
     <script src="mobile.js" defer></script>
   </head>
@@ -22,37 +22,36 @@
           <img class="toksmart-logo" src="logo.svg" alt="" />
           TokSmart
         </a>
-        <nav class="pocket-nav" aria-label="Mobile sections">
-          <button
-            type="button"
-            data-panel="prompts"
-            aria-controls="prompts-panel"
-            aria-pressed="true"
-          >
-            Prompts
-          </button>
-          <button
-            type="button"
-            data-panel="benchmarks"
-            aria-controls="benchmarks-panel"
-            aria-pressed="false"
-          >
-            Benchmarks
-          </button>
-          <button type="button" data-panel="help" aria-controls="help-panel" aria-pressed="false">
-            How to use
-          </button>
-        </nav>
-        <a href="index.html?desktop=1" class="desktop-link"
-          >PC setup <span aria-hidden="true">↗︎</span></a
-        >
+        <a href="index.html?desktop=1" class="desktop-link">PC setup</a>
       </header>
+
+      <nav class="pocket-nav" aria-label="Mobile sections">
+        <button
+          type="button"
+          data-panel="prompts"
+          aria-controls="prompts-panel"
+          aria-pressed="true"
+        >
+          Prompts
+        </button>
+        <button
+          type="button"
+          data-panel="benchmarks"
+          aria-controls="benchmarks-panel"
+          aria-pressed="false"
+        >
+          Benchmarks
+        </button>
+        <button type="button" data-panel="help" aria-controls="help-panel" aria-pressed="false">
+          How to use
+        </button>
+      </nav>
 
       <main>
         <section id="prompts-panel" aria-labelledby="pocket-title">
           <div class="pocket-hero">
-            <h1 id="pocket-title" tabindex="-1">Phone prompts</h1>
-            <p>Copy a mode’s prompt into your AI assistant, then send your task.</p>
+            <h1 id="pocket-title" tabindex="-1">Prompts</h1>
+            <p>Copy a prompt into your AI assistant, then send your task.</p>
           </div>
           <div id="prompt-cards" class="prompt-cards" aria-busy="true"></div>
           <p id="copy-status" class="copy-status" role="status" aria-live="polite">
@@ -74,7 +73,7 @@
             <h1 id="benchmarks-title" tabindex="-1">Benchmarks</h1>
             <p>Compare Normal, Lite, and Pro on matched tasks, including prompt overhead.</p>
           </div>
-          <div class="connect-card benchmark-import">
+          <div class="benchmark-import">
             <h2>Your benchmark history</h2>
             <p>
               Run the benchmark on your computer, export its JSON report, then open it here. Reports
@@ -115,9 +114,9 @@
             </p>
             <p>
               The suite has 36 cases across 12 categories and defaults to three trials. It uses the
-              exact prompts above. Live calls may incur provider charges. News tests check whether
-              the model admits it has no browsing; this runner supplies no tools. Image cases
-              evaluate text and consent behavior, not generated image quality.
+              exact prompts in the library. Live calls may incur provider charges. News tests check
+              whether the model admits it has no browsing; this runner supplies no tools. Image
+              cases evaluate text and consent behavior, not generated image quality.
             </p>
           </details>
         </section>
@@ -127,14 +126,14 @@
             <h1 id="help-title" tabindex="-1">How to use prompts</h1>
           </div>
           <ol class="help-steps">
-            <li class="connect-card">
+            <li class="help-step">
               <h2>Choose and copy</h2>
               <p>
                 Lite for everyday questions. Pro for complex work. Coding for reusing existing code
                 and open-source components. Tap that mode’s Copy prompt button.
               </p>
             </li>
-            <li class="connect-card">
+            <li class="help-step">
               <h2>Paste into your AI</h2>
               <p>
                 Open ChatGPT, Claude, Gemini or another assistant. Start a chat and paste the
@@ -142,7 +141,7 @@
                 that assistant’s capabilities.
               </p>
             </li>
-            <li class="connect-card">
+            <li class="help-step">
               <h2>Send your actual task</h2>
               <p>
                 Describe what you need. For coding, include your stack, constraints and relevant

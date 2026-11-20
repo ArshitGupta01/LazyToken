@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0b1019" />
+    <meta name="theme-color" content="#f4efe5" />
     <meta
       name="description"
-      content="Search your repository, explore code relationships, and review memory for your AI coding assistant."
+      content="Search a local repository, trace relationships, and review project memory with TokSmart."
     />
     <title>TokSmart · Desktop setup</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
@@ -24,41 +24,18 @@
         <a href="https://github.com/ArshitGupta01/TokSmart">GitHub</a>
       </nav>
     </header>
-
     <main class="setup-layout">
-      <section class="setup-intro" aria-labelledby="setup-title">
-        <h1 id="setup-title">Code search and<br /><span>project memory</span></h1>
-        <p>
-          TokSmart indexes your repository locally so you can find the code and project knowledge
-          your next task needs.
+      <div class="setup-column">
+        <h1>Search your local codebase.</h1>
+        <p class="setup-lead">
+          Find files and symbols, trace their relationships, and reuse reviewed project notes in
+          your AI coding assistant.
         </p>
-        <dl class="product-preview">
-          <div>
-            <dt>Graph</dt>
-            <dd>Explore relationships and their evidence.</dd>
-          </div>
-          <div>
-            <dt>Code search</dt>
-            <dd>Find indexed files, symbols, and imports.</dd>
-          </div>
-          <div>
-            <dt>Memory</dt>
-            <dd>Review lessons before they enter future task briefs.</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section class="connect-card setup-card" aria-labelledby="desktop-setup-title">
-        <header>
+        <section class="setup-instructions" aria-labelledby="desktop-setup-title">
           <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
-          <p>
-            On your computer, install Node.js 18+ and Python 3.11+, then run this command in a
-            terminal.
-          </p>
-        </header>
-        <div class="terminal-card">
-          <div class="terminal-header">
-            <span>Terminal</span>
+          <p>Run this on your computer with Node.js 18+ and Python 3.11+.</p>
+          <div class="terminal-card">
+            <code>npx toksmart@latest serve</code>
             <button
               type="button"
               class="copy-button"
@@ -68,28 +45,30 @@
               Copy
             </button>
           </div>
-          <code>npx toksmart@latest serve</code>
-        </div>
-        <p id="step-1-badge" class="copy-hint" role="status"></p>
-        <p class="setup-status" role="status">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span class="setup-status-text">Waiting for the local server</span>
-        </p>
-        <p class="setup-help">
-          Keep the terminal open. The dashboard opens when detected. Your browser may ask for local
-          network access.
-        </p>
-        <a class="launch-btn" href="http://127.0.0.1:8765/"
-          >Open local dashboard <span aria-hidden="true">↗︎</span></a
-        >
-        <details class="install-options">
-          <summary>Install for regular use</summary>
-          <p>Run <code>npm install --global toksmart</code>, then <code>toksmart serve</code>.</p>
-          <a href="https://github.com/ArshitGupta01/TokSmart#quickstart"
-            >Index your first repository</a
-          >
-        </details>
-      </section>
+          <p id="step-1-badge" class="copy-hint" role="status"></p>
+          <p class="setup-status" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            Waiting for the local server
+          </p>
+          <p class="setup-help">
+            Keep the terminal open. If the dashboard doesn’t open automatically,
+            <a href="http://127.0.0.1:8765/">open it here</a>.
+          </p>
+          <details class="install-options">
+            <summary>Install for regular use</summary>
+            <p>Run <code>npm install --global toksmart</code>, then <code>toksmart serve</code>.</p>
+          </details>
+        </section>
+      </div>
+      <figure class="desktop-preview">
+        <img
+          src="desktop-preview.webp"
+          alt="TokSmart dashboard showing a local repository graph and details for its session store."
+          width="1120"
+          height="650"
+        />
+        <figcaption>2D graph and node inspector on a sample repository</figcaption>
+      </figure>
     </main>
   </body>
 </html>

@@ -15,288 +15,30 @@
     <script src="features-ui.js" defer></script>
   </head>
   <body>
-    <!-- Connection Screen (shown when local server is not running) -->
-    <div class="page-container" id="connect-screen">
-      <main class="connect-card" aria-label="Start your local server">
-        <header class="card-header">
-          <div class="brand-badge">
-            <img class="toksmart-logo" src="logo.svg" alt="" />
-            <span>TOKSMART</span>
+    <div id="connect-screen">
+      <main class="reconnect-panel" aria-labelledby="connect-title">
+        <a class="brand" href="/" aria-label="TokSmart home">
+          <img class="toksmart-logo" src="logo.svg" alt="" />
+          TokSmart
+        </a>
+        <h1 id="connect-title" tabindex="-1">Connect to TokSmart</h1>
+        <p id="connection-status" role="status">Checking the local server…</p>
+        <button id="manual-connect-btn" class="small-button" type="button" hidden>Connect</button>
+        <div class="local-command">
+          <div>
+            <p>Start the server from your terminal</p>
+            <code>npx toksmart@latest serve</code>
           </div>
-          <h1 class="card-title">Start your local server</h1>
-          <p class="card-subtitle">
-            One command is all it takes. TokSmart connects and opens right here automatically.
-          </p>
-        </header>
-
-        <!-- Mobile Device Detection Alert -->
-        <div class="mobile-notice" id="mobile-notice" style="display: none">
-          <div class="mobile-notice-header">
-            <span class="mobile-notice-icon">📱</span>
-            <strong>Mobile Device Detected</strong>
-          </div>
-          <p class="mobile-notice-desc">
-            The TokSmart indexing engine runs on your development computer. Open this page there to
-            connect.
-          </p>
+          <button
+            class="small-button copy-button"
+            type="button"
+            data-command="npx toksmart@latest serve"
+            aria-label="Copy launch command"
+          >
+            Copy
+          </button>
         </div>
-
-        <div class="stepper" role="list">
-          <!-- Step 1: Copy Command -->
-          <div class="step-row step-done" id="step-1" role="listitem">
-            <div class="step-gutter">
-              <div class="step-badge badge-green" aria-label="Step 1 completed">
-                <svg
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
-                </svg>
-              </div>
-              <div class="step-line"></div>
-            </div>
-            <div class="step-main">
-              <div class="step-heading">
-                <span class="step-label text-green">Copy the command</span>
-                <span class="pill pill-green" id="step-1-badge">DONE</span>
-              </div>
-
-              <!-- Terminal: NPX -->
-              <div class="terminal-card">
-                <div class="terminal-header">
-                  <div class="window-controls">
-                    <span class="dot dot-red"></span>
-                    <span class="dot dot-yellow"></span>
-                    <span class="dot dot-green"></span>
-                  </div>
-                  <span class="terminal-tab-title">Terminal</span>
-                  <button
-                    class="copy-button"
-                    data-command="npx toksmart@latest serve"
-                    aria-label="Copy npx command"
-                    title="Copy command"
-                  >
-                    <svg
-                      class="copy-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    <svg
-                      class="check-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  </button>
-                </div>
-                <div class="terminal-body">
-                  <span class="terminal-prompt">$</span>
-                  <code class="terminal-code">npx toksmart@latest serve</code>
-                </div>
-              </div>
-
-              <!-- Divider -->
-              <div class="section-divider">
-                <span>OR INSTALL GLOBALLY</span>
-              </div>
-
-              <!-- Terminal: Global Install -->
-              <div class="terminal-card">
-                <div class="terminal-header">
-                  <div class="window-controls">
-                    <span class="dot dot-red"></span>
-                    <span class="dot dot-yellow"></span>
-                    <span class="dot dot-green"></span>
-                  </div>
-                  <span class="terminal-tab-title">Global install</span>
-                  <button
-                    class="copy-button"
-                    data-command="npm install -g toksmart && toksmart serve"
-                    aria-label="Copy global install command"
-                    title="Copy command"
-                  >
-                    <svg
-                      class="copy-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    <svg
-                      class="check-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  </button>
-                </div>
-                <div class="terminal-body">
-                  <span class="terminal-prompt">$</span>
-                  <code class="terminal-code"
-                    >npm install -g toksmart &amp;&amp; toksmart serve</code
-                  >
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 2: Waiting for Server -->
-          <div class="step-row step-active" id="step-2" role="listitem">
-            <div class="step-gutter">
-              <div
-                class="step-badge badge-purple"
-                id="step-2-indicator"
-                aria-label="Step 2: Waiting for server"
-              >
-                <span class="badge-num">2</span>
-                <svg
-                  class="badge-check"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
-                </svg>
-              </div>
-              <div class="step-line"></div>
-            </div>
-            <div class="step-main">
-              <div class="step-heading">
-                <span class="step-label text-white" id="step-2-title"
-                  >Waiting for server to start</span
-                >
-              </div>
-              <div class="listening-box" id="listening-box">
-                <div class="listening-icon-wrap" id="listening-icon-wrap">
-                  <svg
-                    class="lightning-svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                  </svg>
-                  <span class="radar-ping"></span>
-                </div>
-                <div class="listening-content">
-                  <div class="listening-primary" id="listening-primary">
-                    Listening for server ...
-                  </div>
-                  <div class="listening-secondary" id="listening-secondary">
-                    Will auto-connect when detected on port 8765
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 3: Auto-connects -->
-          <div class="step-row step-muted" id="step-3" role="listitem">
-            <div class="step-gutter">
-              <div
-                class="step-badge badge-muted"
-                id="step-3-indicator"
-                aria-label="Step 3: Connects"
-              >
-                <span class="badge-num">3</span>
-                <svg
-                  class="badge-check"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
-                </svg>
-              </div>
-            </div>
-            <div class="step-main">
-              <div class="step-heading">
-                <span class="step-label text-muted" id="step-3-title">Opens your local graph</span>
-              </div>
-              <p class="step-description" id="step-3-description">
-                The browser opens the local dashboard when the server is detected.
-              </p>
-              <div class="action-fallback" id="action-fallback">
-                <button
-                  type="button"
-                  class="launch-btn"
-                  id="manual-connect-btn"
-                  style="display: none"
-                >
-                  Connect to Dashboard ➔
-                </button>
-                <span class="status-tip" id="status-tip"></span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <footer class="card-footer">
-          <div class="footer-item footer-runtime">
-            <svg
-              class="footer-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-              <line x1="6" y1="8" x2="6" y2="8"></line>
-              <line x1="10" y1="8" x2="10" y2="8"></line>
-            </svg>
-            <span>Requires <span class="highlight">Node.js 18+ · Python 3.11+</span></span>
-          </div>
-          <div class="footer-item footer-port">
-            <span class="port-prompt">&gt;_</span>
-            <span>Port <span class="port-num">8765</span></span>
-          </div>
-        </footer>
+        <p id="copy-status" role="status"></p>
       </main>
     </div>
 
@@ -304,9 +46,7 @@
     <div class="app-shell" id="app-shell">
       <header class="topbar">
         <a class="brand" href="/" aria-label="TokSmart home">
-          <span class="brand-mark">
-            <img class="toksmart-logo" src="logo.svg" alt="" />
-          </span>
+          <img class="toksmart-logo" src="logo.svg" alt="" />
           <span>TokSmart</span>
         </a>
         <nav class="topnav" aria-label="Main navigation">
@@ -345,7 +85,7 @@
         </button>
       </header>
 
-      <main class="workspace">
+      <main class="workspace" aria-label="TokSmart dashboard">
         <aside class="sidebar" aria-label="Graph controls">
           <h2 class="panel-heading">Explorer</h2>
           <label class="section-head" for="project">Repository</label>
@@ -388,7 +128,6 @@
               <span id="scope-label" class="scope-label">Shared knowledge</span>
             </div>
             <label class="searchbox">
-              <span>⌕</span>
               <input
                 id="search"
                 placeholder="Filter graph nodes…"
@@ -417,9 +156,7 @@
               aria-describedby="graph-keyboard-help"
             ></canvas>
             <div id="webgl-host" class="webgl-host" hidden></div>
-            <div id="loading" class="loading" role="status">
-              <span class="loader" aria-hidden="true"></span>Loading graph…
-            </div>
+            <div id="loading" class="loading" role="status">Loading graph…</div>
             <div id="empty" class="empty" hidden>
               <b>No matching knowledge yet</b>
               <span>Select a repository or try another search and scope.</span>
@@ -457,7 +194,7 @@
 
         <aside id="inspector" class="inspector">
           <div class="panel-heading">
-            <span class="panel-icon">◇</span><strong>Node inspector</strong>
+            <strong>Node inspector</strong>
             <button
               id="inspector-minimize"
               class="icon-button inspector-minimize"
@@ -470,7 +207,6 @@
             </button>
           </div>
           <div class="inspector-empty">
-            <span class="inspect-orbit" aria-hidden="true">◇</span>
             <h2>No node selected</h2>
             <p>Choose a node on the graph to see its summary, relationships, and evidence.</p>
           </div>
@@ -493,7 +229,7 @@
         aria-expanded="false"
         hidden
       >
-        <span aria-hidden="true">◇</span> Node inspector <span aria-hidden="true">↗</span>
+        Show node inspector
       </button>
 
       <!-- Knowledge Workspace Section -->

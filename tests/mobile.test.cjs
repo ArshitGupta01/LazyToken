@@ -323,10 +323,10 @@ test('zero baselines and unknown scores remain unknown; invalid numbers are reje
   assert.throws(() => metrics.summarize(duplicate), /duplicate run/);
 });
 
-test('mobile HTML uses existing components, local assets and no graph engine', () => {
+test('mobile HTML includes local prompt assets and no graph engine', () => {
   const html = readFileSync(join(__dirname, '../web/mobile.html'), 'utf8');
   assert.match(html, /href="styles.css"/);
-  assert.match(html, /connect-card/);
+  assert.match(html, /id="prompt-cards"/);
   assert.match(html, /launch-btn/);
   assert.doesNotMatch(html, /graph3d|three\.module|features-ui|src="https:/);
   assert.match(html, /id="fallback-text"\s+readonly/);

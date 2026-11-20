@@ -30,10 +30,10 @@
         status.textContent = 'Use your device’s Copy action on the selected prompt.';
         return;
       }
-      status.textContent = 'Copied! Paste into your AI assistant, then send your task.';
-      button.textContent = 'Copied ✓';
+      status.textContent = 'Copied. Paste into your AI assistant.';
+      button.textContent = 'Copied';
       setTimeout(() => {
-        button.textContent = 'Copy prompt';
+        button.textContent = 'Copy';
       }, 2000);
     } finally {
       button.disabled = false;
@@ -52,7 +52,7 @@
       if (
         !data.version ||
         !['lite', 'pro', 'coding'].every((mode) =>
-          ['name', 'description', 'prompt'].every(
+          ['name', 'best_for', 'prompt'].every(
             (key) => typeof data.modes?.[mode]?.[key] === 'string'
           )
         )
@@ -62,17 +62,17 @@
       cards.replaceChildren();
       ['lite', 'pro', 'coding'].forEach((mode) => {
         const item = data.modes[mode];
-        const card = el('article', undefined, `connect-card prompt-card mode-${mode}`);
-        const heading = el('h2', item.name);
+        const card = el('article', undefined, 'prompt-card');
+        const heading = el('h2', item.name.replace(/^TokSmart /, ''));
         heading.id = `mode-${mode}-title`;
         card.setAttribute('aria-labelledby', heading.id);
-        const button = el('button', 'Copy prompt', 'launch-btn');
+        const button = el('button', 'Copy', 'launch-btn');
         button.type = 'button';
         button.setAttribute('aria-label', `Copy ${item.name} prompt`);
         button.addEventListener('click', () => copyPrompt(item.prompt, button));
         const details = el('details');
         details.append(el('summary', 'Read the prompt'), el('pre', item.prompt, 'prompt-preview'));
-        card.append(heading, el('p', item.description), button, details);
+        card.append(heading, el('p', item.best_for), button, details);
         cards.append(card);
       });
       status.textContent = '';

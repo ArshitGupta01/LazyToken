@@ -9,7 +9,7 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
     powerPreference: 'high-performance'
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setClearColor(0x050b18, 0);
+  renderer.setClearColor(0x1d1c18, 0);
   renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge graph');
   function onContextLost(event) {
     event.preventDefault();
@@ -33,26 +33,15 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
   const group = new THREE.Group();
   scene.add(group);
   // A faint reference grid is decorative; it does not represent graph records.
-  const grid = new THREE.GridHelper(1200, 24, 0x267fb4, 0x144264);
+  const grid = new THREE.GridHelper(1200, 24, 0x887a68, 0x645b4c);
   grid.position.y = -250;
   grid.material.transparent = true;
-  grid.material.opacity = 0.13;
+  grid.material.opacity = 0.27;
   grid.material.depthWrite = false;
   scene.add(grid);
   const raycaster = new THREE.Raycaster(),
     pointer = new THREE.Vector2();
   const sphere = new THREE.SphereGeometry(1, 16, 12);
-  const glowCanvas = document.createElement('canvas');
-  glowCanvas.width = 64;
-  glowCanvas.height = 64;
-  const gc = glowCanvas.getContext('2d'),
-    gradient = gc.createRadialGradient(32, 32, 1, 32, 32, 32);
-  gradient.addColorStop(0, 'rgba(255,255,255,.9)');
-  gradient.addColorStop(0.24, 'rgba(255,255,255,.34)');
-  gradient.addColorStop(1, 'rgba(255,255,255,0)');
-  gc.fillStyle = gradient;
-  gc.fillRect(0, 0, 64, 64);
-  const glowTexture = new THREE.CanvasTexture(glowCanvas);
   let nodeMeshes = [],
     labels = [],
     edgeLines = null,
@@ -66,18 +55,14 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
     target = null,
     resizeObserver = null;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  scene.add(new THREE.AmbientLight(0xb6d9ff, 1.1));
-  const keyLight = new THREE.PointLight(0xe4f9ff, 180000);
+  scene.add(new THREE.AmbientLight(0xe0d5c5, 1.1));
+  const keyLight = new THREE.PointLight(0xffecd7, 180000);
   keyLight.position.set(150, 220, 480);
   scene.add(keyLight);
   function clear() {
     for (const mesh of nodeMeshes) {
       group.remove(mesh);
       mesh.material.dispose();
-      if (mesh.userData.glow) {
-        group.remove(mesh.userData.glow);
-        mesh.userData.glow.material.dispose();
-      }
     }
     nodeMeshes = [];
     for (const label of labels) label.remove();
@@ -116,16 +101,16 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
       signature = key;
       clear();
       const positions = new Map();
-      for (const [index, n] of nodes.entries()) {
+      for (const n of nodes) {
         const pos = positionFor(n, width, height);
         positions.set(n.id, pos);
         const nodeColor = new THREE.Color(color(n.kind));
         const material = new THREE.MeshPhongMaterial({
-          color: nodeColor.clone().multiplyScalar(0.35),
+          color: nodeColor.clone().multiplyScalar(0.61),
           emissive: nodeColor,
           emissiveIntensity: 0.3,
-          shininess: 100,
-          specular: 0xd5faff
+          shininess: 22,
+          specular: 0xffe6c4
         });
         const mesh = new THREE.Mesh(sphere, material);
         const radius = Math.max(7, Math.min(14, n.r || 9));
@@ -134,22 +119,6 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
         mesh.userData.node = n;
         group.add(mesh);
         nodeMeshes.push(mesh);
-        if (index < 120) {
-          const glow = new THREE.Sprite(
-            new THREE.SpriteMaterial({
-              map: glowTexture,
-              color: nodeColor,
-              transparent: true,
-              blending: THREE.AdditiveBlending,
-              depthWrite: false,
-              opacity: 0.7
-            })
-          );
-          glow.position.copy(pos);
-          glow.scale.set(radius * 5, radius * 5, 1);
-          mesh.userData.glow = glow;
-          group.add(glow);
-        }
         const label = document.createElement('button');
         label.type = 'button';
         label.className = 'graph3d-label';
@@ -169,7 +138,7 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
           b = positions.get(e.b.id);
         if (!a || !b) continue;
         coords.push(a.x, a.y, a.z, b.x, b.y, b.z);
-        const c = new THREE.Color(e.scope === '*' ? '#64bff7' : '#46deec');
+        const c = new THREE.Color(e.scope === '*' ? '#a99a84' : '#867b6c');
         colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
         renderedEdges.push(e);
       }
@@ -203,17 +172,15 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
       mesh.scale.setScalar(
         (mesh.userData.node.r || 9) * (isSelected ? 1.35 : isHovered ? 1.15 : 1)
       );
-      mesh.material.color.set(color(mesh.userData.node.kind)).multiplyScalar(dim ? 0.12 : 0.35);
+      mesh.material.color.set(color(mesh.userData.node.kind)).multiplyScalar(dim ? 0.2 : 0.61);
       mesh.material.emissiveIntensity = dim ? 0.06 : isSelected ? 0.5 : 0.3;
-      if (mesh.userData.glow)
-        mesh.userData.glow.material.opacity = dim ? 0.12 : isSelected ? 1 : 0.75;
     }
     if (edgeLines) {
       const attribute = edgeLines.geometry.getAttribute('color');
       renderedEdges.forEach((edge, i) => {
         const activeEdge = focused && (edge.a.id === focused.id || edge.b.id === focused.id);
         const tint = new THREE.Color(
-          activeEdge ? '#c6faff' : edge.scope === '*' ? '#64bff7' : '#46deec'
+          activeEdge ? '#f1ab84' : edge.scope === '*' ? '#a99a84' : '#867b6c'
         ).multiplyScalar(focused && !activeEdge ? 0.2 : 1);
         attribute.setXYZ(i * 2, tint.r, tint.g, tint.b);
         attribute.setXYZ(i * 2 + 1, tint.r, tint.g, tint.b);
@@ -378,7 +345,6 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
       resizeObserver.disconnect();
       clear();
       sphere.dispose();
-      glowTexture.dispose();
       grid.geometry.dispose();
       grid.material.dispose();
       controls.dispose();

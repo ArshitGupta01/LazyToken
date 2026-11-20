@@ -36,9 +36,10 @@
     if (!toastEl) {
       toastEl = document.createElement('div');
       toastEl.className = 'server-toast';
+      toastEl.setAttribute('role', 'status');
       document.body.appendChild(toastEl);
     }
-    toastEl.textContent = '⚠️ ' + msg;
+    toastEl.textContent = msg;
     toastEl.hidden = false;
   }
 
@@ -46,46 +47,15 @@
     if (toastEl) toastEl.hidden = true;
   }
 
-  // --- Copy Buttons ---
   function setupCopyButtons() {
-    const copyButtons = document.querySelectorAll('.copy-button');
-    const step1Badge = document.getElementById('step-1-badge');
-
-    copyButtons.forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const cmd = btn.getAttribute('data-command');
-        if (!cmd) return;
-
+    const status = document.getElementById('copy-status');
+    document.querySelectorAll('.copy-button').forEach((button) => {
+      button.addEventListener('click', async () => {
         try {
-          await navigator.clipboard.writeText(cmd);
-          btn.classList.add('copied');
-
-          if (step1Badge) {
-            step1Badge.textContent = 'COPIED';
-            step1Badge.classList.add('active');
-          }
-
-          setTimeout(() => {
-            btn.classList.remove('copied');
-            if (step1Badge) {
-              step1Badge.textContent = 'DONE';
-              step1Badge.classList.remove('active');
-            }
-          }, 2000);
+          await navigator.clipboard.writeText(button.dataset.command);
+          status.textContent = 'Command copied.';
         } catch {
-          const ta = document.createElement('textarea');
-          ta.value = cmd;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.select();
-          try {
-            document.execCommand('copy');
-            btn.classList.add('copied');
-            setTimeout(() => btn.classList.remove('copied'), 2000);
-          } finally {
-            document.body.removeChild(ta);
-          }
+          status.textContent = 'Select and copy the command manually.';
         }
       });
     });
@@ -120,85 +90,14 @@
   }
 
   function updateConnectCardServerReady(serverAlive) {
-    const step2Indicator = document.getElementById('step-2-indicator');
-    const step2Title = document.getElementById('step-2-title');
-    const listeningBox = document.getElementById('listening-box');
-    const listeningPrimary = document.getElementById('listening-primary');
-    const listeningSecondary = document.getElementById('listening-secondary');
-    const manualBtn = document.getElementById('manual-connect-btn');
-    const step3Row = document.getElementById('step-3');
-    const step3Indicator = document.getElementById('step-3-indicator');
-    const step3Title = document.getElementById('step-3-title');
-    const step3Desc = document.getElementById('step-3-description');
-
-    if (serverAlive) {
-      if (step2Indicator) {
-        step2Indicator.classList.remove('badge-purple');
-        step2Indicator.classList.add('badge-green', 'checked');
-      }
-      if (step2Title) {
-        step2Title.textContent = 'TokSmart server ready on port ' + DEFAULT_PORT;
-        step2Title.classList.remove('text-white');
-        step2Title.classList.add('text-green');
-      }
-      if (listeningBox) listeningBox.classList.add('connected');
-      if (listeningPrimary) listeningPrimary.textContent = 'Server detected (Disconnected)';
-      if (listeningSecondary)
-        listeningSecondary.textContent = 'Click below to connect to your TokSmart dashboard';
-
-      if (manualBtn) manualBtn.style.display = 'inline-flex';
-
-      if (step3Row) {
-        step3Row.classList.remove('step-muted');
-        step3Row.classList.add('step-connected');
-      }
-      if (step3Indicator) {
-        step3Indicator.classList.remove('badge-muted');
-        step3Indicator.classList.add('badge-purple', 'checked');
-      }
-      if (step3Title) {
-        step3Title.textContent = 'Ready to open knowledge graph';
-        step3Title.classList.remove('text-muted');
-        step3Title.classList.add('text-white');
-      }
-      if (step3Desc) {
-        step3Desc.textContent = 'Click "Connect to Dashboard" to launch your TokSmart visualizer.';
-      }
-    } else {
-      if (step2Indicator) {
-        step2Indicator.classList.add('badge-purple');
-        step2Indicator.classList.remove('badge-green', 'checked');
-      }
-      if (step2Title) {
-        step2Title.textContent = 'Waiting for server to start';
-        step2Title.classList.add('text-white');
-        step2Title.classList.remove('text-green');
-      }
-      if (listeningBox) listeningBox.classList.remove('connected');
-      if (listeningPrimary) listeningPrimary.textContent = 'Listening for server ...';
-      if (listeningSecondary)
-        listeningSecondary.textContent = 'Will auto-connect when detected on port ' + DEFAULT_PORT;
-
-      if (manualBtn) manualBtn.style.display = 'none';
-
-      if (step3Row) {
-        step3Row.classList.add('step-muted');
-        step3Row.classList.remove('step-connected');
-      }
-      if (step3Indicator) {
-        step3Indicator.classList.add('badge-muted');
-        step3Indicator.classList.remove('badge-green', 'badge-purple', 'checked');
-      }
-      if (step3Title) {
-        step3Title.textContent = 'Opens directly on this website';
-        step3Title.classList.add('text-muted');
-        step3Title.classList.remove('text-white', 'text-green');
-      }
-      if (step3Desc) {
-        step3Desc.textContent =
-          'No new tab or raw localhost needed — the graph visualizer renders right here.';
-      }
+    const status = document.getElementById('connection-status');
+    const button = document.getElementById('manual-connect-btn');
+    if (status) {
+      status.textContent = serverAlive
+        ? 'Local server is running.'
+        : 'Waiting for the local server…';
     }
+    if (button) button.hidden = !serverAlive;
   }
 
   // --- Server Health Polling ---
@@ -223,6 +122,7 @@
     } catch {
       if (intent !== connectionIntent) return;
       consecutiveFailures++;
+      if (!isConnected) updateConnectCardServerReady(false);
       if (isConnected && consecutiveFailures >= 3) {
         showToast('Local server disconnected. Checking connection...');
       }
@@ -249,47 +149,6 @@
     document.documentElement.classList.add('server-connected');
     document.body.classList.add('server-connected');
 
-    const step2Indicator = document.getElementById('step-2-indicator');
-    const step2Title = document.getElementById('step-2-title');
-    const listeningBox = document.getElementById('listening-box');
-    const listeningPrimary = document.getElementById('listening-primary');
-    const listeningSecondary = document.getElementById('listening-secondary');
-
-    if (step2Indicator) {
-      step2Indicator.classList.remove('badge-purple');
-      step2Indicator.classList.add('badge-green', 'checked');
-    }
-    if (step2Title) {
-      step2Title.textContent = 'TokSmart server connected';
-      step2Title.classList.remove('text-white');
-      step2Title.classList.add('text-green');
-    }
-    if (listeningBox) listeningBox.classList.add('connected');
-    if (listeningPrimary) listeningPrimary.textContent = 'Connected to local server';
-    if (listeningSecondary) listeningSecondary.textContent = 'Detected on port ' + DEFAULT_PORT;
-
-    const step3Row = document.getElementById('step-3');
-    const step3Indicator = document.getElementById('step-3-indicator');
-    const step3Title = document.getElementById('step-3-title');
-    const step3Desc = document.getElementById('step-3-description');
-
-    if (step3Row) {
-      step3Row.classList.remove('step-muted');
-      step3Row.classList.add('step-connected');
-    }
-    if (step3Indicator) {
-      step3Indicator.classList.remove('badge-muted');
-      step3Indicator.classList.add('badge-green', 'checked');
-    }
-    if (step3Title) {
-      step3Title.textContent = 'Knowledge graph ready';
-      step3Title.classList.remove('text-muted');
-      step3Title.classList.add('text-green');
-    }
-    if (step3Desc) {
-      step3Desc.textContent = 'Dashboard is active.';
-    }
-
     if (window.startDashboard) {
       window.startDashboard();
     }
@@ -308,6 +167,7 @@
     document.documentElement.classList.remove('server-connected');
     document.body.classList.remove('server-connected');
 
+    document.getElementById('connect-title')?.focus();
     updateConnectCardServerReady(false);
     checkServer();
   }
@@ -326,17 +186,6 @@
   function bootstrap() {
     setupCopyButtons();
 
-    // Mobile device detection
-    const isMobile =
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) {
-      document.documentElement.classList.add('is-mobile');
-      const mobileNotice = document.getElementById('mobile-notice');
-      if (mobileNotice) mobileNotice.style.display = 'block';
-    }
-
-    // Event delegation guarantees button clicks work 100% of the time
     document.addEventListener('click', (e) => {
       const target = e.target;
       if (!target) return;
@@ -353,8 +202,6 @@
 
     if (isManuallyDisconnected) updateConnectCardServerReady(false);
 
-    // Loopback on a phone cannot reach the development computer.
-    if (isMobile) return;
     checkServer();
     setInterval(checkServer, POLL_INTERVAL);
   }
@@ -382,25 +229,24 @@
       ctx = canvas.getContext('2d'),
       host = $('#webgl-host');
     const palette = {
-      project: '#22e6f0',
-      framework: '#20d9ff',
-      library: '#39ead4',
-      platform: '#4f8fff',
-      pattern: '#b36cff',
-      component: '#e59fff',
-      skill: '#a88dff',
-      plugin: '#55d9d0',
-      decision: '#d37cff',
-      lesson: '#e58dff',
-      technology: '#38c9ff'
+      project: '#f0ad81',
+      framework: '#b6bc8e',
+      library: '#8db3a5',
+      platform: '#c6aa78',
+      pattern: '#beb1cb',
+      component: '#cfbca7',
+      skill: '#b7a9a0',
+      plugin: '#9cbaad',
+      decision: '#e0ab89',
+      lesson: '#d1bb80',
+      technology: '#b9b6a7'
     };
-    const color = (kind) => palette[kind] || '#83a7e7';
+    const color = (kind) => palette[kind] || '#cbbca8';
     const esc = (value = '') =>
       String(value).replace(
         /[&<>"']/g,
         (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
       );
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     let data = { nodes: [], edges: [] },
       projects = [],
       nodes = [],
@@ -752,22 +598,16 @@
           ctx.beginPath();
           ctx.moveTo(edge.a.x, edge.a.y);
           ctx.lineTo(edge.b.x, edge.b.y);
-          ctx.setLineDash(edge.scope === '*' ? [] : [5, 5]);
-          ctx.lineDashOffset = reduced.matches ? 0 : -(performance.now() / 100) % 10;
-          ctx.strokeStyle = active ? '#aff6ffff' : '#39bde9a8';
-          ctx.lineWidth = active ? 2.4 : 1.2 + Math.max(0, Math.min(1, Number(edge.weight) || 0));
-          if (shown.length < 100) {
-            ctx.shadowColor = '#14cfff';
-            ctx.shadowBlur = active ? 14 : 6;
-          }
+          ctx.setLineDash(edge.scope === '*' ? [] : [4, 4]);
+          ctx.strokeStyle = active ? '#f1ab84' : '#80786b';
+          ctx.lineWidth = active ? 2 : 0.9 + Math.max(0, Math.min(1, Number(edge.weight) || 0));
           ctx.stroke();
-          ctx.shadowBlur = 0;
           ctx.setLineDash([]);
           if (active) {
             const x = (edge.a.x + edge.b.x) / 2,
               y = (edge.a.y + edge.b.y) / 2;
-            ctx.fillStyle = '#b8d5ed';
-            ctx.font = '10px Segoe UI, sans-serif';
+            ctx.fillStyle = '#e6c6ac';
+            ctx.font = '11px Consolas, monospace';
             ctx.textAlign = 'center';
             ctx.fillText(edge.relation.replaceAll('_', ' '), x, y - 7);
           }
@@ -781,27 +621,24 @@
           const isSelected = selected === n,
             near = linked.has(n),
             dim = focus && focus !== n && !near;
-          ctx.globalAlpha = dim ? 0.28 : 1;
+          ctx.globalAlpha = dim ? 0.46 : 1;
           const c = color(n.kind);
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.r + (isSelected ? 2 : 0), 0, Math.PI * 2);
-          ctx.shadowColor = c;
-          ctx.shadowBlur = shown.length < 100 ? (isSelected ? 28 : 18) : 0;
-          ctx.fillStyle = '#09192e';
-          ctx.fill();
-          ctx.lineWidth = 1.8;
-          ctx.strokeStyle = c;
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, Math.max(2, n.r * 0.37), 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, n.r * 0.68, 0, Math.PI * 2);
           ctx.fillStyle = c;
           ctx.fill();
-          ctx.font = `${isSelected ? '600 ' : ''}11px Segoe UI, sans-serif`;
+          if (isSelected || n === hover) {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, n.r * 0.68 + 4, 0, Math.PI * 2);
+            ctx.lineWidth = 1.3;
+            ctx.strokeStyle = '#f4e5cf';
+            ctx.stroke();
+          }
+          ctx.font = `${isSelected ? '600 ' : ''}12px Segoe UI, sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillStyle = '#e2edf9';
+          ctx.fillStyle = '#f0ece1';
           if (shown.length <= 60 || isSelected || near || n === hover)
-            ctx.fillText(n.name, n.x, n.y + n.r + 17);
+            ctx.fillText(n.name, n.x, n.y + n.r + 13);
           ctx.globalAlpha = 1;
         }
         ctx.restore();
@@ -843,7 +680,7 @@
           .split(',')
           .map((x) => x.trim())
           .filter(Boolean);
-      detail.innerHTML = `<div class="detail-top"><span class="kind-pill">${esc(node.kind)}</span><span class="detail-scope">${node.scope === 'global' ? 'SHARED' : 'PROJECT SCOPED'}</span></div><h2 class="detail-name">${esc(node.name)}</h2><p class="detail-summary">${esc(node.summary || 'No summary has been added yet.')}</p>${tags.length ? `<div class="tag-list">${tags.map((t) => `<span class="tag"># ${esc(t)}</span>`).join('')}</div>` : ''}${node.freshness ? `<div class="memory-health"><span>Evidence status</span><strong>${esc(node.freshness)} · ${esc(node.verification_state || 'unverified')}</strong></div>` : ''}<div class="detail-section"><h3>LINKED KNOWLEDGE <span>${links.length}</span></h3>${
+      detail.innerHTML = `<div class="detail-top"><span class="kind-pill">${esc(node.kind)}</span><span class="detail-scope">${node.scope === 'global' ? 'Shared' : 'Repository'}</span></div><h2 class="detail-name">${esc(node.name)}</h2><p class="detail-summary">${esc(node.summary || 'No summary has been added yet.')}</p>${tags.length ? `<div class="tag-list">${tags.map((t) => `<span class="tag"># ${esc(t)}</span>`).join('')}</div>` : ''}${node.freshness ? `<div class="memory-health"><span>Evidence status</span><strong>${esc(node.freshness)} · ${esc(node.verification_state || 'unverified')}</strong></div>` : ''}<div class="detail-section"><h3>Relationships <span>${links.length}</span></h3>${
         links.length
           ? links
               .map((edge) => {
@@ -862,7 +699,7 @@
               })
               .join('')
           : '<p class="detail-summary">No relationships in this scope.</p>'
-      }</div>${node.source ? `<span class="source">SOURCE &nbsp; ${esc(node.source)}</span>` : ''}`;
+      }</div>${node.source ? `<span class="source">Source &nbsp; ${esc(node.source)}</span>` : ''}`;
       draw();
     }
     canvas.addEventListener('keydown', (event) => {
@@ -1143,9 +980,6 @@
     setInterval(() => {
       if (!document.hidden && !drag) loadGraph(scope, true);
     }, 10000);
-    setInterval(() => {
-      if (!view3d && !document.hidden && !reduced.matches && edges.length <= 150) draw();
-    }, 100);
     refreshGraph();
   }
 })();

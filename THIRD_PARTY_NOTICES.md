@@ -11,3 +11,5 @@ The Windows package includes the build interpreter's **CPython 3.14** runtime. I
 The Python runtime includes **OpenSSL 3**, under the Apache License 2.0; the same license text is supplied in `vendor/TOKENIZERS-LICENSE.txt`. OpenSSL is copyright the OpenSSL Project and its contributors; see <https://github.com/openssl/openssl/blob/openssl-3.0.13/README.md> and the build interpreter's notice for details. The package also includes **SQLite**, whose core is dedicated to the public domain; see <https://www.sqlite.org/copyright.html>.
 
 These notices address identified components, not a completed inventory of every transitive dependency and redistributed runtime file. Complete that inventory for each release build.
+
+The hosted website serves the Latin subsets of [Newsreader](https://github.com/productiontype/Newsreader) and [IBM Plex Sans](https://github.com/IBM/plex) under the SIL Open Font License 1.1. See [Newsreader’s license](web/fonts/newsreader-OFL.txt) and [IBM Plex Sans’s license](web/fonts/ibm-plex-sans-OFL.txt).
