@@ -18,10 +18,7 @@
   }
   window.API_BASE = getApiBase();
 
-  function buildEndpoints() {
-    return [(window.API_BASE || '') + '/api/health'];
-  }
-  let ENDPOINTS = buildEndpoints();
+  const healthEndpoint = (window.API_BASE || '') + '/api/health';
 
   let isConnected = false;
   let isManuallyDisconnected = false;
@@ -32,7 +29,7 @@
   } catch (e) {}
 
   let consecutiveFailures = 0;
-  let pollTimer = null;
+  let connectionIntent = 0;
   let toastEl = null;
 
   function showToast(msg) {
@@ -41,7 +38,7 @@
       toastEl.className = 'server-toast';
       document.body.appendChild(toastEl);
     }
-    toastEl.innerHTML = '⚠️ <span>' + msg + '</span>';
+    toastEl.textContent = '⚠️ ' + msg;
     toastEl.hidden = false;
   }
 
@@ -94,7 +91,7 @@
     });
   }
 
-  // --- Concurrent Endpoint Ping ---
+  // --- Local Health Check ---
   function pingEndpoint(url) {
     return new Promise((resolve, reject) => {
       const controller = new AbortController();
@@ -112,7 +109,7 @@
         })
         .then((data) => {
           clearTimeout(timeoutId);
-          if (data.service === 'toksmart' || data.service === 'lazytoken') resolve(url);
+          if (data.service === 'toksmart' || data.service === 'lazytoken') resolve();
           else reject(new Error('Not a TokSmart server'));
         })
         .catch((err) => {
@@ -205,23 +202,26 @@
   }
 
   // --- Server Health Polling ---
-  async function checkServer(force = false) {
-    if (isManuallyDisconnected && !force) {
+  async function checkServer() {
+    const intent = connectionIntent;
+    if (isManuallyDisconnected) {
       try {
-        await Promise.any(ENDPOINTS.map((url) => pingEndpoint(url)));
-        updateConnectCardServerReady(true);
+        await pingEndpoint(healthEndpoint);
+        if (intent === connectionIntent) updateConnectCardServerReady(true);
       } catch {
-        updateConnectCardServerReady(false);
+        if (intent === connectionIntent) updateConnectCardServerReady(false);
       }
       return;
     }
 
     try {
-      const winningUrl = await Promise.any(ENDPOINTS.map((url) => pingEndpoint(url)));
+      await pingEndpoint(healthEndpoint);
+      if (intent !== connectionIntent) return;
       consecutiveFailures = 0;
       hideToast();
-      handleServerFound(winningUrl);
+      handleServerFound();
     } catch {
+      if (intent !== connectionIntent) return;
       consecutiveFailures++;
       if (isConnected && consecutiveFailures >= 3) {
         showToast('Local server disconnected. Checking connection...');
@@ -229,7 +229,7 @@
     }
   }
 
-  function handleServerFound(url) {
+  function handleServerFound() {
     isConnected = true;
     isManuallyDisconnected = false;
     try {
@@ -296,6 +296,7 @@
   }
 
   function handleDisconnect() {
+    connectionIntent++;
     isManuallyDisconnected = true;
     isConnected = false;
     try {
@@ -312,13 +313,14 @@
   }
 
   function handleManualConnect() {
+    connectionIntent++;
     isManuallyDisconnected = false;
     try {
       localStorage.removeItem(DISCONNECT_KEY);
       LEGACY_DISCONNECT_KEYS.forEach((k) => localStorage.removeItem(k));
       localStorage.setItem(STORAGE_KEY, 'true');
     } catch (e) {}
-    checkServer(true);
+    checkServer();
   }
 
   function bootstrap() {
@@ -354,7 +356,7 @@
     // Loopback on a phone cannot reach the development computer.
     if (isMobile) return;
     checkServer();
-    pollTimer = setInterval(checkServer, POLL_INTERVAL);
+    setInterval(checkServer, POLL_INTERVAL);
   }
 
   if (document.readyState === 'loading') {
@@ -975,10 +977,13 @@
         return;
       }
       try {
+        let module;
         if (!gl) {
           glLoading ??= import('./graph3d.js');
-          const module = await glLoading;
-          if (!view3d) return;
+          module = await glLoading;
+        }
+        if (!view3d) return;
+        if (!gl) {
           host.hidden = false;
           gl = module.createGraph3D(host, {
             onUnavailable: () => {
@@ -1011,7 +1016,6 @@
             color
           });
         }
-        if (!view3d) return;
         canvas.hidden = true;
         host.hidden = false;
         gl.setActive(true);

@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import sqlite3
+import stat
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -167,6 +168,59 @@ class LazyTokenFeaturesTests(unittest.TestCase):
         copy = sqlite3.connect(backups[0])
         self.assertEqual(copy.execute("SELECT value FROM legacy_marker").fetchone()[0], "preserved")
         copy.close()
+
+    def test_upgrade_legacy_call_table_preserves_rows_and_applies_current_schema(self):
+        path = Path(self.temp.name) / "legacy-calls.sqlite3"
+        with sqlite3.connect(path) as legacy:
+            legacy.execute(
+                "CREATE TABLE symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, "
+                "caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, line INTEGER NOT NULL, "
+                "PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,line))"
+            )
+            legacy.execute(
+                "INSERT INTO symbol_calls VALUES(?,?,?,?,?)", ("old", "a.py", "run", "go", 12)
+            )
+        legacy.close()
+
+        upgraded = kn.connect(path)
+        try:
+            call = upgraded.execute(
+                "SELECT receiver, callee_name, line FROM symbol_calls"
+            ).fetchone()
+            self.assertEqual(tuple(call), ("", "go", 12))
+            columns = {
+                row["name"]: row["pk"]
+                for row in upgraded.execute("PRAGMA table_info(symbol_calls)")
+            }
+            self.assertGreater(columns["receiver"], 0)
+            indexes = {row["name"] for row in upgraded.execute("PRAGMA index_list(symbol_calls)")}
+            self.assertIn("symbol_calls_method_idx", indexes)
+            (self.root / "lookup.py").write_text(
+                "def lookup():\n    return target()\n", encoding="utf-8"
+            )
+            self.assertEqual(kn.sync(self.root, upgraded)["added"], 3)
+            line = upgraded.execute(
+                "SELECT line FROM symbol_calls WHERE callee_name='target'"
+            ).fetchone()
+            self.assertEqual(line[0], 2)
+        finally:
+            upgraded.close()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permissions")
+    def test_new_store_and_sidecars_are_created_with_private_modes(self):
+        root = Path(self.temp.name) / "local-store"
+        previous = os.umask(0)
+        try:
+            with patch.dict(os.environ, {"KN_HOME": str(root)}):
+                db = kn.connect()
+            try:
+                self.assertEqual(stat.S_IMODE(root.stat().st_mode), 0o700)
+                for name in ("network.sqlite3", "network.sqlite3-wal", "network.sqlite3-shm"):
+                    self.assertEqual(stat.S_IMODE((root / name).stat().st_mode), 0o600)
+            finally:
+                db.close()
+        finally:
+            os.umask(previous)
 
     def test_future_schema_is_not_modified(self):
         path = Path(self.temp.name) / "future.sqlite3"

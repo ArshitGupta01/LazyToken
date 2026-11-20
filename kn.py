@@ -153,13 +153,30 @@ def data_root() -> Path:
 
 def db_path() -> Path:
     root = data_root()
-    root.mkdir(parents=True, exist_ok=True)
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
     return root / "network.sqlite3"
+
+
+SYMBOL_CALLS_SCHEMA = "CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, receiver TEXT NOT NULL DEFAULT '', resolved_callee TEXT NOT NULL DEFAULT '', confidence TEXT NOT NULL DEFAULT 'provisional', caller_symbol_id TEXT NOT NULL DEFAULT '', callee_symbol_id TEXT NOT NULL DEFAULT '', resolution_method TEXT NOT NULL DEFAULT 'unresolved', line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,receiver,line))"
+SYMBOL_CALLS_COLUMNS = (
+    "project_id",
+    "caller_path",
+    "caller_symbol",
+    "callee_name",
+    "receiver",
+    "resolved_callee",
+    "confidence",
+    "caller_symbol_id",
+    "callee_symbol_id",
+    "resolution_method",
+    "line",
+)
 
 
 def _init_schema_and_migrations(conn: sqlite3.Connection) -> None:
     conn.executescript(
-        """
+        f"""
+      BEGIN IMMEDIATE;
       CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, root TEXT NOT NULL, updated_at INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS files(project_id TEXT NOT NULL, path TEXT NOT NULL, digest TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY(project_id,path));
       CREATE TABLE IF NOT EXISTS symbols(project_id TEXT NOT NULL, path TEXT NOT NULL, name TEXT NOT NULL, line INTEGER NOT NULL, PRIMARY KEY(project_id,path,name,line));
@@ -170,13 +187,9 @@ def _init_schema_and_migrations(conn: sqlite3.Connection) -> None:
       CREATE TABLE IF NOT EXISTS asset_link_evidence(source_id INTEGER NOT NULL, target_id INTEGER NOT NULL, relation TEXT NOT NULL, scope TEXT NOT NULL, weight REAL NOT NULL, evidence TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(source_id,target_id,relation,scope));
       CREATE TABLE IF NOT EXISTS retrievals(at INTEGER NOT NULL, project_id TEXT NOT NULL DEFAULT '', query_chars INTEGER NOT NULL, result_chars INTEGER NOT NULL, estimated_tokens INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS task_measurements(id INTEGER PRIMARY KEY, task TEXT NOT NULL, baseline_tokens INTEGER NOT NULL, network_tokens INTEGER NOT NULL, indexing_tokens INTEGER NOT NULL, measured_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS symbol_calls(project_id TEXT NOT NULL, caller_path TEXT NOT NULL, caller_symbol TEXT NOT NULL, callee_name TEXT NOT NULL, receiver TEXT NOT NULL DEFAULT '', resolved_callee TEXT NOT NULL DEFAULT '', confidence TEXT NOT NULL DEFAULT 'provisional', caller_symbol_id TEXT NOT NULL DEFAULT '', callee_symbol_id TEXT NOT NULL DEFAULT '', resolution_method TEXT NOT NULL DEFAULT 'unresolved', line INTEGER NOT NULL, PRIMARY KEY(project_id,caller_path,caller_symbol,callee_name,receiver,line));
+      {SYMBOL_CALLS_SCHEMA};
       CREATE TABLE IF NOT EXISTS index_skipped_files(project_id TEXT NOT NULL, path TEXT NOT NULL, reason TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY(project_id,path));
       CREATE TABLE IF NOT EXISTS sync_generations(project_id TEXT PRIMARY KEY, generation INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS symbol_calls_callee_idx ON symbol_calls(project_id, callee_name);
-      CREATE INDEX IF NOT EXISTS symbol_calls_resolved_idx ON symbol_calls(project_id, resolved_callee);
-      CREATE INDEX IF NOT EXISTS symbol_calls_caller_id_idx ON symbol_calls(project_id, caller_symbol_id);
-      CREATE INDEX IF NOT EXISTS symbol_calls_method_idx ON symbol_calls(project_id, resolution_method);
       CREATE INDEX IF NOT EXISTS symbol_name_idx ON symbols(name);
       CREATE INDEX IF NOT EXISTS asset_name_idx ON assets(name);
       CREATE INDEX IF NOT EXISTS asset_link_source_idx ON asset_links(source_id);
@@ -193,27 +206,28 @@ def _init_schema_and_migrations(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE assets ADD COLUMN scope TEXT NOT NULL DEFAULT 'global'")
     if "project_id" not in cols:
         conn.execute("ALTER TABLE assets ADD COLUMN project_id TEXT NOT NULL DEFAULT ''")
-    call_cols = {r["name"] for r in conn.execute("PRAGMA table_info(symbol_calls)")}
-    if "receiver" not in call_cols:
-        conn.execute("ALTER TABLE symbol_calls ADD COLUMN receiver TEXT NOT NULL DEFAULT ''")
-    if "resolved_callee" not in call_cols:
-        conn.execute("ALTER TABLE symbol_calls ADD COLUMN resolved_callee TEXT NOT NULL DEFAULT ''")
-    if "confidence" not in call_cols:
+    call_columns = tuple(row["name"] for row in conn.execute("PRAGMA table_info(symbol_calls)"))
+    if call_columns != SYMBOL_CALLS_COLUMNS:
+        # Older stores have a different column order and may omit receiver from the primary key.
+        columns = ", ".join(column for column in SYMBOL_CALLS_COLUMNS if column in call_columns)
+        conn.execute("ALTER TABLE symbol_calls RENAME TO symbol_calls_legacy")
+        conn.execute(SYMBOL_CALLS_SCHEMA)
         conn.execute(
-            "ALTER TABLE symbol_calls ADD COLUMN confidence TEXT NOT NULL DEFAULT 'provisional'"
+            f"INSERT INTO symbol_calls ({columns}) SELECT {columns} FROM symbol_calls_legacy"
         )
-    if "caller_symbol_id" not in call_cols:
-        conn.execute(
-            "ALTER TABLE symbol_calls ADD COLUMN caller_symbol_id TEXT NOT NULL DEFAULT ''"
-        )
-    if "callee_symbol_id" not in call_cols:
-        conn.execute(
-            "ALTER TABLE symbol_calls ADD COLUMN callee_symbol_id TEXT NOT NULL DEFAULT ''"
-        )
-    if "resolution_method" not in call_cols:
-        conn.execute(
-            "ALTER TABLE symbol_calls ADD COLUMN resolution_method TEXT NOT NULL DEFAULT 'unresolved'"
-        )
+        conn.execute("DROP TABLE symbol_calls_legacy")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS symbol_calls_callee_idx ON symbol_calls(project_id, callee_name)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS symbol_calls_resolved_idx ON symbol_calls(project_id, resolved_callee)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS symbol_calls_caller_id_idx ON symbol_calls(project_id, caller_symbol_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS symbol_calls_method_idx ON symbol_calls(project_id, resolution_method)"
+    )
     # Upgrade pre-scope links by attributing them to the project that uses both endpoints.
     conn.execute(
         """INSERT OR IGNORE INTO asset_link_evidence(source_id,target_id,relation,scope,weight,evidence,updated_at)
@@ -230,44 +244,57 @@ def _init_schema_and_migrations(conn: sqlite3.Connection) -> None:
 def connect(path: Path | None = None) -> sqlite3.Connection:
     target = path or db_path()
     existed = Path(target).is_file() and Path(target).stat().st_size > 0
+    if os.name == "posix" and str(target) != ":memory:":
+        try:
+            fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(fd)
     conn = sqlite3.connect(target, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous = NORMAL")
-    tables = set()
-    version = 0
-    if existed:
-        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        version = (
-            conn.execute("SELECT coalesce(max(version),0) FROM lazytoken_migrations").fetchone()[0]
-            if "lazytoken_migrations" in tables
-            else 0
-        )
-        if version > 7:
-            conn.close()
-            raise RuntimeError(
-                "Database was created by a newer TokSmart version; upgrade the application before opening it."
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+        tables = set()
+        version = 0
+        if existed:
+            tables = {
+                r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
+            version = (
+                conn.execute(
+                    "SELECT coalesce(max(version),0) FROM lazytoken_migrations"
+                ).fetchone()[0]
+                if "lazytoken_migrations" in tables
+                else 0
             )
-        if tables and version < 7:
-            # SQLite's backup API includes committed WAL data and leaves the original intact.
-            stamp = f"{time.time_ns()}"
-            backup_path = Path(target).with_name(Path(target).name + f".pre-v7-{stamp}.sqlite3")
-            descriptor = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            os.close(descriptor)
-            try:
-                backup = sqlite3.connect(backup_path)
+            if version > 7:
+                raise RuntimeError(
+                    "Database was created by a newer TokSmart version; upgrade the application before opening it."
+                )
+            if tables and version < 7:
+                # SQLite's backup API includes committed WAL data and leaves the original intact.
+                stamp = f"{time.time_ns()}"
+                backup_path = Path(target).with_name(Path(target).name + f".pre-v7-{stamp}.sqlite3")
+                descriptor = os.open(backup_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                os.close(descriptor)
                 try:
-                    conn.backup(backup)
-                finally:
-                    backup.close()
-            except Exception:
-                backup_path.unlink(missing_ok=True)
-                conn.close()
-                raise
-    if (not existed) or ("projects" not in tables) or (version < 7):
-        _init_schema_and_migrations(conn)
+                    backup = sqlite3.connect(backup_path)
+                    try:
+                        conn.backup(backup)
+                    finally:
+                        backup.close()
+                except Exception:
+                    backup_path.unlink(missing_ok=True)
+                    raise
+        if (not existed) or ("projects" not in tables) or (version < 7):
+            _init_schema_and_migrations(conn)
+    except BaseException:
+        conn.close()
+        raise
     return conn
 
 

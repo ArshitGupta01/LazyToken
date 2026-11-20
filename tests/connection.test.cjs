@@ -40,7 +40,7 @@ for (const file of ['app.js', 'web/app.js']) {
   });
 }
 for (const file of ['app.js']) {
-  test(`${file} starts the local dashboard after a verified health response`, async () => {
+  test(`${file} verifies health and honors a disconnect during polling`, async () => {
     const listeners = {};
     const classes = new Set();
     const classList = { add: (x) => classes.add(x), remove: (x) => classes.delete(x) };
@@ -55,6 +55,7 @@ for (const file of ['app.js']) {
       getElementById: () => null
     };
     const window = { location: { protocol: 'http:', hostname: '127.0.0.1' } };
+    let poll;
     const context = {
       document,
       window,
@@ -62,7 +63,10 @@ for (const file of ['app.js']) {
       localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
       fetch: async () => ({ ok: true, json: async () => ({ service: 'toksmart' }) }),
       AbortController,
-      setInterval: () => 1,
+      setInterval: (callback) => {
+        poll = callback;
+        return 1;
+      },
       setTimeout: () => 1,
       clearTimeout: () => {},
       URL,
@@ -77,6 +81,19 @@ for (const file of ['app.js']) {
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(started, true);
     assert.equal(classes.has('server-connected'), true);
+
+    let finishPoll;
+    context.fetch = () => new Promise((resolve) => (finishPoll ??= resolve));
+    const pending = poll();
+    context.fetch = async () => ({ ok: true, json: async () => ({ service: 'toksmart' }) });
+    listeners.click({
+      target: { id: 'disconnect-btn' },
+      preventDefault() {},
+      stopPropagation() {}
+    });
+    finishPoll({ ok: true, json: async () => ({ service: 'toksmart' }) });
+    await pending;
+    assert.equal(classes.has('server-connected'), false);
   });
 }
 

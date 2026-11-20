@@ -1,4 +1,5 @@
 import http.client
+import errno
 import json
 import sqlite3
 import os
@@ -18,6 +19,30 @@ import kn
 
 
 class LocalReviewTests(unittest.TestCase):
+    def test_existing_dashboard_is_recognized(self):
+        with dashboard.LocalServer(("127.0.0.1", 0), dashboard.Handler) as server:
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            try:
+                self.assertTrue(dashboard.dashboard_is_running(server.server_port))
+            finally:
+                server.shutdown()
+                thread.join()
+
+    def test_port_conflict_does_not_open_an_unrelated_service(self):
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            patch.dict(os.environ, {"KN_HOME": temp}),
+            patch.object(sys, "argv", ["dashboard", "--port", "8765"]),
+            patch.object(dashboard, "LocalServer", side_effect=OSError(errno.EADDRINUSE, "busy")),
+            patch.object(dashboard, "dashboard_is_running", return_value=False) as probe,
+            patch.object(dashboard.threading, "Timer") as browser_timer,
+        ):
+            with self.assertRaisesRegex(SystemExit, "Choose another port with --port"):
+                dashboard.main()
+            probe.assert_called_once_with(8765)
+            browser_timer.assert_not_called()
+
     def test_deleted_project_is_not_listed_when_it_was_the_only_project(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"KN_HOME": temp}):
             root = Path(temp) / "project"

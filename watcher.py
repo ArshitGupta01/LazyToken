@@ -256,7 +256,7 @@ class ProjectWatcher:
 
 def run(kn, interval=2.0, debounce=1.0):
     directory = kn.data_root()
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     lock = StoreLock(directory / "watch.lock")
     if not lock.acquire():
         return {"error": lock.error} if lock.error else {"already_running": True}

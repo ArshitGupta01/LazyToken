@@ -10,6 +10,8 @@ import socket
 import sqlite3
 import threading
 import webbrowser
+from contextlib import closing
+from http.client import HTTPConnection, HTTPException
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
@@ -65,6 +67,7 @@ def read_projects() -> list[dict]:
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "TokSmartLocal/0.5"
+    timeout = 10
 
     def handle(self) -> None:
         try:
@@ -259,7 +262,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self' data:",
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+            "connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'",
         )
         self.end_headers()
         self.wfile.write(body)
@@ -286,7 +290,10 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if length < 1 or length > 16384:
                 return self._json({"error": "Invalid request size"}, 400)
-            args = json.loads(self.rfile.read(length))
+            body = self.rfile.read(length)
+            if len(body) != length:
+                return self._json({"error": "Incomplete request body"}, 400)
+            args = json.loads(body)
             if not isinstance(args, dict):
                 return self._json({"error": "Expected object"}, 400)
             if not database_path().is_file():
@@ -318,6 +325,27 @@ class LocalServer(ThreadingHTTPServer):
         super().server_bind()
 
 
+def dashboard_is_running(port: int) -> bool:
+    try:
+        with closing(HTTPConnection("127.0.0.1", port, timeout=0.5)) as client:
+            client.request("GET", "/api/health")
+            with client.getresponse() as response:
+                if response.status != 200:
+                    return False
+                body = response.read(4097)
+        if len(body) > 4096:
+            return False
+        health = json.loads(body)
+        return (
+            isinstance(health, dict)
+            and health.get("status") == "ok"
+            and health.get("service") in ("toksmart", "repomind", "lazytoken")
+            and health.get("port") == port
+        )
+    except (OSError, HTTPException, ValueError):
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
@@ -325,9 +353,8 @@ def main() -> None:
     args = parser.parse_args()
     # Initialize additive schema updates before opening graph reads in read-only mode.
     if database_path().is_file():
-        conn = kn.connect(database_path())
-        selected = conn.execute("SELECT 1 FROM projects LIMIT 1").fetchone()
-        conn.close()
+        with closing(kn.connect(database_path())) as conn:
+            selected = conn.execute("SELECT 1 FROM projects LIMIT 1").fetchone()
         if selected:
             import watcher
 
@@ -340,6 +367,10 @@ def main() -> None:
             or getattr(err, "errno", None) in (48, 98, 10048)
             or "10048" in str(err)
         ):
+            if not dashboard_is_running(args.port):
+                raise SystemExit(
+                    f"Port {args.port} is already in use. Choose another port with --port."
+                ) from None
             url = f"http://127.0.0.1:{args.port}"
             print(f"TokSmart server is already running on port {args.port}!", flush=True)
             print(f"Dashboard: {url} (loopback only)", flush=True)
