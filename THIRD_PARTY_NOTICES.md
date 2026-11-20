@@ -12,4 +12,4 @@ The Python runtime includes **OpenSSL 3**, under the Apache License 2.0; the sam
 
 These notices address identified components, not a completed inventory of every transitive dependency and redistributed runtime file. Complete that inventory for each release build.
 
-The hosted website serves the Latin subsets of [Newsreader](https://github.com/productiontype/Newsreader) and [IBM Plex Sans](https://github.com/IBM/plex) under the SIL Open Font License 1.1. See [Newsreader’s license](web/fonts/newsreader-OFL.txt) and [IBM Plex Sans’s license](web/fonts/ibm-plex-sans-OFL.txt).
+The hosted website serves the Latin subsets of [Barlow Condensed](https://github.com/jpt/barlow) and [IBM Plex Sans](https://github.com/IBM/plex) under the SIL Open Font License 1.1. See [Barlow Condensed’s license](web/fonts/barlow-condensed-OFL.txt) and [IBM Plex Sans’s license](web/fonts/ibm-plex-sans-OFL.txt).

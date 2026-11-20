@@ -9,7 +9,7 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
     powerPreference: 'high-performance'
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setClearColor(0x1d1c18, 0);
+  renderer.setClearColor(0x111914, 0);
   renderer.domElement.setAttribute('aria-label', 'Interactive 3D knowledge graph');
   function onContextLost(event) {
     event.preventDefault();
@@ -33,7 +33,7 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
   const group = new THREE.Group();
   scene.add(group);
   // A faint reference grid is decorative; it does not represent graph records.
-  const grid = new THREE.GridHelper(1200, 24, 0x887a68, 0x645b4c);
+  const grid = new THREE.GridHelper(1200, 24, 0x687c6c, 0x596e5f);
   grid.position.y = -250;
   grid.material.transparent = true;
   grid.material.opacity = 0.27;
@@ -55,8 +55,8 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
     target = null,
     resizeObserver = null;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  scene.add(new THREE.AmbientLight(0xe0d5c5, 1.1));
-  const keyLight = new THREE.PointLight(0xffecd7, 180000);
+  scene.add(new THREE.AmbientLight(0xdcebd9, 1.1));
+  const keyLight = new THREE.PointLight(0xeff8e9, 180000);
   keyLight.position.set(150, 220, 480);
   scene.add(keyLight);
   function clear() {
@@ -110,7 +110,7 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
           emissive: nodeColor,
           emissiveIntensity: 0.3,
           shininess: 22,
-          specular: 0xffe6c4
+          specular: 0xe9f2e7
         });
         const mesh = new THREE.Mesh(sphere, material);
         const radius = Math.max(7, Math.min(14, n.r || 9));

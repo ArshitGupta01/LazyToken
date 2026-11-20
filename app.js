@@ -239,34 +239,34 @@
       host = $('#webgl-host');
     const root = document.documentElement;
     const palettes = {
-      project: ['#9a4325', '#f0ad81'],
-      framework: ['#59623d', '#b6bc8e'],
-      library: ['#3b6c5d', '#8db3a5'],
-      platform: ['#795629', '#c6aa78'],
-      pattern: ['#695078', '#beb1cb'],
-      component: ['#755c44', '#cfbca7'],
-      skill: ['#72574e', '#b7a9a0'],
-      plugin: ['#3e685a', '#9cbaad'],
-      decision: ['#934c2d', '#e0ab89'],
-      lesson: ['#795d24', '#d1bb80'],
-      technology: ['#66634b', '#b9b6a7']
+      project: ['#385c29', '#c3f670'],
+      framework: ['#536d2a', '#b4ce83'],
+      library: ['#2d6b5c', '#69c8b4'],
+      platform: ['#6b5b2d', '#c9b277'],
+      pattern: ['#56507c', '#a9a4d1'],
+      component: ['#4e684d', '#a0be92'],
+      skill: ['#626046', '#b7bb95'],
+      plugin: ['#356658', '#83c4ac'],
+      decision: ['#357943', '#9ada91'],
+      lesson: ['#6e6429', '#cfd980'],
+      technology: ['#53674d', '#a5b49d']
     };
     const themeColors = {
       light: {
-        activeEdge: '#983d25',
-        sharedEdge: '#746659',
-        projectEdge: '#85776a',
-        label: '#24211c',
-        edgeLabel: '#813920',
-        focus: '#523c2d'
+        activeEdge: '#355c1d',
+        sharedEdge: '#698373',
+        projectEdge: '#6c7d70',
+        label: '#18221c',
+        edgeLabel: '#355c1d',
+        focus: '#325224'
       },
       dark: {
-        activeEdge: '#f1ab84',
-        sharedEdge: '#a99a84',
-        projectEdge: '#867b6c',
-        label: '#f0ece1',
-        edgeLabel: '#e6c6ac',
-        focus: '#f4e5cf'
+        activeEdge: '#c3f670',
+        sharedEdge: '#839b8b',
+        projectEdge: '#608371',
+        label: '#f1f7ed',
+        edgeLabel: '#deefc5',
+        focus: '#ebfbd9'
       }
     };
     const activeTheme = () => (root?.dataset?.theme === 'dark' ? 'dark' : 'light');

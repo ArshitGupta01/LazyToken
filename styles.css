@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --canvas: #f4efe5;
-  --panel: #fbf7ef;
-  --control: #eee7db;
-  --line: #c5baaa;
-  --ink: #24211c;
-  --muted: #5d544a;
-  --accent: #983d25;
-  --active: #ead8ce;
-  --graph-surface: #f6f0e5;
-  --graph-grid: #e9dfd0;
-  --online: #446543;
+  --canvas: #edf1e9;
+  --panel: #f7f9f4;
+  --control: #e5ece2;
+  --line: #b9c8bb;
+  --ink: #18221c;
+  --muted: #4c5d51;
+  --accent: #355c1d;
+  --active: #dce8d3;
+  --graph-surface: #eff4ec;
+  --graph-grid: #dce7da;
+  --online: #376334;
   --logo-brightness: 0.6;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   --sans: 'Segoe UI', system-ui, sans-serif;
@@ -19,17 +19,17 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --canvas: #1b1b18;
-  --panel: #24231f;
-  --control: #2d2b25;
-  --line: #514c42;
-  --ink: #f0ece1;
-  --muted: #c0b8a8;
-  --accent: #f1ab84;
-  --active: #49372c;
-  --graph-surface: #1d1c18;
-  --graph-grid: #28261f;
-  --online: #9bb58c;
+  --canvas: #0e1211;
+  --panel: #131b16;
+  --control: #1b2720;
+  --line: #34463a;
+  --ink: #f1f7ed;
+  --muted: #a8b9ad;
+  --accent: #c3f670;
+  --active: #293d21;
+  --graph-surface: #111914;
+  --graph-grid: #1c2a21;
+  --online: #a5ca91;
   --logo-brightness: 1.45;
 }
 
@@ -360,6 +360,7 @@ body.server-connected .app-shell {
   gap: 9px 12px;
   padding: 13px 17px 11px;
   border-bottom: 1px solid var(--line);
+  background: var(--canvas);
 }
 .graph-title h1 {
   margin: 0 0 4px;
@@ -497,6 +498,8 @@ kbd {
   max-width: calc(100% - 24px);
   padding: 4px 6px;
   background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 2px;
   color: var(--muted);
   font: 10px var(--mono);
   pointer-events: none;

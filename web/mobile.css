@@ -2,7 +2,7 @@
   padding-inline: clamp(16px, 5vw, 35px);
 }
 .pocket-shell {
-  max-width: 680px;
+  max-width: 630px;
   margin-inline: auto;
   padding-bottom: 44px;
 }
@@ -41,11 +41,12 @@
   outline-offset: -2px;
 }
 .pocket-hero {
-  margin: clamp(26px, 6vh, 52px) 0 20px;
+  margin: clamp(27px, 5vh, 52px) 0 18px;
 }
 .pocket-hero h1 {
   margin: 0;
-  font: 450 clamp(48px, 9vw, 70px) / 0.96 var(--display);
+  color: var(--accent);
+  font: 700 clamp(54px, 14vw, 91px) / 0.9 var(--display);
   letter-spacing: -0.042em;
 }
 .pocket-hero p {
@@ -57,7 +58,7 @@
 }
 
 .prompt-cards {
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid var(--accent);
 }
 .prompt-card {
   display: grid;
@@ -70,7 +71,7 @@
 .prompt-card h2 {
   margin: 0;
   align-self: center;
-  font: 500 33px/1.01 var(--display);
+  font: 700 41px/0.95 var(--display);
   letter-spacing: -0.03em;
 }
 .prompt-card p {
@@ -84,7 +85,13 @@
 .prompt-card .launch-btn {
   grid-row: 1;
   grid-column: 2;
-  min-width: 74px;
+  min-width: 84px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.prompt-card .launch-btn:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
 }
 .prompt-card details {
   grid-column: 1 / -1;
@@ -296,7 +303,7 @@
 }
 #copy-fallback h2 {
   margin: 0;
-  font: 500 32px/1.05 var(--display);
+  font: 700 36px/1.05 var(--display);
 }
 #copy-fallback p {
   color: var(--muted);
@@ -312,4 +319,14 @@
   background: var(--surface);
   font-size: 16px;
   line-height: 1.45;
+}
+
+@media (max-width: 360px) {
+  .mobile-page .theme-control > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    overflow: hidden;
+  }
 }

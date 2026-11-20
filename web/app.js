@@ -82,6 +82,39 @@
     });
   }
 
+  function setupPreview() {
+    const image = document.getElementById('dashboard-preview');
+    const fullSize = document.getElementById('preview-full-size');
+    const caption = document.getElementById('preview-caption');
+    if (!image || !fullSize || !caption) return;
+
+    const views = {
+      graph: {
+        src: 'desktop-preview.webp',
+        alt: 'TokSmart knowledge graph with the Session store node selected and its relationships in the inspector.',
+        caption: 'Graph and node inspector on an example repository.'
+      },
+      search: {
+        src: 'search-preview.webp',
+        alt: 'TokSmart code search for SessionStore showing the matching symbol and source file.',
+        caption: 'Code search for SessionStore in the same repository.'
+      }
+    };
+    const controls = document.querySelectorAll('[data-preview]');
+    controls.forEach((control) => {
+      control.addEventListener('click', () => {
+        const view = views[control.dataset.preview];
+        image.src = view.src;
+        fullSize.href = view.src;
+        image.alt = view.alt;
+        caption.textContent = view.caption;
+        controls.forEach((button) => {
+          button.setAttribute('aria-pressed', String(button === control));
+        });
+      });
+    });
+  }
+
   function start() {
     setupCopyButtons();
     if (
@@ -92,6 +125,7 @@
       window.location.replace('mobile.html');
       return;
     }
+    setupPreview();
     checkServer();
     setInterval(checkServer, 3000);
   }

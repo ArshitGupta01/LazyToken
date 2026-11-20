@@ -1,8 +1,8 @@
 @font-face {
-  font-family: Newsreader;
-  src: url('fonts/newsreader.woff2') format('woff2');
+  font-family: 'Barlow Condensed';
+  src: url('fonts/barlow-condensed.woff2') format('woff2');
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 700;
   font-display: swap;
 }
 @font-face {
@@ -15,41 +15,43 @@
 
 :root {
   color-scheme: light;
-  --paper: #f4efe5;
-  --surface: #fbf7ef;
-  --ink: #24211c;
-  --muted: #5d544a;
-  --line: #c4b9a8;
-  --accent: #983d25;
-  --accent-tint: #ead8ce;
+  --paper: #edf1e9;
+  --surface: #f7f9f4;
+  --ink: #18221c;
+  --muted: #4c5d51;
+  --line: #b9c8bb;
+  --accent: #355c1d;
+  --accent-ink: #fff;
+  --accent-tint: #dce8d3;
   --logo-brightness: 0.6;
-  --track: #e6ddce;
-  --chart-output: #8b7056;
-  --chart-quality: #596747;
-  --disabled: #6f655a;
-  --terminal: #25231e;
-  --terminal-line: #474137;
-  --display: Newsreader, Georgia, serif;
+  --track: #dce6dc;
+  --chart-output: #487265;
+  --chart-quality: #6b752d;
+  --disabled: #627063;
+  --terminal: #131b17;
+  --terminal-line: #405046;
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   --mono: 'SFMono-Regular', Consolas, monospace;
   font-family: var(--sans);
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --paper: #1b1b18;
-  --surface: #25231f;
-  --ink: #f0ece1;
-  --muted: #c0b8a8;
-  --line: #514c42;
-  --accent: #f1ab84;
-  --accent-tint: #413027;
+  --paper: #0e1211;
+  --surface: #151e19;
+  --ink: #f1f7ed;
+  --muted: #a8b9ad;
+  --line: #34463a;
+  --accent: #c3f670;
+  --accent-ink: #172211;
+  --accent-tint: #253421;
   --logo-brightness: 1.45;
-  --track: #3b362e;
-  --chart-output: #d6ad79;
-  --chart-quality: #b0c19a;
-  --disabled: #9d9588;
-  --terminal: #23211d;
-  --terminal-line: #696051;
+  --track: #26332b;
+  --chart-output: #87cab6;
+  --chart-quality: #d0db91;
+  --disabled: #84978a;
+  --terminal: #111a15;
+  --terminal-line: #425748;
 }
 * {
   box-sizing: border-box;
@@ -88,7 +90,7 @@ a {
   color: var(--ink);
   font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.045em;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -153,23 +155,30 @@ a {
   text-decoration: underline;
 }
 .setup-layout {
+  padding-block: clamp(24px, 4vh, 56px) 35px;
+}
+.setup-hero {
   display: grid;
-  grid-template-columns: minmax(285px, 0.75fr) minmax(0, 1.25fr);
-  gap: clamp(30px, 4.5vw, 78px);
-  padding-block: clamp(36px, 10vh, 110px) 42px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(310px, 0.8fr);
+  align-items: end;
+  gap: clamp(34px, 7vw, 110px);
+  margin-bottom: clamp(27px, 4vh, 48px);
 }
 .setup-column h1 {
-  max-width: 9.5em;
   margin: 0;
-  font: 450 clamp(46px, 5.5vw, 88px) / 0.94 var(--display);
-  letter-spacing: -0.042em;
+  color: var(--accent);
+  font: 700 clamp(74px, 8.4vw, 128px) / 0.81 var(--display);
+  letter-spacing: -0.018em;
+}
+.setup-column h1 span {
+  display: block;
 }
 .setup-lead {
-  max-width: 42ch;
-  margin: 14px 0 32px;
+  max-width: 53ch;
+  margin: 14px 0 0;
   color: var(--muted);
-  font-size: 17px;
-  line-height: 1.5;
+  font-size: clamp(15px, 1.4vw, 18px);
+  line-height: 1.45;
 }
 .setup-instructions {
   padding-top: 15px;
@@ -177,7 +186,7 @@ a {
 }
 .setup-instructions h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 650;
 }
 .setup-instructions p,
@@ -195,29 +204,34 @@ a {
   margin-top: 14px;
   padding: 7px 9px 7px 12px;
   border: 1px solid var(--terminal-line);
-  border-radius: 2px;
+  border-radius: 5px;
   background: var(--terminal);
 }
+.terminal-prompt {
+  color: #c3f670;
+  font: 13px var(--mono);
+}
 .terminal-card code {
-  color: #f0e7d7;
+  flex: 1;
+  min-width: 0;
+  color: #f0f7ee;
   font: 13px/1.5 var(--mono);
   overflow-wrap: anywhere;
 }
 .copy-button {
-  min-height: 38px;
+  min-height: 42px;
   padding-inline: 10px;
-  border: 1px solid #ba9e8a;
-  border-radius: 2px;
-  background: transparent;
-  color: #f3dccb;
+  border: 1px solid #c3f670;
+  border-radius: 3px;
+  background: #c3f670;
+  color: #172211;
   font-size: 13px;
   font-weight: 600;
 }
 .copy-button:hover,
 .copy-button.copied {
-  background: #f1ab84;
-  color: #25231e;
-  border-color: #f1ab84;
+  background: #e3ffac;
+  border-color: #e3ffac;
 }
 .setup-instructions .copy-hint {
   margin-block: 5px;
@@ -252,36 +266,95 @@ a {
   overflow-wrap: anywhere;
 }
 .desktop-preview {
-  align-self: start;
-  margin: 16px 0 0;
+  margin: 0;
   min-width: 0;
+  border: 1px solid var(--terminal-line);
+  border-radius: 8px;
+  background: #111914;
+  color: #e8f1e9;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 52px;
+  padding-inline: 14px;
+  border-bottom: 1px solid #34463a;
+}
+.preview-heading {
+  color: #b4c5b9;
+  font: 12px var(--mono);
+}
+.preview-switch {
+  display: flex;
+  gap: 5px;
+}
+.preview-switch button {
+  min-height: 44px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding-inline: 10px;
+  background: transparent;
+  color: #b4c5b9;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.preview-switch button:hover,
+.preview-switch button[aria-pressed='true'] {
+  color: #c3f670;
+}
+.preview-switch button[aria-pressed='true'] {
+  border-bottom-color: #c3f670;
+}
+.preview-switch button:focus-visible,
+.terminal-card .copy-button:focus-visible {
+  outline-color: #c3f670;
+  outline-offset: 1px;
+}
+.preview-full-size {
+  display: block;
+}
+.preview-full-size:focus-visible {
+  outline-color: #c3f670;
+  outline-offset: -3px;
 }
 .desktop-preview img {
   display: block;
   width: 100%;
   height: auto;
-  border: 1px solid var(--line);
 }
 .desktop-preview figcaption {
-  margin-top: 7px;
-  color: var(--muted);
+  padding: 9px 14px;
+  border-top: 1px solid #34463a;
+  color: #c0cec2;
   font-size: 13px;
 }
 
 @media (max-width: 790px) {
-  .setup-layout {
+  .setup-hero {
     grid-template-columns: minmax(0, 1fr);
-    padding-top: 36px;
+    gap: 20px;
   }
   .setup-column h1 {
-    max-width: 12ch;
+    font-size: clamp(64px, 12vw, 98px);
   }
-  .desktop-preview {
-    margin-top: 0;
+  .setup-lead {
+    max-width: 50ch;
   }
 }
 @media (max-width: 370px) {
   .site-header nav a {
+    font-size: 13px;
+  }
+  .preview-header {
+    padding-inline: 7px;
+  }
+  .preview-heading {
+    font-size: 10px;
+  }
+  .preview-switch button {
+    padding-inline: 7px;
     font-size: 13px;
   }
 }

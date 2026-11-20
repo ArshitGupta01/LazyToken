@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f4efe5" />
+    <meta name="theme-color" content="#edf1e9" />
     <meta
       name="description"
       content="Search a local repository, trace relationships, and review project memory with TokSmart."
@@ -36,16 +36,19 @@
       </div>
     </header>
     <main class="setup-layout">
-      <div class="setup-column">
-        <h1>Search your local codebase.</h1>
-        <p class="setup-lead">
-          Find files and symbols, trace their relationships, and reuse reviewed project notes in
-          your AI coding assistant.
-        </p>
+      <div class="setup-hero">
+        <div class="setup-column">
+          <h1>Trace your <span>codebase.</span></h1>
+          <p class="setup-lead">
+            Search files and symbols, follow their relationships, and bring reviewed project notes
+            into your AI coding assistant. Your index stays on your computer.
+          </p>
+        </div>
         <section class="setup-instructions" aria-labelledby="desktop-setup-title">
           <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
           <p>Run this on your computer with Node.js 18+ and Python 3.11+.</p>
           <div class="terminal-card">
+            <span class="terminal-prompt" aria-hidden="true">$</span>
             <code id="launch-command">npx toksmart@latest serve</code>
             <button
               type="button"
@@ -72,13 +75,47 @@
         </section>
       </div>
       <figure class="desktop-preview">
-        <img
-          src="desktop-preview.webp"
-          alt="TokSmart dashboard showing a local repository graph and details for its session store."
-          width="1120"
-          height="650"
-        />
-        <figcaption>2D graph and node inspector on a sample repository</figcaption>
+        <div class="preview-header">
+          <span class="preview-heading">Dashboard preview</span>
+          <div class="preview-switch" role="group" aria-label="Dashboard preview views">
+            <button
+              type="button"
+              data-preview="graph"
+              aria-controls="dashboard-preview"
+              aria-pressed="true"
+            >
+              Graph
+            </button>
+            <button
+              type="button"
+              data-preview="search"
+              aria-controls="dashboard-preview"
+              aria-pressed="false"
+            >
+              Code search
+            </button>
+          </div>
+        </div>
+        <a
+          id="preview-full-size"
+          class="preview-full-size"
+          href="desktop-preview.webp"
+          target="_blank"
+          rel="noopener"
+          aria-label="Open dashboard preview at full size"
+        >
+          <img
+            id="dashboard-preview"
+            src="desktop-preview.webp"
+            alt="TokSmart knowledge graph with the Session store node selected and its relationships in the inspector."
+            width="1280"
+            height="720"
+            fetchpriority="high"
+          />
+        </a>
+        <figcaption id="preview-caption" aria-live="polite">
+          Graph and node inspector on an example repository.
+        </figcaption>
       </figure>
     </main>
   </body>
