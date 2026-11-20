@@ -1,33 +1,137 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-default-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#edf1e9" />
+    <meta name="theme-color" content="#0e1211" />
     <meta
       name="description"
       content="Search a local repository, trace relationships, and review project memory with TokSmart."
     />
-    <title>TokSmart · Desktop setup</title>
+    <title>TokSmart · Local code intelligence</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="desktop.css" />
     <script src="app.js" defer></script>
     <script src="desktop-ui.js" type="module"></script>
   </head>
   <body class="setup-page">
+    <!-- Lucide icons (see vendor/lucide-LICENSE.txt). -->
+    <svg class="visually-hidden" aria-hidden="true">
+      <symbol id="icon-arrow-right" viewBox="0 0 24 24">
+        <path d="M5 12h14" />
+        <path d="m12 5 7 7-7 7" />
+      </symbol>
+      <symbol id="icon-arrow-up-right" viewBox="0 0 24 24">
+        <path d="M7 7h10v10" />
+        <path d="M7 17 17 7" />
+      </symbol>
+      <symbol id="icon-box" viewBox="0 0 24 24">
+        <path
+          d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"
+        />
+        <path d="m3.3 7 8.7 5 8.7-5" />
+        <path d="M12 22V12" />
+      </symbol>
+      <symbol id="icon-brackets" viewBox="0 0 24 24">
+        <path d="M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3" />
+        <path d="M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+      <symbol id="icon-code-xml" viewBox="0 0 24 24">
+        <path d="m18 16 4-4-4-4" />
+        <path d="m6 8-4 4 4 4" />
+        <path d="m14.5 4-5 16" />
+      </symbol>
+      <symbol id="icon-database" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="5" rx="9" ry="3" />
+        <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+        <path d="M3 12A9 3 0 0 0 21 12" />
+      </symbol>
+      <symbol id="icon-file-code" viewBox="0 0 24 24">
+        <path
+          d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
+        />
+        <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+        <path d="M10 12.5 8 15l2 2.5" />
+        <path d="m14 12.5 2 2.5-2 2.5" />
+      </symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24">
+        <path
+          d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
+        />
+      </symbol>
+      <symbol id="icon-git-fork" viewBox="0 0 24 24">
+        <circle cx="12" cy="18" r="3" />
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="6" r="3" />
+        <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+        <path d="M12 12v3" />
+      </symbol>
+      <symbol id="icon-layers" viewBox="0 0 24 24">
+        <path
+          d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"
+        />
+        <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+        <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+      </symbol>
+      <symbol id="icon-monitor" viewBox="0 0 24 24">
+        <rect width="20" height="14" x="2" y="3" rx="2" />
+        <line x1="8" x2="16" y1="21" y2="21" />
+        <line x1="12" x2="12" y1="17" y2="21" />
+      </symbol>
+      <symbol id="icon-network" viewBox="0 0 24 24">
+        <rect x="16" y="16" width="6" height="6" rx="1" />
+        <rect x="2" y="16" width="6" height="6" rx="1" />
+        <rect x="9" y="2" width="6" height="6" rx="1" />
+        <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+        <path d="M12 12V8" />
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <path d="m21 21-4.34-4.34" />
+        <circle cx="11" cy="11" r="8" />
+      </symbol>
+      <symbol id="icon-smartphone" viewBox="0 0 24 24">
+        <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+        <path d="M12 18h.01" />
+      </symbol>
+      <symbol id="icon-terminal" viewBox="0 0 24 24">
+        <path d="M12 19h8" />
+        <path d="m4 17 6-6-6-6" />
+      </symbol>
+      <symbol id="icon-zap" viewBox="0 0 24 24">
+        <path
+          d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"
+        />
+      </symbol>
+    </svg>
+
     <header class="site-header">
       <a class="brand-badge" href="index.html?desktop=1" aria-label="TokSmart home">
         <img class="toksmart-logo" src="logo.svg" alt="" />
-        TokSmart
+        <span>Tok<span class="brand-accent">Smart</span></span>
       </a>
       <div class="site-header-actions">
         <nav aria-label="Site links">
-          <a href="mobile.html">Phone prompts</a>
-          <a href="https://github.com/ArshitGupta01/TokSmart">GitHub</a>
+          <a class="phone-link" href="mobile.html"
+            ><svg class="site-icon" aria-hidden="true">
+              <use href="#icon-smartphone"></use>
+            </svg>
+            Phone prompts</a
+          >
+          <a href="https://github.com/ArshitGupta01/TokSmart"
+            >GitHub
+            <svg class="site-icon" aria-hidden="true">
+              <use href="#icon-arrow-up-right"></use></svg
+          ></a>
         </nav>
-        <label class="theme-control">
-          <span>Theme</span>
+        <label class="theme-control desktop-theme">
+          <span class="visually-hidden">Theme</span
+          ><svg class="site-icon" aria-hidden="true">
+            <use href="#icon-chevron-down"></use>
+          </svg>
           <select data-theme-control aria-label="Theme">
             <option value="system">System</option>
             <option value="light">Light</option>
@@ -37,39 +141,188 @@
       </div>
     </header>
     <main class="setup-layout">
-      <div class="setup-hero">
-        <div class="setup-column">
-          <h1>Trace your <span>codebase.</span></h1>
-          <p class="setup-lead">
-            Find files and symbols, follow their relationships, and review project notes. Your index
-            stays on your computer.
+      <section class="product-hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="product-kind">
+            <svg class="site-icon" aria-hidden="true">
+              <use href="#icon-zap"></use>
+            </svg>
+            Local code intelligence
           </p>
+          <h1 id="hero-title">Trace and reuse your codebase. <span>Use fewer tokens.</span></h1>
+          <p class="hero-lead">
+            Map how your code connects, find what matters, and give your AI assistant the context it
+            needs. Your index stays on your computer.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-action" href="#desktop-setup"
+              >Get started
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-arrow-right"></use></svg
+            ></a>
+            <a class="secondary-action" href="https://github.com/ArshitGupta01/TokSmart"
+              >View on GitHub
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-arrow-up-right"></use></svg
+            ></a>
+          </div>
         </div>
-        <section class="setup-instructions" aria-labelledby="desktop-setup-title">
-          <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
-          <p>Requires Node.js 18+ and Python 3.11+.</p>
+        <div class="hero-art" aria-hidden="true">
+          <div class="graph-window">
+            <div class="window-bar">
+              <span class="window-dots"><i></i><i></i><i></i></span>
+              <span>TokSmart / Knowledge graph</span>
+            </div>
+            <div class="window-content">
+              <div class="window-rail">
+                <svg class="site-icon" aria-hidden="true">
+                  <use href="#icon-folder"></use></svg
+                ><svg class="site-icon" aria-hidden="true">
+                  <use href="#icon-network"></use></svg
+                ><svg class="site-icon" aria-hidden="true">
+                  <use href="#icon-search"></use></svg
+                ><svg class="site-icon" aria-hidden="true">
+                  <use href="#icon-layers"></use>
+                </svg>
+              </div>
+              <div class="hero-network">
+                <i class="network-edge" style="--edge-length: 30.89%; --angle: -150.95deg"></i
+                ><i class="network-edge" style="--edge-length: 29.87%; --angle: -36.53deg"></i
+                ><i class="network-edge" style="--edge-length: 36.04%; --angle: -2.65deg"></i
+                ><i class="network-edge" style="--edge-length: 28.08%; --angle: 35.01deg"></i
+                ><i class="network-edge" style="--edge-length: 27.6%; --angle: 142.85deg"></i
+                ><i class="network-edge" style="--edge-length: 37.02%; --angle: 178.28deg"></i>
+                <div class="network-node" style="--x: 23%; --y: 23%">
+                  <svg class="site-icon" aria-hidden="true">
+                    <use href="#icon-folder"></use></svg
+                  ><span>routes/</span>
+                </div>
+                <div class="network-node" style="--x: 74%; --y: 18%">
+                  <svg class="site-icon" aria-hidden="true">
+                    <use href="#icon-file-code"></use></svg
+                  ><span>auth.py</span>
+                </div>
+                <div class="network-node" style="--x: 86%; --y: 47%">
+                  <svg class="site-icon" aria-hidden="true">
+                    <use href="#icon-brackets"></use></svg
+                  ><span>middleware</span>
+                </div>
+                <div class="network-node" style="--x: 73%; --y: 79%">
+                  <svg class="site-icon" aria-hidden="true">
+                    <use href="#icon-database"></use></svg
+                  ><span>storage</span>
+                </div>
+                <div class="network-node" style="--x: 28%; --y: 80%">
+                  <svg class="site-icon" aria-hidden="true">
+                    <use href="#icon-box"></use></svg
+                  ><span>dependencies</span>
+                </div>
+                <div class="network-node" style="--x: 13%; --y: 52%">
+                  <svg class="site-icon" aria-hidden="true">
+                    <use href="#icon-file-code"></use></svg
+                  ><span>sessions.py</span>
+                </div>
+                <div class="network-node network-root">
+                  <svg class="site-icon" aria-hidden="true">
+                    <use href="#icon-code-xml"></use>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <ul class="product-features" aria-label="TokSmart capabilities">
+        <li>
+          <svg class="site-icon" aria-hidden="true">
+            <use href="#icon-network"></use>
+          </svg>
+          <h2>Code graph</h2>
+          <p>See how files, symbols, and dependencies connect.</p>
+        </li>
+        <li>
+          <svg class="site-icon" aria-hidden="true">
+            <use href="#icon-search"></use>
+          </svg>
+          <h2>Code search</h2>
+          <p>Find symbols, source files, and saved project notes.</p>
+        </li>
+        <li>
+          <svg class="site-icon" aria-hidden="true">
+            <use href="#icon-layers"></use>
+          </svg>
+          <h2>Project context</h2>
+          <p>Give your coding assistant reviewed context through MCP.</p>
+        </li>
+        <li>
+          <svg class="site-icon" aria-hidden="true">
+            <use href="#icon-zap"></use>
+          </svg>
+          <h2>Token benchmarks</h2>
+          <p>Measure token usage against a baseline.</p>
+        </li>
+      </ul>
+
+      <section
+        id="desktop-setup"
+        class="setup-instructions"
+        aria-labelledby="desktop-setup-title"
+        tabindex="-1"
+      >
+        <div class="setup-copy">
+          <header>
+            <span class="setup-icon"
+              ><svg class="site-icon" aria-hidden="true">
+                <use href="#icon-monitor"></use></svg
+            ></span>
+            <div>
+              <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
+              <p>Run one command to open TokSmart on this computer.</p>
+            </div>
+          </header>
           <div class="terminal-card">
             <span class="terminal-prompt" aria-hidden="true">$</span>
             <code id="launch-command">npx toksmart@latest serve</code>
             <button type="button" class="copy-button" aria-label="Copy launch command">Copy</button>
           </div>
           <p id="step-1-badge" class="copy-hint" role="status"></p>
-          <p class="setup-status" role="status">
-            <span class="status-dot" aria-hidden="true"></span>
-            Waiting for the local server
-          </p>
+          <p class="setup-requirements">Requires Node.js 18+ and Python 3.11+.</p>
           <p class="setup-help">
-            Keep the terminal open, then <a href="http://127.0.0.1:8765/">open the dashboard</a>.
+            <span class="status-dot" aria-hidden="true"></span> Keep the terminal open, then
+            <a href="http://127.0.0.1:8765/">open the dashboard</a>.
           </p>
           <details class="install-options">
             <summary>Install for regular use</summary>
             <p>Run <code>npm install --global toksmart</code>, then <code>toksmart serve</code>.</p>
           </details>
-        </section>
-      </div>
+        </div>
+        <div class="example-terminal" aria-label="Example terminal output">
+          <div class="window-bar">
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span>Terminal</span>
+          </div>
+          <div class="example-output">
+            <code><span>$</span> npx toksmart@latest serve</code>
+            <p>TokSmart dashboard:</p>
+            <code class="example-address"
+              ><svg class="site-icon" aria-hidden="true">
+                <use href="#icon-check"></use>
+              </svg>
+              http://127.0.0.1:8765</code
+            >
+            <p>Loopback only · Ctrl+C to stop</p>
+          </div>
+        </div>
+      </section>
+
       <tab-container class="desktop-preview">
         <div class="preview-header" slot="tablist-wrapper">
-          <span class="preview-heading">Sample repository</span>
+          <span class="preview-heading"
+            ><svg class="site-icon" aria-hidden="true">
+              <use href="#icon-git-fork"></use>
+            </svg>
+            Sample repository</span
+          >
           <div class="preview-switch" role="tablist" aria-label="Dashboard preview views">
             <button
               type="button"
@@ -78,6 +331,9 @@
               aria-controls="graph-preview"
               aria-selected="true"
             >
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-network"></use>
+              </svg>
               Graph
             </button>
             <button
@@ -88,7 +344,23 @@
               aria-selected="false"
               tabindex="-1"
             >
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-search"></use>
+              </svg>
               Code search
+            </button>
+            <button
+              type="button"
+              id="project-tab"
+              role="tab"
+              aria-controls="project-preview"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-layers"></use>
+              </svg>
+              Project view
             </button>
           </div>
         </div>
@@ -133,6 +405,29 @@
               alt="TokSmart code search for SessionStore showing the matching symbol and source file."
               width="600"
               height="665"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div
+          id="project-preview"
+          role="tabpanel"
+          aria-labelledby="project-tab"
+          data-tab-container-no-tabstop
+          hidden
+        >
+          <a
+            class="preview-full-size"
+            href="project-preview.webp"
+            target="_blank"
+            rel="noopener"
+            aria-label="Open project preview at full size"
+          >
+            <img
+              src="project-preview.webp"
+              alt="TokSmart dashboard showing the sample API project, its connected graph, and the selected node inspector."
+              width="1280"
+              height="720"
               loading="lazy"
             />
           </a>

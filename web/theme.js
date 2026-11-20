@@ -1,18 +1,19 @@
 (() => {
   const storageKey = 'toksmart_theme';
   const root = document.documentElement;
+  const defaultMode = root.dataset.defaultTheme === 'dark' ? 'dark' : 'system';
   const system = window.matchMedia('(prefers-color-scheme: dark)');
   const color = document.querySelector('meta[name="theme-color"]');
 
   function normalize(value) {
-    return value === 'light' || value === 'dark' ? value : 'system';
+    return value === 'light' || value === 'dark' || value === 'system' ? value : defaultMode;
   }
 
-  let mode = 'system';
+  let mode = defaultMode;
   try {
     mode = normalize(localStorage.getItem(storageKey));
   } catch {
-    // Keep the system setting when browser storage is unavailable.
+    // Keep the page default when browser storage is unavailable.
   }
 
   function apply() {
