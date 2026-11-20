@@ -3,312 +3,93 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#050913" />
+    <meta name="theme-color" content="#0b1019" />
     <meta
       name="description"
-      content="Local-first AI coding memory, context & interactive 2D/3D knowledge graph visualizer."
+      content="Search your repository, explore code relationships, and review memory for your AI coding assistant."
     />
-    <title>TokSmart · Knowledge graph</title>
+    <title>TokSmart · Desktop setup</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
   </head>
-  <body>
-    <!-- Connection Screen (shown when local server is not running) -->
-    <div class="page-container" id="connect-screen">
-      <main class="connect-card" aria-label="Start your local server">
-        <header class="card-header">
-          <div class="brand-badge">
-            <img class="toksmart-logo" src="logo.svg" alt="" />
-            <span>TOKSMART</span>
+  <body class="setup-page">
+    <header class="site-header">
+      <a class="brand-badge" href="index.html?desktop=1" aria-label="TokSmart home">
+        <img class="toksmart-logo" src="logo.svg" alt="" />
+        TokSmart
+      </a>
+      <nav aria-label="Site links">
+        <a href="mobile.html">Phone prompts</a>
+        <a href="https://github.com/ArshitGupta01/TokSmart">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="setup-layout">
+      <section class="setup-intro" aria-labelledby="setup-title">
+        <h1 id="setup-title">Code search and<br /><span>project memory</span></h1>
+        <p>
+          TokSmart indexes your repository locally so you can find the code and project knowledge
+          your next task needs.
+        </p>
+        <dl class="product-preview">
+          <div>
+            <dt>Graph</dt>
+            <dd>Explore relationships and their evidence.</dd>
           </div>
-          <h1 class="card-title">Start your local server</h1>
-          <p class="card-subtitle">
-            Run the command below. Your browser opens the local dashboard when it connects.
+          <div>
+            <dt>Code search</dt>
+            <dd>Find indexed files, symbols, and imports.</dd>
+          </div>
+          <div>
+            <dt>Memory</dt>
+            <dd>Review lessons before they enter future task briefs.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="connect-card setup-card" aria-labelledby="desktop-setup-title">
+        <header>
+          <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
+          <p>
+            On your computer, install Node.js 18+ and Python 3.11+, then run this command in a
+            terminal.
           </p>
         </header>
-
-        <!-- Mobile Device Detection Alert -->
-        <div class="mobile-notice" id="mobile-notice" style="display: none">
-          <div class="mobile-notice-header">
-            <span class="mobile-notice-icon">📱</span>
-            <strong>Using TokSmart on your phone</strong>
-          </div>
-          <p class="mobile-notice-desc">
-            Open <a href="mobile.html">the mobile prompt hub</a>, copy a mode's prompt, then paste
-            it into your AI app. The steps below are for your development computer: install Node.js
-            18+ and Python 3.11+, then run the command there. 127.0.0.1 on your phone refers to the
-            phone, not your computer. Use the local dashboard on that computer to index your
-            repository; Coding mode needs no server.
-          </p>
-        </div>
-
-        <div class="stepper" role="list">
-          <!-- Step 1: Copy Command -->
-          <div class="step-row step-done" id="step-1" role="listitem">
-            <div class="step-gutter">
-              <div class="step-badge badge-green" aria-label="Step 1 completed">
-                <svg
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
-                </svg>
-              </div>
-              <div class="step-line"></div>
-            </div>
-            <div class="step-main">
-              <div class="step-heading">
-                <span class="step-label text-green">Copy the command</span>
-                <span class="pill pill-green" id="step-1-badge" aria-live="polite">READY</span>
-              </div>
-
-              <!-- Terminal: NPX -->
-              <div class="terminal-card">
-                <div class="terminal-header">
-                  <div class="window-controls">
-                    <span class="dot dot-red"></span>
-                    <span class="dot dot-yellow"></span>
-                    <span class="dot dot-green"></span>
-                  </div>
-                  <span class="terminal-tab-title">Terminal</span>
-                  <button
-                    class="copy-button"
-                    data-command="npx toksmart@latest serve"
-                    aria-label="Copy npx command"
-                    title="Copy command"
-                  >
-                    <svg
-                      class="copy-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    <svg
-                      class="check-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  </button>
-                </div>
-                <div class="terminal-body">
-                  <span class="terminal-prompt">$</span>
-                  <code class="terminal-code">npx toksmart@latest serve</code>
-                </div>
-              </div>
-
-              <!-- Divider -->
-              <div class="section-divider">
-                <span>OR INSTALL GLOBALLY</span>
-              </div>
-
-              <!-- Terminal: Global Install -->
-              <div class="terminal-card">
-                <div class="terminal-header">
-                  <div class="window-controls">
-                    <span class="dot dot-red"></span>
-                    <span class="dot dot-yellow"></span>
-                    <span class="dot dot-green"></span>
-                  </div>
-                  <span class="terminal-tab-title">Global install</span>
-                  <button
-                    class="copy-button"
-                    data-command="npm install -g toksmart"
-                    aria-label="Copy global install command"
-                    title="Copy command"
-                  >
-                    <svg
-                      class="copy-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    <svg
-                      class="check-svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  </button>
-                </div>
-                <div class="terminal-body">
-                  <span class="terminal-prompt">$</span>
-                  <code class="terminal-code">npm install -g toksmart</code>
-                </div>
-              </div>
-              <p class="install-note">After installation, run <code>toksmart serve</code>.</p>
-            </div>
-          </div>
-
-          <!-- Step 2: Waiting for Server -->
-          <div class="step-row step-active" id="step-2" role="listitem">
-            <div class="step-gutter">
-              <div
-                class="step-badge badge-purple"
-                id="step-2-indicator"
-                aria-label="Step 2: Waiting for server"
-              >
-                <span class="badge-num">2</span>
-                <svg
-                  class="badge-check"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
-                </svg>
-              </div>
-              <div class="step-line"></div>
-            </div>
-            <div class="step-main">
-              <div class="step-heading">
-                <span class="step-label text-white" id="step-2-title"
-                  >Waiting for server to start</span
-                >
-              </div>
-              <div class="listening-box" id="listening-box" role="status" aria-live="polite">
-                <div class="listening-icon-wrap" id="listening-icon-wrap">
-                  <svg
-                    class="lightning-svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                  </svg>
-                  <span class="radar-ping"></span>
-                </div>
-                <div class="listening-content">
-                  <div class="listening-primary" id="listening-primary">
-                    Listening for server ...
-                  </div>
-                  <div class="listening-secondary" id="listening-secondary">
-                    Start the command above. Allow local access if your browser asks.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Step 3: Auto-connects -->
-          <div class="step-row step-muted" id="step-3" role="listitem">
-            <div class="step-gutter">
-              <div
-                class="step-badge badge-muted"
-                id="step-3-indicator"
-                aria-label="Step 3: Connects"
-              >
-                <span class="badge-num">3</span>
-                <svg
-                  class="badge-check"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" />
-                </svg>
-              </div>
-            </div>
-            <div class="step-main">
-              <div class="step-heading">
-                <span class="step-label text-muted" id="step-3-title">Opens your local graph</span>
-              </div>
-              <p class="step-description" id="step-3-description">
-                The browser opens the local dashboard when the server is detected. Allow local
-                network access if prompted.
-              </p>
-              <a class="launch-btn" href="http://127.0.0.1:8765/">Open local dashboard →</a>
-            </div>
-          </div>
-        </div>
-
-        <footer class="card-footer">
-          <div class="footer-item footer-runtime">
-            <svg
-              class="footer-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
+        <div class="terminal-card">
+          <div class="terminal-header">
+            <span>Terminal</span>
+            <button
+              type="button"
+              class="copy-button"
+              data-command="npx toksmart@latest serve"
+              aria-label="Copy launch command"
             >
-              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-              <line x1="6" y1="8" x2="6" y2="8"></line>
-              <line x1="10" y1="8" x2="10" y2="8"></line>
-            </svg>
-            <span>Requires <span class="highlight">Node.js 18+ · Python 3.11+</span></span>
+              Copy
+            </button>
           </div>
-          <div class="footer-item footer-port">
-            <span class="port-prompt">&gt;_</span>
-            <span>Port <span class="port-num">8765</span></span>
-          </div>
-        </footer>
-      </main>
-      <section class="product-preview" aria-labelledby="preview-title">
-        <p class="preview-eyebrow">AFTER THE SERVER STARTS</p>
-        <h2 id="preview-title">Your code, connected and searchable</h2>
-        <div class="preview-grid">
-          <div>
-            <span aria-hidden="true">01</span><strong>Explore relationships</strong>
-            <p>Follow linked knowledge in a local 2D or 3D graph.</p>
-          </div>
-          <div>
-            <span aria-hidden="true">02</span><strong>Find useful context</strong>
-            <p>Search code and memory together, with evidence for each link.</p>
-          </div>
-          <div>
-            <span aria-hidden="true">03</span><strong>Review memory</strong>
-            <p>Approve or reject lessons before they become trusted context.</p>
-          </div>
+          <code>npx toksmart@latest serve</code>
         </div>
-        <p class="preview-privacy">The graph and source stay on your computer.</p>
+        <p id="step-1-badge" class="copy-hint" role="status"></p>
+        <p class="setup-status" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="setup-status-text">Waiting for the local server</span>
+        </p>
+        <p class="setup-help">
+          Keep the terminal open. The dashboard opens when detected. Your browser may ask for local
+          network access.
+        </p>
+        <a class="launch-btn" href="http://127.0.0.1:8765/"
+          >Open local dashboard <span aria-hidden="true">↗︎</span></a
+        >
+        <details class="install-options">
+          <summary>Install for regular use</summary>
+          <p>Run <code>npm install --global toksmart</code>, then <code>toksmart serve</code>.</p>
+          <a href="https://github.com/ArshitGupta01/TokSmart#quickstart"
+            >Index your first repository</a
+          >
+        </details>
       </section>
-    </div>
+    </main>
   </body>
 </html>

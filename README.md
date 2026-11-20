@@ -39,7 +39,7 @@ npx toksmart@latest add "$(pwd)"
 npx toksmart@latest add "$($PWD.Path)"
 ```
 
-**3. Find your code.** Refresh the dashboard, select the repository, and open **Search**. Try a function or class name from your project. `npx toksmart@latest projects` lists file and symbol counts, indexing errors, and folder availability. A freshly indexed repository can have searchable code before it has knowledge nodes to display in the graph.
+**3. Find your code.** Refresh the dashboard, select the repository, and open **Code search**. Try a function or class name from your project. `npx toksmart@latest projects` lists file and symbol counts, indexing errors, and folder availability. A freshly indexed repository can have searchable code before it has knowledge nodes to display in the graph.
 
 For regular use, install the stable command with `npm install --global toksmart`. From a source checkout, run the same commands with `python app_entry.py` in place of `toksmart`.
 

@@ -448,7 +448,7 @@
           projects
             .map(
               (p) =>
-                `<option value="${esc(p.id)}">${esc(p.root.split(/[\\/]/).filter(Boolean).pop() || p.root)} · ${p.files} files</option>`
+                `<option value="${esc(p.id)}">${esc(p.root.split(/[\\/]/).filter(Boolean).pop() || p.root)} · ${p.files} ${p.files === 1 ? 'file' : 'files'}</option>`
             )
             .join('');
       } catch {
@@ -490,15 +490,17 @@
             : projects[0]?.id || ''
           : scope;
       $('#project').value = nextScope === '@workspace' ? '' : nextScope;
-      document.querySelectorAll('.scope').forEach((button) => {
-        button.classList.toggle('active', button.dataset.project === nextScope);
-      });
       await loadGraph(nextScope);
     }
     async function loadGraph(project = '', background = false) {
       const requestId = ++graphRequest;
       scope = project;
       if (!background) {
+        document.querySelectorAll('.scope').forEach((button) => {
+          const active = button.dataset.project === scope;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
         $('#loading').hidden = false;
         $('#empty').hidden = true;
       }
@@ -699,10 +701,7 @@
       for (const [id, v] of [
         ['node-count', shown.length],
         ['edge-count', links.length],
-        ['evidence-count', evidence],
-        ['analytics-nodes', shown.length],
-        ['analytics-edges', links.length],
-        ['analytics-evidence', evidence]
+        ['evidence-count', evidence]
       ])
         $('#' + id).textContent = v;
     }
@@ -965,10 +964,9 @@
       $('#view-3d').classList.toggle('active', three);
       $('#view-2d').setAttribute('aria-pressed', String(!three));
       $('#view-3d').setAttribute('aria-pressed', String(three));
-      $('#graph-mode-label').textContent = three ? '3D KNOWLEDGE UNIVERSE' : '2D RELATIONSHIP MAP';
       $('#canvas-hint').textContent = three
-        ? 'DRAG TO ORBIT · RIGHT DRAG TO PAN · SCROLL TO ZOOM'
-        : 'DRAG NODES OR CANVAS · SCROLL TO ZOOM';
+        ? 'Drag to orbit · Right-drag to pan · Scroll to zoom'
+        : 'Drag to move · Scroll to zoom';
       if (!three) {
         canvas.hidden = false;
         host.hidden = true;
@@ -1034,7 +1032,6 @@
         $('#view-3d').classList.remove('active');
         $('#view-2d').setAttribute('aria-pressed', 'true');
         $('#view-3d').setAttribute('aria-pressed', 'false');
-        $('#graph-mode-label').textContent = '2D RELATIONSHIP MAP';
         $('#canvas-hint').textContent = '3D unavailable on this device · showing 2D';
         draw();
       }
@@ -1076,18 +1073,12 @@
       }
     };
     $('#project').onchange = (e) => {
-      document
-        .querySelectorAll('.scope')
-        .forEach((b) => b.classList.toggle('active', !e.target.value && b.dataset.project === ''));
       loadGraph(e.target.value);
     };
     document.querySelectorAll('.scope').forEach(
       (button) =>
         (button.onclick = () => {
           $('#project').value = '';
-          document
-            .querySelectorAll('.scope')
-            .forEach((b) => b.classList.toggle('active', b === button));
           loadGraph(button.dataset.project || '');
         })
     );

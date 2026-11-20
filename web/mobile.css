@@ -1,91 +1,59 @@
-/* Reuses the desktop palette, typography, cards, pills and launch button. */
 .mobile-page {
-  display: block;
-  padding: 0 20px calc(110px + env(safe-area-inset-bottom));
+  padding: 0 clamp(14px, 4vw, 36px) 40px;
+  background: radial-gradient(ellipse at 50% 6%, #1b3d453d, transparent 62%), var(--bg-page);
 }
 .pocket-shell {
-  width: 100%;
-  max-width: 600px;
-  margin: 0 auto;
+  max-width: 1060px;
+  margin-inline: auto;
 }
 .pocket-header {
+  min-height: 74px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 28px 0;
-}
-.pocket-header .brand-badge {
-  margin: 0;
-  text-decoration: none;
-  letter-spacing: 1.4px;
-}
-.pocket-header .toksmart-logo {
-  width: 28px;
-  height: 28px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-card);
 }
 .desktop-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
   color: var(--text-secondary);
-  font-size: 12px;
-  padding: 12px 0;
+  font-size: 13px;
+  text-decoration: none;
+}
+.desktop-link:hover {
+  color: var(--green-text);
 }
 .pocket-hero {
-  padding: 25px 0 34px;
-}
-.pocket-hero .pill {
-  font-size: 9px;
-  letter-spacing: 1.3px;
+  margin: clamp(25px, 6vh, 56px) 0 22px;
 }
 .pocket-hero h1 {
-  font-size: clamp(32px, 8.5vw, 48px);
-  line-height: 1.12;
-  letter-spacing: -1.8px;
-  margin: 20px 0 16px;
-}
-.pocket-hero h1 span {
-  color: var(--purple-light);
+  color: var(--text-primary);
+  font-size: clamp(35px, 6vw, 56px);
+  line-height: 1.08;
+  letter-spacing: -0.055em;
 }
 .pocket-hero p {
+  margin-top: 9px;
+  max-width: 50ch;
+  color: var(--text-secondary);
   font-size: 15px;
-  color: var(--text-secondary);
-  line-height: 1.7;
-}
-.pocket-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 20px;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-.pocket-meta span::before {
-  content: '✓';
-  color: var(--green-text);
-  margin-right: 5px;
-}
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.section-heading h2 {
-  font-size: 15px;
-}
-.section-heading > span {
-  font: 10px var(--font-mono);
-  color: var(--text-secondary);
+  line-height: 1.6;
 }
 .prompt-cards {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  align-items: start;
 }
 .prompt-card.connect-card {
-  padding: 24px;
-  border-radius: 18px;
-  box-shadow: none;
-  border-top: 2px solid var(--mode-accent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px 12px;
+  padding: 15px 15px 7px 17px;
+  border-left: 3px solid var(--mode-accent);
 }
 .prompt-card {
   --mode-accent: var(--green-text);
@@ -94,59 +62,47 @@
   --mode-accent: var(--purple-light);
 }
 .prompt-card.mode-coding {
-  --mode-accent: #67e8f9;
+  --mode-accent: #9dc8ff;
 }
-.mode-eyebrow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--mode-accent);
-  font: 10px var(--font-mono);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-.prompt-card h3 {
-  font-size: 25px;
-  letter-spacing: -0.7px;
-  margin: 14px 0 8px;
+.prompt-card h2 {
+  font-size: clamp(18px, 3vw, 24px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
 }
 .prompt-card p {
+  grid-column: 1 / -1;
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.7;
-}
-.prompt-card .best-for {
-  padding: 12px 0 16px;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .mobile-page .launch-btn {
-  width: 100%;
-  min-height: 48px;
-  justify-content: center;
+  min-height: 44px;
   margin: 0;
-  font: 600 14px var(--font-sans);
-  text-align: center;
-  text-decoration: none;
-  cursor: pointer;
+  font-size: 14px;
 }
 .prompt-card .launch-btn {
-  color: var(--bg-page);
+  grid-column: 2;
+  grid-row: 1;
+  color: #0b1b20;
   background: var(--mode-accent);
-  border-color: var(--mode-accent);
+  padding-inline: 11px;
+  white-space: nowrap;
 }
 .mobile-page button:disabled {
-  opacity: 0.45;
+  opacity: 0.48;
   cursor: default;
 }
 .prompt-card details {
-  margin-top: 14px;
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-top: 1px solid var(--border-card);
 }
 .prompt-card summary {
-  font-size: 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
   min-height: 44px;
-  padding-block: 12px;
+  padding-block: 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
 }
 .prompt-preview {
   font: 12px/1.75 var(--font-mono);
@@ -158,102 +114,78 @@
   border-radius: 8px;
 }
 .copy-status {
-  min-height: 24px;
   font-size: 12px;
   line-height: 1.6;
   color: var(--green-text);
-  margin-top: 12px;
+  margin-top: 10px;
+}
+.copy-status:empty {
+  margin-top: 0;
 }
 .mobile-note {
-  margin: 18px 0;
-  padding: 18px 0;
-  border-top: 1px solid var(--border-card);
-  font-size: 12px;
+  margin-top: 16px;
   color: var(--text-secondary);
-  line-height: 1.8;
-}
-.mobile-note strong {
-  color: var(--text-primary);
-}
-.mobile-page a {
-  text-underline-offset: 4px;
+  font-size: 14px;
+  line-height: 1.65;
 }
 .pocket-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  padding: 8px max(12px, calc((100% - 600px) / 2)) calc(8px + env(safe-area-inset-bottom));
-  background: var(--bg-card);
-  border-top: 1px solid var(--border-card);
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  background: var(--bg-page);
 }
 .pocket-nav button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-height: 54px;
+  min-height: 42px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 8px;
+  padding-inline: 12px;
   background: transparent;
   color: var(--text-secondary);
-  font: 11px var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
-.pocket-nav button span {
-  font-size: 21px;
-  line-height: 28px;
+.pocket-nav button[aria-pressed='true'],
+.pocket-nav button:hover {
+  background: var(--bg-control);
+  color: var(--text-primary);
 }
 .pocket-nav button[aria-pressed='true'] {
-  background: var(--purple-bg);
-  color: var(--purple-light);
-}
-.pocket-footer {
-  color: var(--text-secondary);
-  font-size: 11px;
-  margin: 28px 0 0;
-  line-height: 1.7;
-}
-.pocket-footer span {
   color: var(--green-text);
 }
-.compact {
-  padding-top: 20px;
-}
 .help-steps {
-  list-style: none;
   display: grid;
-  gap: 14px;
-  counter-reset: none;
+  gap: 12px;
+  list-style-position: inside;
+}
+.help-steps li::marker {
+  color: var(--green-text);
+  font-weight: 750;
 }
 .help-steps .connect-card,
 .benchmark-import.connect-card {
-  padding: 22px;
-  border-radius: 16px;
-  box-shadow: none;
-}
-.step-number {
-  color: var(--purple-light);
-  font: 12px var(--font-mono);
+  padding: clamp(16px, 3vw, 24px);
 }
 .help-steps h2,
 .benchmark-import h2 {
   font-size: 19px;
-  margin: 10px 0;
+  margin-bottom: 7px;
+}
+.help-steps h2 {
+  display: inline-block;
 }
 .help-steps p,
 .benchmark-import p,
 .mobile-guide p {
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.65;
 }
 .benchmark-import label {
   display: flex;
+  width: fit-content;
   margin-top: 16px !important;
 }
 #benchmark-file {
@@ -264,7 +196,7 @@
   overflow: hidden;
 }
 .benchmark-import label:focus-within {
-  outline: 2px solid var(--purple-light);
+  outline: 2px solid var(--green-text);
   outline-offset: 4px;
 }
 .mobile-guide {
@@ -283,9 +215,15 @@
   overflow-wrap: anywhere;
 }
 .benchmark-actions {
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 20px 0;
+}
+.benchmark-actions .launch-btn {
+  color: var(--text-primary);
+  background: var(--bg-control);
+  border-color: var(--border-card);
 }
 .benchmark-filter-label {
   display: block;
@@ -314,7 +252,7 @@
 }
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 132px), 1fr));
   gap: 10px;
   margin-top: 18px;
 }
@@ -399,13 +337,6 @@
   font: 12px/1.7 var(--font-sans);
   color: var(--text-secondary);
 }
-.mobile-page [hidden] {
-  display: none !important;
-}
-.mobile-page :focus-visible {
-  outline: 2px solid var(--purple-light);
-  outline-offset: 4px;
-}
 #copy-fallback {
   margin: auto;
   width: min(560px, calc(100% - 24px));
@@ -439,11 +370,55 @@
   border: 1px solid var(--border-card);
   border-radius: 8px;
 }
-@media (max-width: 359px) {
-  .mobile-page {
-    padding-inline: 14px;
+@media (min-width: 830px) {
+  .prompt-cards,
+  .help-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .prompt-card.connect-card {
-    padding: 20px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 18px 18px 8px;
+  }
+  .prompt-card p {
+    min-height: 3em;
+  }
+  .prompt-card .launch-btn {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+@media (max-width: 660px) {
+  .mobile-page {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+  .pocket-header {
+    min-height: 62px;
+  }
+  .pocket-nav {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+    border: 0;
+    border-top: 1px solid var(--border-card);
+    border-radius: 0;
+    background: var(--bg-card);
+  }
+  .pocket-nav button {
+    min-height: 48px;
+    padding-inline: 4px;
+  }
+}
+@media (max-width: 359px) {
+  .prompt-card.connect-card {
+    column-gap: 7px;
+    padding-inline: 12px;
+  }
+  .prompt-card .launch-btn {
+    font-size: 13px;
+    padding-inline: 8px;
   }
 }

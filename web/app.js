@@ -56,14 +56,16 @@
           }
         }
         if (!copied) {
-          if (badge) badge.textContent = 'SELECT TEXT';
+          if (badge) badge.textContent = 'Select and copy the command from the terminal box.';
           return;
         }
         button.classList.add('copied');
-        if (badge) badge.textContent = 'COPIED';
+        button.textContent = 'Copied';
+        if (badge) badge.textContent = 'Command copied.';
         setTimeout(() => {
           button.classList.remove('copied');
-          if (badge) badge.textContent = 'READY';
+          button.textContent = 'Copy';
+          if (badge) badge.textContent = '';
         }, 2000);
       });
     });

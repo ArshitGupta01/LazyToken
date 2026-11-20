@@ -18,7 +18,12 @@ class Element {
     this.children = children;
     this.textContent = '';
   }
-  setAttribute() {}
+  setAttribute(name, value) {
+    this[name] = value;
+  }
+  focus() {
+    this.focused = true;
+  }
   addEventListener(name, handler) {
     this[name] = handler;
   }
@@ -57,9 +62,9 @@ function setup() {
       })
   };
   vm.runInNewContext(readFileSync(join(__dirname, '../features-ui.js'), 'utf8'), context);
-  requests.shift().reply({ runs: [] });
   return {
     node,
+    navigation,
     requests,
     open: (view) => navigation.find((button) => button.dataset.workspaceView === view).onclick()
   };
@@ -126,4 +131,18 @@ test('review keeps its project while the local session token is being fetched', 
   const review = requests.shift();
   assert.equal(review.url, '/api/review');
   assert.equal(JSON.parse(review.options.body).project, 'one');
+});
+
+test('workspace heading receives focus and Escape returns focus to the opener', () => {
+  const { node, navigation, open } = setup();
+  open('search');
+  const search = navigation.find((button) => button.dataset.workspaceView === 'search');
+  const graph = navigation.find((button) => button.dataset.workspaceView === 'graph');
+  assert.equal(search['aria-pressed'], 'true');
+  assert.equal(node('#workspace-title').focused, true);
+  const panel = node('#knowledge-workspace');
+  panel.keydown({ key: 'Escape', stopPropagation() {} });
+  assert.equal(panel.hidden, true);
+  assert.equal(search.focused, true);
+  assert.equal(graph['aria-pressed'], 'true');
 });

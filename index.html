@@ -309,15 +309,21 @@
           </span>
           <span>TokSmart</span>
         </a>
-        <span class="brand-subtitle">Local-first AI coding memory &amp; context</span>
         <nav class="topnav" aria-label="Main navigation">
-          <button class="active" data-workspace-view="graph" aria-label="Graph">
-            ◈ <span>Graph</span>
+          <button type="button" class="active" data-workspace-view="graph" aria-pressed="true">
+            Graph
           </button>
-          <button data-workspace-view="proposals" aria-label="Memory">▤ <span>Memory</span></button>
-          <button data-workspace-view="search" aria-label="Search">⌕ <span>Search</span></button>
-          <button data-workspace-view="benchmark_list" aria-label="Benchmarks">
-            ▥ <span>Benchmarks</span>
+          <button
+            type="button"
+            id="workspace-open"
+            data-workspace-view="search"
+            aria-pressed="false"
+          >
+            Code search
+          </button>
+          <button type="button" data-workspace-view="proposals" aria-pressed="false">Memory</button>
+          <button type="button" data-workspace-view="benchmark_list" aria-pressed="false">
+            Benchmarks
           </button>
         </nav>
         <div
@@ -340,52 +346,44 @@
       </header>
 
       <main class="workspace">
-        <aside class="sidebar">
-          <div class="panel-heading">
-            <span class="panel-icon">⏚</span><strong>Explorer filters</strong>
-          </div>
-          <div class="section-head"><span>PROJECT SCOPE</span></div>
+        <aside class="sidebar" aria-label="Graph controls">
+          <h2 class="panel-heading">Explorer</h2>
+          <label class="section-head" for="project">Repository</label>
           <div class="scope-tabs">
-            <button class="scope" data-project="@workspace">◈ &nbsp; All projects</button>
-            <button class="scope active" data-project="">◈ &nbsp; Shared graph</button>
-            <select id="project" aria-label="Select a project">
+            <select id="project">
               <option value="">Choose a project…</option>
             </select>
+            <button type="button" class="scope" data-project="@workspace" aria-pressed="false">
+              All projects
+            </button>
+            <button type="button" class="scope active" data-project="" aria-pressed="true">
+              Shared graph
+            </button>
           </div>
-          <div class="section-head kind-heading">
-            <span>NODE TYPE</span><button id="clear-filters" class="text-button">Reset</button>
-          </div>
-          <div id="filters" class="filters"></div>
-          <label class="section-head" for="node-jump">FIND A NODE</label>
-          <select id="node-jump" class="health-filter" aria-label="Inspect any visible graph node">
+          <label class="section-head" for="node-jump">Jump to a node</label>
+          <select id="node-jump" class="health-filter">
             <option value="">Choose a node…</option>
           </select>
-          <label class="section-head" for="health-filter">MEMORY STATUS</label>
-          <select id="health-filter" class="health-filter">
-            <option value="all">All knowledge</option>
-            <option value="verified">Verified and current</option>
-            <option value="stale">Needs revalidation</option>
-            <option value="unverified">Unverified</option>
-          </select>
-          <button id="workspace-open" class="workspace-open">
-            Knowledge workspace <span>↗</span>
-          </button>
-          <div class="sidebar-foot">
-            <div class="scope-note">
-              <span class="shield">◈</span>
-              <span>Project relationships stay scoped to their source.</span>
+          <details class="graph-filters">
+            <summary>Graph filters</summary>
+            <label class="section-head" for="health-filter">Memory status</label>
+            <select id="health-filter" class="health-filter">
+              <option value="all">All knowledge</option>
+              <option value="verified">Verified and current</option>
+              <option value="stale">Needs revalidation</option>
+              <option value="unverified">Unverified</option>
+            </select>
+            <div class="section-head kind-heading">
+              <span>Node types</span
+              ><button type="button" id="clear-filters" class="text-button">Reset filters</button>
             </div>
-            <span class="local-tag"><i></i> PRIVATE · ON THIS DEVICE</span>
-          </div>
+            <div id="filters" class="filters"></div>
+          </details>
         </aside>
 
         <section class="graph-area" aria-label="Interactive knowledge graph">
           <div class="graph-topline">
             <div class="graph-title">
-              <div class="eyebrow">
-                <span class="panel-icon">✣</span>
-                <span id="graph-mode-label">2D RELATIONSHIP MAP</span>
-              </div>
               <h1>Knowledge graph</h1>
               <span id="scope-label" class="scope-label">Shared knowledge</span>
             </div>
@@ -393,18 +391,19 @@
               <span>⌕</span>
               <input
                 id="search"
-                placeholder="Search knowledge, decisions, technologies…"
+                placeholder="Filter graph nodes…"
                 autocomplete="off"
                 aria-label="Search graph"
+                aria-keyshortcuts="/"
               />
-              <kbd>/</kbd>
+              <kbd aria-hidden="true">/</kbd>
             </label>
             <div class="graph-actions">
-              <div class="view-toggle" aria-label="Graph view">
+              <div class="view-toggle" role="group" aria-label="Graph view">
                 <button id="view-2d" class="active" aria-pressed="true">2D</button>
-                <button id="view-3d" aria-pressed="false">◇ 3D</button>
+                <button id="view-3d" aria-pressed="false">3D</button>
               </div>
-              <button id="fit" class="small-button">FIT <span>⌖</span></button>
+              <button id="fit" class="small-button" title="Fit graph to view">Fit</button>
               <button id="zoom-out" class="round-button" aria-label="Zoom out">−</button>
               <button id="zoom-in" class="round-button" aria-label="Zoom in">+</button>
             </div>
@@ -418,8 +417,8 @@
               aria-describedby="graph-keyboard-help"
             ></canvas>
             <div id="webgl-host" class="webgl-host" hidden></div>
-            <div id="loading" class="loading">
-              <span class="loader"></span>Connecting to local graph…
+            <div id="loading" class="loading" role="status">
+              <span class="loader" aria-hidden="true"></span>Loading graph…
             </div>
             <div id="empty" class="empty" hidden>
               <b>No matching knowledge yet</b>
@@ -443,50 +442,17 @@
               Arrow keys cycle through visible nodes. Enter focuses the selected node. Use the node
               inspector to read its relationships and evidence.
             </span>
-            <div id="canvas-hint" class="canvas-hint">DRAG TO EXPLORE · SCROLL TO ZOOM</div>
+            <div id="canvas-hint" class="canvas-hint">Drag to move · Scroll to zoom</div>
             <div id="tooltip" class="tooltip" hidden></div>
           </div>
 
           <footer class="graph-footer">
-            <div class="stat"><strong id="node-count">—</strong><span>NODES</span></div>
-            <div class="stat"><strong id="edge-count">—</strong><span>RELATIONSHIPS</span></div>
-            <div class="stat wide">
-              <strong id="evidence-count">—</strong><span>EVIDENCE LINKS</span>
-            </div>
-            <div class="legend">
-              <i class="legend-line"></i> relationship <i class="legend-node"></i> asset
+            <div class="stat"><strong id="node-count">—</strong><span>Nodes</span></div>
+            <div class="stat"><strong id="edge-count">—</strong><span>Relationships</span></div>
+            <div class="stat">
+              <strong id="evidence-count">—</strong><span>Evidence links</span>
             </div>
           </footer>
-
-          <div class="analytics">
-            <div class="analytics-heading">
-              <span class="panel-icon">▥</span>
-              <strong>Network overview</strong>
-              <span>Live local data</span>
-            </div>
-            <div class="analytics-grid">
-              <div class="metric-card">
-                <span>Knowledge assets</span>
-                <strong id="analytics-nodes">—</strong>
-                <small>in this view</small>
-              </div>
-              <div class="metric-card">
-                <span>Connections</span>
-                <strong id="analytics-edges">—</strong>
-                <small>in this view</small>
-              </div>
-              <div class="metric-card">
-                <span>Evidence links</span>
-                <strong id="analytics-evidence">—</strong>
-                <small>with recorded evidence</small>
-              </div>
-              <div class="metric-card">
-                <span>Token savings</span>
-                <strong id="analytics-bench" class="metric-empty">Not measured</strong>
-                <small id="analytics-bench-note">No benchmark records yet</small>
-              </div>
-            </div>
-          </div>
         </section>
 
         <aside id="inspector" class="inspector">
@@ -504,10 +470,9 @@
             </button>
           </div>
           <div class="inspector-empty">
-            <span class="inspect-orbit">✣</span>
-            <div class="eyebrow">EXPLORE TOKSMART NETWORK</div>
-            <h2>Select a node<br />to inspect it.</h2>
-            <p>See its summary, relationships, and the evidence behind them.</p>
+            <span class="inspect-orbit" aria-hidden="true">◇</span>
+            <h2>No node selected</h2>
+            <p>Choose a node on the graph to see its summary, relationships, and evidence.</p>
           </div>
           <div
             id="detail"
@@ -530,31 +495,28 @@
       >
         <span aria-hidden="true">◇</span> Node inspector <span aria-hidden="true">↗</span>
       </button>
-    </div>
 
-    <!-- Knowledge Workspace Section -->
-    <section
-      id="knowledge-workspace"
-      class="knowledge-workspace"
-      hidden
-      aria-label="Knowledge workspace"
-    >
-      <header>
-        <div>
-          <span class="eyebrow">TOKSMART</span>
-          <h2>Knowledge workspace</h2>
-        </div>
-        <button id="workspace-close" aria-label="Close workspace">✕</button>
-      </header>
-      <nav class="workspace-nav" aria-label="Workspace sections">
-        <button data-view="search">Search</button>
-        <button data-view="proposals">Memory review</button>
-        <button data-view="benchmark_list">Benchmarks</button>
-        <button data-view="dependencies">Dependencies</button>
-        <button data-view="discover">Patterns</button>
-      </nav>
-      <p id="workspace-scope" class="workspace-scope"></p>
-      <div id="workspace-body" class="workspace-body"></div>
-    </section>
+      <!-- Knowledge Workspace Section -->
+      <section
+        id="knowledge-workspace"
+        class="knowledge-workspace"
+        hidden
+        aria-labelledby="workspace-title"
+      >
+        <header>
+          <h2 id="workspace-title" tabindex="-1">Knowledge workspace</h2>
+          <button type="button" id="workspace-close" aria-label="Close workspace">✕</button>
+        </header>
+        <nav class="workspace-nav" aria-label="Workspace sections">
+          <button type="button" data-view="search" aria-pressed="true">Search</button>
+          <button type="button" data-view="proposals" aria-pressed="false">Memory review</button>
+          <button type="button" data-view="benchmark_list" aria-pressed="false">Benchmarks</button>
+          <button type="button" data-view="dependencies" aria-pressed="false">Dependencies</button>
+          <button type="button" data-view="discover" aria-pressed="false">Patterns</button>
+        </nav>
+        <p id="workspace-scope" class="workspace-scope"></p>
+        <div id="workspace-body" class="workspace-body"></div>
+      </section>
+    </div>
   </body>
 </html>

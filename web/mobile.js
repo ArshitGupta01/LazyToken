@@ -52,7 +52,7 @@
       if (
         !data.version ||
         !['lite', 'pro', 'coding'].every((mode) =>
-          ['name', 'tag', 'description', 'best_for', 'prompt'].every(
+          ['name', 'description', 'prompt'].every(
             (key) => typeof data.modes?.[mode]?.[key] === 'string'
           )
         )
@@ -60,15 +60,10 @@
         throw Error('Invalid prompt file');
       }
       cards.replaceChildren();
-      ['lite', 'pro', 'coding'].forEach((mode, index) => {
+      ['lite', 'pro', 'coding'].forEach((mode) => {
         const item = data.modes[mode];
         const card = el('article', undefined, `connect-card prompt-card mode-${mode}`);
-        const eyebrow = el('div', undefined, 'mode-eyebrow');
-        eyebrow.append(
-          el('span', `0${index + 1} / ${mode === 'coding' ? 'BUILD' : 'THINK'}`),
-          el('span', item.tag)
-        );
-        const heading = el('h3', item.name);
+        const heading = el('h2', item.name);
         heading.id = `mode-${mode}-title`;
         card.setAttribute('aria-labelledby', heading.id);
         const button = el('button', 'Copy prompt', 'launch-btn');
@@ -77,18 +72,10 @@
         button.addEventListener('click', () => copyPrompt(item.prompt, button));
         const details = el('details');
         details.append(el('summary', 'Read the prompt'), el('pre', item.prompt, 'prompt-preview'));
-        card.append(
-          eyebrow,
-          heading,
-          el('p', item.description),
-          el('p', item.best_for, 'best-for'),
-          button,
-          details
-        );
+        card.append(heading, el('p', item.description), button, details);
         cards.append(card);
       });
-      get('prompt-version').textContent = `PROMPTS v${data.version}`;
-      status.textContent = 'One tap to copy. Paste into your AI, then ask your question.';
+      status.textContent = '';
     } catch {
       status.textContent = 'Prompts could not load. Check your connection and retry.';
       get('retry-prompts').hidden = false;

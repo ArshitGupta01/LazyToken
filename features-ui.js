@@ -1,11 +1,13 @@
 (() => {
   const panel = document.querySelector('#knowledge-workspace'),
+    title = document.querySelector('#workspace-title'),
     body = document.querySelector('#workspace-body'),
     scope = document.querySelector('#workspace-scope'),
     project = document.querySelector('#project');
   let current = 'search',
     token = '',
-    generation = 0;
+    generation = 0,
+    opener = null;
   const el = (tag, text, cls) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -13,7 +15,9 @@
     return node;
   };
   function message(text) {
-    body.replaceChildren(el('p', text, 'workspace-message'));
+    const status = el('p', text, 'workspace-message');
+    status.setAttribute('role', 'status');
+    body.replaceChildren(status);
   }
   function projectName() {
     return project.selectedOptions[0]?.textContent || '';
@@ -67,9 +71,11 @@
     scope.textContent = project.value
       ? 'Project: ' + projectName()
       : 'Select a project in the sidebar for search, review, and dependencies.';
-    document
-      .querySelectorAll('.workspace-nav button')
-      .forEach((b) => b.classList.toggle('active', b.dataset.view === current));
+    document.querySelectorAll('.workspace-nav button').forEach((button) => {
+      const active = button.dataset.view === current;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
     if (current === 'search') {
       if (!project.value) {
         message('Select a project to search its indexed metadata.');
@@ -77,7 +83,7 @@
       }
       const form = el('form', undefined, 'workspace-search');
       const input = el('input');
-      input.placeholder = 'Search files, symbols, imports, and knowledge';
+      input.placeholder = 'Files, symbols, imports, or knowledge…';
       input.setAttribute('aria-label', 'Search project knowledge');
       const button = el('button', 'Search');
       form.append(input, button);
@@ -319,27 +325,38 @@
     }
   }
   function setNavigation(view) {
-    document
-      .querySelectorAll('[data-workspace-view]')
-      .forEach((b) => b.classList.toggle('active', b.dataset.workspaceView === view));
+    document.querySelectorAll('[data-workspace-view]').forEach((button) => {
+      const active = button.dataset.workspaceView === view;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
   }
-  function openWorkspace(view) {
-    setNavigation(view);
-    if (view === 'graph') {
-      generation++;
-      panel.hidden = true;
-      return;
-    }
-    current = view;
-    panel.hidden = false;
-    render();
-  }
-  document.querySelector('#workspace-open').onclick = () => openWorkspace('search');
-  document.querySelector('#workspace-close').onclick = () => {
+  function closeWorkspace(restoreFocus = true) {
     generation++;
     panel.hidden = true;
     setNavigation('graph');
-  };
+    if (restoreFocus) opener?.focus();
+    opener = null;
+  }
+  function openWorkspace(view, trigger) {
+    if (view === 'graph') {
+      closeWorkspace(false);
+      return;
+    }
+    setNavigation(view);
+    opener = trigger;
+    current = view;
+    panel.hidden = false;
+    render();
+    title.focus();
+  }
+  document.querySelector('#workspace-close').onclick = () => closeWorkspace();
+  panel.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      closeWorkspace();
+    }
+  });
   document.querySelectorAll('.workspace-nav button').forEach(
     (b) =>
       (b.onclick = () => {
@@ -348,22 +365,10 @@
         render();
       })
   );
-  document
-    .querySelectorAll('[data-workspace-view]')
-    .forEach((b) => (b.onclick = () => openWorkspace(b.dataset.workspaceView)));
+  document.querySelectorAll('[data-workspace-view]').forEach((button) => {
+    button.onclick = () => openWorkspace(button.dataset.workspaceView, button);
+  });
   project.addEventListener('change', () => {
     if (!panel.hidden) render();
   });
-  request('benchmark_list')
-    .then((data) => {
-      if (data.runs.length) {
-        document.querySelector('#analytics-bench').textContent = 'Not verified';
-        document.querySelector('#analytics-bench-note').textContent =
-          `${data.runs.length} records loaded`;
-      }
-    })
-    .catch(() => {
-      document.querySelector('#analytics-bench').textContent = 'Unavailable';
-      document.querySelector('#analytics-bench-note').textContent = 'Could not load records';
-    });
 })();

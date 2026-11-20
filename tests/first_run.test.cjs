@@ -33,7 +33,10 @@ function setup() {
   };
   const scopes = ['', '@workspace'].map((project) => ({
     dataset: { project },
-    classList: { toggle() {} }
+    classList: { toggle() {} },
+    setAttribute(name, value) {
+      this[name] = value;
+    }
   }));
   const requests = [];
   const document = {
@@ -139,6 +142,8 @@ test('refresh preserves a deliberately selected shared graph', async () => {
   await settle();
   const refreshedGraph = requests.shift();
   assert.equal(refreshedGraph.url, '/api/graph');
+  assert.equal(scopes[0]['aria-pressed'], 'true');
+  assert.equal(scopes[1]['aria-pressed'], 'false');
   sharedGraph.reply({ nodes: [], edges: [] });
   refreshedGraph.reply({ nodes: [], edges: [] });
   await refreshing;
