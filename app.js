@@ -76,6 +76,7 @@
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2500);
 
+      const started = Date.now();
       fetch(url, {
         method: 'GET',
         mode: 'cors',
@@ -88,7 +89,8 @@
         })
         .then((data) => {
           clearTimeout(timeoutId);
-          if (data.service === 'toksmart' || data.service === 'lazytoken') resolve();
+          if (data.service === 'toksmart' || data.service === 'lazytoken')
+            resolve(Math.max(0, Date.now() - started));
           else reject(new Error('Not a TokSmart server'));
         })
         .catch((err) => {
@@ -98,12 +100,12 @@
     });
   }
 
-  function updateConnectCardServerReady(serverAlive) {
+  function updateConnectCardServerReady(serverAlive, latency) {
     const status = document.getElementById('connection-status');
     const button = document.getElementById('manual-connect-btn');
     if (status) {
       status.textContent = serverAlive
-        ? 'Local server is running.'
+        ? `Local server is running · ${Math.max(0, latency)} ms.`
         : 'Waiting for the local server…';
     }
     if (button) button.hidden = !serverAlive;
@@ -114,8 +116,8 @@
     const intent = connectionIntent;
     if (isManuallyDisconnected) {
       try {
-        await pingEndpoint(healthEndpoint);
-        if (intent === connectionIntent) updateConnectCardServerReady(true);
+        const latency = await pingEndpoint(healthEndpoint);
+        if (intent === connectionIntent) updateConnectCardServerReady(true, latency);
       } catch {
         if (intent === connectionIntent) updateConnectCardServerReady(false);
       }
@@ -123,19 +125,35 @@
     }
 
     try {
-      await pingEndpoint(healthEndpoint);
+      const latency = await pingEndpoint(healthEndpoint);
       if (intent !== connectionIntent) return;
       consecutiveFailures = 0;
       hideToast();
-      handleServerFound();
+      updateHeaderStatus('online', latency ? `Local · ${latency} ms` : 'Local · <1 ms');
+      if (!isConnected) handleServerFound();
     } catch {
       if (intent !== connectionIntent) return;
       consecutiveFailures++;
       if (!isConnected) updateConnectCardServerReady(false);
-      if (isConnected && consecutiveFailures >= 3) {
-        showToast('Local server disconnected. Checking connection...');
+      if (isConnected) {
+        const offline = consecutiveFailures >= 3;
+        updateHeaderStatus(
+          offline ? 'offline' : 'checking',
+          offline ? 'Server offline' : 'Rechecking…'
+        );
+        if (consecutiveFailures === 3) showToast('Local server disconnected. Checking connection…');
       }
     }
+  }
+
+  function updateHeaderStatus(state, label) {
+    const status = document.getElementById('header-server-status');
+    const text = document.getElementById('header-connection-label');
+    if (status) {
+      status.dataset.connection = state;
+      status.title = label + ' · ' + window.location.host;
+    }
+    if (text) text.textContent = label;
   }
 
   function handleServerFound() {
@@ -149,10 +167,6 @@
     } catch (e) {}
 
     window.API_BASE = getApiBase();
-    const localAddress = window.location.host;
-    const serverStatus = document.getElementById('header-server-status');
-    if (serverStatus) serverStatus.title = 'Connected to local server at ' + localAddress;
-
     document.documentElement.classList.add('server-connected');
     document.body.classList.add('server-connected');
 
@@ -174,6 +188,7 @@
     document.documentElement.classList.remove('server-connected');
     document.body.classList.remove('server-connected');
 
+    hideToast();
     document.getElementById('connect-title')?.focus();
     updateConnectCardServerReady(false);
     checkServer();
@@ -256,7 +271,8 @@
         projectEdge: '#6c7d70',
         label: '#18221c',
         edgeLabel: '#355c1d',
-        focus: '#325224'
+        focus: '#325224',
+        halo: '#eff4ec'
       },
       dark: {
         activeEdge: '#c3f670',
@@ -264,7 +280,8 @@
         projectEdge: '#608371',
         label: '#f1f7ed',
         edgeLabel: '#deefc5',
-        focus: '#ebfbd9'
+        focus: '#ebfbd9',
+        halo: '#111914'
       }
     };
     const activeTheme = () => (root?.dataset?.theme === 'dark' ? 'dark' : 'light');
@@ -295,6 +312,8 @@
       view3d = false,
       gl = null,
       glLoading = null;
+    let neighborsOnly = false;
+    let renderedNodes = [];
     let searchVisible = null,
       graphRequest = 0,
       jumpSignature = '',
@@ -376,6 +395,7 @@
     }
     async function loadGraph(project = '', background = false) {
       const requestId = ++graphRequest;
+      if (scope !== project) neighborsOnly = false;
       scope = project;
       if (!background) {
         document.querySelectorAll('.scope').forEach((button) => {
@@ -459,15 +479,25 @@
       relations = new Set(data.edges.map((edge) => edge.relation));
       draw();
     }
-    function layout() {
-      const rect = canvas.parentElement.getBoundingClientRect(),
-        dpr = Math.min(devicePixelRatio || 1, 2);
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return false;
+      const dx = (rect.width - width) / 2;
+      const dy = (rect.height - height) / 2;
       width = rect.width;
       height = rect.height;
-      if (!width || !height) return;
+      const dpr = Math.min(devicePixelRatio || 1, 2);
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      for (const node of nodes) {
+        node.x += dx;
+        node.y += dy;
+      }
+      return true;
+    }
+    function layout() {
+      if (!resizeCanvas()) return;
       const list = data.nodes,
         n = list.length,
         cx = width / 2,
@@ -571,12 +601,21 @@
           if (matches.has(edge.b) && baseVisible(edge.a)) searchVisible.add(edge.a);
         }
       } else searchVisible = null;
-      const shown = nodes.filter(visible),
-        ids = new Set(shown);
-      return {
-        shown,
-        links: edges.filter((e) => ids.has(e.a) && ids.has(e.b) && relations.has(e.relation))
-      };
+      const visibleNodes = nodes.filter(visible);
+      const ids = new Set(visibleNodes);
+      const eligibleLinks = edges.filter(
+        (e) => ids.has(e.a) && ids.has(e.b) && relations.has(e.relation)
+      );
+      if (!ids.has(selected)) neighborsOnly = false;
+      if (!neighborsOnly) return { shown: visibleNodes, links: eligibleLinks };
+
+      const links = eligibleLinks.filter((edge) => edge.a === selected || edge.b === selected);
+      const neighborhood = new Set([selected]);
+      for (const edge of links) {
+        neighborhood.add(edge.a);
+        neighborhood.add(edge.b);
+      }
+      return { shown: visibleNodes.filter((node) => neighborhood.has(node)), links };
     }
     function updateCounts(shown, links) {
       const evidence = links.filter((e) => e.evidence).length;
@@ -591,9 +630,13 @@
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const { shown, links } = filtered(),
-          focus = hover || selected,
+          focus = shown.includes(hover) ? hover : shown.includes(selected) ? selected : null,
           visuals = themeColors[activeTheme()];
+        renderedNodes = shown;
         updateCounts(shown, links);
+        $('#focus-neighbors').disabled = !selected || !shown.includes(selected);
+        $('#focus-neighbors').setAttribute('aria-pressed', String(neighborsOnly));
+        $('#graph-focus-label').hidden = !neighborsOnly;
         const signature = shown.map((n) => n.id + ':' + n.name).join('|');
         if (signature !== jumpSignature) {
           jumpSignature = signature;
@@ -625,8 +668,8 @@
           gl.setState({
             nodes: shown,
             edges: links,
-            selected,
-            hovered: hover,
+            selected: shown.includes(selected) ? selected : null,
+            hovered: shown.includes(hover) ? hover : null,
             width,
             height,
             visuals
@@ -649,16 +692,40 @@
             : edge.scope === '*'
               ? visuals.sharedEdge
               : visuals.projectEdge;
-          ctx.lineWidth = active ? 2 : 0.9 + Math.max(0, Math.min(1, Number(edge.weight) || 0));
+          ctx.lineWidth = active ? 2.2 : 0.9 + Math.max(0, Math.min(1, Number(edge.weight) || 0));
+          ctx.globalAlpha = focus && !active ? 0.33 : 1;
           ctx.stroke();
           ctx.setLineDash([]);
+          ctx.globalAlpha = 1;
           if (active) {
+            const dx = edge.b.x - edge.a.x;
+            const dy = edge.b.y - edge.a.y;
+            const length = Math.hypot(dx, dy);
+            if (length > edge.a.r + edge.b.r) {
+              const ux = dx / length;
+              const uy = dy / length;
+              const distance = edge.b.r * 0.68 + 3;
+              const tipX = edge.b.x - ux * distance;
+              const tipY = edge.b.y - uy * distance;
+              ctx.beginPath();
+              ctx.moveTo(tipX, tipY);
+              ctx.lineTo(tipX - ux * 7 + uy * 3.5, tipY - uy * 7 - ux * 3.5);
+              ctx.lineTo(tipX - ux * 7 - uy * 3.5, tipY - uy * 7 + ux * 3.5);
+              ctx.closePath();
+              ctx.fillStyle = visuals.activeEdge;
+              ctx.fill();
+            }
             const x = (edge.a.x + edge.b.x) / 2,
               y = (edge.a.y + edge.b.y) / 2;
             ctx.fillStyle = visuals.edgeLabel;
             ctx.font = '11px Consolas, monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(edge.relation.replaceAll('_', ' '), x, y - 7);
+            ctx.strokeStyle = visuals.halo;
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 4;
+            const label = edge.relation.replaceAll('_', ' ');
+            ctx.strokeText(label, x, y - 7);
+            ctx.fillText(label, x, y - 7);
           }
         }
         const linked = new Set(
@@ -683,12 +750,34 @@
             ctx.strokeStyle = visuals.focus;
             ctx.stroke();
           }
-          ctx.font = `${isSelected ? '600 ' : ''}12px Segoe UI, sans-serif`;
+          ctx.globalAlpha = 1;
+        }
+
+        const labels = [];
+        const priority = (node) =>
+          node === selected ? 3 : node === hover ? 2 : linked.has(node) ? 1 : 0;
+        for (const node of [...shown].sort((a, b) => priority(b) - priority(a))) {
+          if (shown.length > 60 && !priority(node)) break;
+          ctx.font = `${priority(node) > 1 ? '600 ' : ''}12px Segoe UI, sans-serif`;
+          const y = node.y + node.r + 13;
+          const halfWidth = ctx.measureText(node.name).width / 2 + 3;
+          const bounds = { left: node.x - halfWidth, right: node.x + halfWidth, y };
+          if (
+            labels.some(
+              (label) =>
+                Math.abs(label.y - y) < 15 && label.left < bounds.right && label.right > bounds.left
+            )
+          )
+            continue;
+          labels.push(bounds);
+          ctx.globalAlpha = focus && !priority(node) ? 0.57 : 1;
           ctx.textAlign = 'center';
           ctx.fillStyle = visuals.label;
-          if (shown.length <= 60 || isSelected || near || n === hover)
-            ctx.fillText(n.name, n.x, n.y + n.r + 13);
-          ctx.globalAlpha = 1;
+          ctx.strokeStyle = visuals.halo;
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = 4;
+          ctx.strokeText(node.name, node.x, y);
+          ctx.fillText(node.name, node.x, y);
         }
         ctx.restore();
       });
@@ -705,9 +794,9 @@
     }
     function hit(p) {
       const point = world(p);
-      return [...nodes]
+      return [...renderedNodes]
         .reverse()
-        .find((n) => visible(n) && Math.hypot(n.x - point.x, n.y - point.y) < n.r + 8);
+        .find((n) => Math.hypot(n.x - point.x, n.y - point.y) < n.r + 8);
     }
     function inspector(node) {
       selected = node;
@@ -753,7 +842,7 @@
     }
     canvas.addEventListener('keydown', (event) => {
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) return;
-      const available = nodes.filter(visible);
+      const { shown: available } = filtered();
       if (!available.length) return;
       event.preventDefault();
       let index = available.findIndex((node) => node.id === selected?.id);
@@ -817,8 +906,8 @@
         tip.hidden = !node;
         if (node) {
           tip.textContent = `${node.name} · ${node.kind}`;
-          tip.style.left = `${Math.min(p.x + 13, width - 190)}px`;
-          tip.style.top = `${Math.min(p.y + 13, height - 40)}px`;
+          tip.style.left = `${Math.max(8, Math.min(p.x + 13, width - 190))}px`;
+          tip.style.top = `${Math.max(8, Math.min(p.y + 13, height - 40))}px`;
         }
       }
     });
@@ -839,12 +928,18 @@
         drag = null;
         canvas.classList.remove('dragging');
       });
+    function zoomAt(point, factor) {
+      const anchor = world(point);
+      zoom = Math.min(2.8, Math.max(0.1, zoom * factor));
+      pan.x = point.x - width / 2 - (anchor.x - width / 2) * zoom;
+      pan.y = point.y - height / 2 - (anchor.y - height / 2) * zoom;
+      draw();
+    }
     canvas.addEventListener(
       'wheel',
       (event) => {
         event.preventDefault();
-        zoom = Math.min(2.8, Math.max(0.4, zoom * (event.deltaY < 0 ? 1.1 : 0.91)));
-        draw();
+        zoomAt(screenPoint(event), event.deltaY < 0 ? 1.1 : 0.91);
       },
       { passive: false }
     );
@@ -938,6 +1033,10 @@
         draw();
       }
     };
+    $('#focus-neighbors').onclick = () => {
+      neighborsOnly = !neighborsOnly;
+      draw();
+    };
     $('#view-2d').onclick = () => setView(false);
     $('#view-3d').onclick = () => setView(true);
     $('#health-filter').onchange = (e) => {
@@ -1009,22 +1108,17 @@
     };
     $('#zoom-in').onclick = () => {
       if (view3d && gl) gl.zoom(0.82);
-      else {
-        zoom = Math.min(2.8, zoom * 1.18);
-        draw();
-      }
+      else zoomAt({ x: width / 2, y: height / 2 }, 1.18);
     };
     $('#zoom-out').onclick = () => {
       if (view3d && gl) gl.zoom(1.22);
-      else {
-        zoom = Math.max(0.4, zoom / 1.18);
-        draw();
-      }
+      else zoomAt({ x: width / 2, y: height / 2 }, 1 / 1.18);
     };
     $('#refresh').onclick = refreshGraph;
     $('#empty-refresh').onclick = refreshGraph;
     $('#empty-search').onclick = () => $('#workspace-open').click();
     $('#clear-filters').onclick = () => {
+      neighborsOnly = false;
       $('#filters')
         .querySelectorAll('input')
         .forEach((i) => (i.checked = true));
@@ -1050,10 +1144,7 @@
       }
     });
     new ResizeObserver(() => {
-      const id = selected?.id;
-      layout();
-      selected = nodes.find((n) => n.id === id) || null;
-      if (selected) inspector(selected);
+      if (!resizeCanvas()) return;
       if (gl) gl.resize();
       draw();
     }).observe(canvas.parentElement);

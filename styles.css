@@ -9,7 +9,7 @@
   --accent: #355c1d;
   --active: #dce8d3;
   --graph-surface: #eff4ec;
-  --graph-grid: #dce7da;
+  --graph-grid: #cbdacb;
   --online: #376334;
   --logo-brightness: 0.6;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
@@ -28,7 +28,7 @@
   --accent: #c3f670;
   --active: #293d21;
   --graph-surface: #111914;
-  --graph-grid: #1c2a21;
+  --graph-grid: #2a3c31;
   --online: #a5ca91;
   --logo-brightness: 1.45;
 }
@@ -76,7 +76,11 @@ kbd {
   padding: 24px;
 }
 .reconnect-panel {
-  width: min(450px, 100%);
+  width: min(480px, 100%);
+  padding: clamp(18px, 4vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel);
 }
 .reconnect-panel h1 {
   margin: 32px 0 8px;
@@ -95,8 +99,10 @@ kbd {
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  border-block: 1px solid var(--line);
-  padding-block: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--canvas);
 }
 .local-command p {
   font-size: 13px;
@@ -181,6 +187,9 @@ body.server-connected .app-shell {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 50px;
   color: var(--muted);
   font: 11px var(--mono);
   white-space: nowrap;
@@ -190,6 +199,9 @@ body.server-connected .app-shell {
   height: 6px;
   border-radius: 50%;
   background: var(--online);
+}
+.header-meta:not([data-connection='online']) .live-dot {
+  background: #af822e;
 }
 .icon-button,
 .round-button,
@@ -417,8 +429,31 @@ kbd {
 }
 .graph-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
+}
+#focus-neighbors {
+  min-height: 34px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+#focus-neighbors[aria-pressed='true'],
+.graph-focus-label {
+  border-color: var(--accent);
+  background: var(--active);
+  color: var(--accent);
+}
+#focus-neighbors:disabled {
+  opacity: 0.67;
+  cursor: default;
+  border-color: var(--line);
+}
+.graph-focus-label {
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 11px;
 }
 .view-toggle,
 .camera-controls {
@@ -461,12 +496,9 @@ kbd {
   min-height: 230px;
   overflow: hidden;
   background-color: var(--graph-surface);
-  background-image: repeating-linear-gradient(
-      0deg,
-      transparent 0 33px,
-      var(--graph-grid) 33px 34px
-    ),
-    repeating-linear-gradient(90deg, transparent 0 33px, var(--graph-grid) 33px 34px);
+  background-image: radial-gradient(var(--graph-grid) 0.85px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: center;
 }
 .canvas-wrap > canvas,
 .webgl-host canvas {

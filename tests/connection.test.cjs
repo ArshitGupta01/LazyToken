@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const vm = require('node:vm');
 
-for (const file of ['app.js', 'web/app.js']) {
+for (const file of ['app.js']) {
   test(`${file} waits for a healthy server despite a saved connection`, async () => {
     const listeners = {};
     const classes = new Set();
@@ -97,36 +97,96 @@ for (const file of ['app.js']) {
   });
 }
 
-test('hosted page opens the local dashboard even after a saved disconnect', async () => {
+function hostedSetup(fetch) {
   const listeners = {};
+  const elements = new Map();
   const redirects = [];
+  let poll;
+  const element = (id) => {
+    if (!elements.has(id)) {
+      elements.set(id, {
+        dataset: {},
+        textContent: '',
+        addEventListener: (name, handler) => {
+          listeners[id + ':' + name] = handler;
+        }
+      });
+    }
+    return elements.get(id);
+  };
   const document = {
     readyState: 'loading',
-    addEventListener: (name, fn) => {
-      listeners[name] = fn;
+    addEventListener: (name, listener) => {
+      listeners[name] = listener;
     },
-    querySelectorAll: () => [],
-    getElementById: () => null
+    getElementById: element
   };
   const window = { location: { replace: (url) => redirects.push(url) } };
   const context = {
     document,
     window,
     navigator: { maxTouchPoints: 0, userAgent: '' },
-    localStorage: { getItem: () => 'true' },
-    fetch: async (url, options) => {
+    fetch: (url, options) => {
       assert.equal(url, 'http://127.0.0.1:8765/api/health');
       assert.equal(options.targetAddressSpace, 'loopback');
-      return { ok: true, json: async () => ({ service: 'toksmart' }) };
+      return fetch();
     },
+    performance: { now: () => 5 },
     AbortController,
-    setInterval: () => 1,
+    setInterval: (callback) => {
+      poll = callback;
+    },
     setTimeout: () => 1,
     clearTimeout: () => {},
     URLSearchParams
   };
   vm.runInNewContext(readFileSync(join(__dirname, '..', 'web/app.js'), 'utf8'), context);
   listeners.DOMContentLoaded();
+  return { element, redirects, retry: () => listeners['check-server:click'](), poll: () => poll() };
+}
+
+test('hosted setup reports readiness and latency after the server starts, then resumes waiting', async () => {
+  let alive = false;
+  let requests = 0;
+  const setup = hostedSetup(async () => {
+    requests++;
+    if (!alive) throw new Error('offline');
+    return {
+      ok: true,
+      json: async () => ({ status: 'ok', service: 'toksmart', version: '0.5.4' })
+    };
+  });
+  const { element } = setup;
+  assert.equal(element('check-server').disabled, true);
+  await setup.retry();
+  assert.equal(requests, 1);
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(redirects, ['http://127.0.0.1:8765/']);
+  assert.equal(element('server-state').textContent, 'Waiting for server');
+  assert.equal(element('server-ping').textContent, '—');
+  assert.equal(element('check-server').disabled, false);
+
+  alive = true;
+  await setup.retry();
+  assert.equal(element('server-status').dataset.state, 'online');
+  assert.equal(element('server-state').textContent, 'Server ready');
+  assert.match(element('server-detail').textContent, /0\.5\.4/);
+  assert.equal(element('server-ping').textContent, '<1 ms');
+  assert(element('server-checked').textContent);
+  assert.deepEqual(setup.redirects, []);
+
+  alive = false;
+  setup.poll();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(element('server-state').textContent, 'Waiting for server');
+  assert.equal(element('server-ping').textContent, '—');
+});
+
+test('hosted setup rejects a response from a different local service', async () => {
+  const { element } = hostedSetup(async () => ({
+    ok: true,
+    json: async () => ({ status: 'ok', service: 'unrelated' })
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(element('server-status').dataset.state, 'unexpected');
+  assert.equal(element('server-ping').textContent, '—');
 });

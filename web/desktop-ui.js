@@ -1,13 +1,21 @@
 import { copy, waapi } from './vendor/desktop-components.js';
 
-const command = document.getElementById('launch-command');
-const copyButton = document.querySelector('.copy-button');
 const copyHint = document.getElementById('step-1-badge');
 let resetCopy;
+let copyAttempt = 0;
+let activeCopy;
 
-copyButton.addEventListener('click', async () => {
+document.querySelector('.setup-instructions').addEventListener('click', async (event) => {
+  const button = event.target.closest('.copy-button');
+  if (!button) return;
+  const attempt = ++copyAttempt;
+  const command = button.parentElement.querySelector('code');
   clearTimeout(resetCopy);
-  if (!(await copy(command.textContent.trim()))) {
+  if (activeCopy) activeCopy.textContent = 'Copy';
+  activeCopy = button;
+  const copied = await copy(command.textContent.trim());
+  if (attempt !== copyAttempt) return;
+  if (!copied) {
     const selection = window.getSelection();
     if (selection) {
       const range = document.createRange();
@@ -15,21 +23,18 @@ copyButton.addEventListener('click', async () => {
       selection.removeAllRanges();
       selection.addRange(range);
     }
-    copyButton.classList.remove('copied');
-    copyButton.textContent = 'Copy';
     copyHint.textContent = selection
       ? 'Command selected. Copy it manually.'
       : 'Select and copy the command from the terminal box.';
     return;
   }
 
-  copyButton.classList.add('copied');
-  copyButton.textContent = 'Copied';
+  button.textContent = 'Copied';
   copyHint.textContent = 'Command copied.';
   resetCopy = setTimeout(() => {
-    copyButton.classList.remove('copied');
-    copyButton.textContent = 'Copy';
+    button.textContent = 'Copy';
     copyHint.textContent = '';
+    activeCopy = null;
   }, 2000);
 });
 

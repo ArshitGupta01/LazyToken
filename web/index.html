@@ -19,10 +19,6 @@
   <body class="setup-page">
     <!-- Lucide icons (see vendor/lucide-LICENSE.txt). -->
     <svg class="visually-hidden" aria-hidden="true">
-      <symbol id="icon-arrow-right" viewBox="0 0 24 24">
-        <path d="M5 12h14" />
-        <path d="m12 5 7 7-7 7" />
-      </symbol>
       <symbol id="icon-arrow-up-right" viewBox="0 0 24 24">
         <path d="M7 7h10v10" />
         <path d="M7 17 17 7" />
@@ -109,115 +105,121 @@
       </div>
     </header>
     <main class="setup-layout">
-      <section class="product-hero" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="product-kind">Local code intelligence</p>
-          <h1 id="hero-title">See how your <span>code connects.</span></h1>
-          <p class="hero-lead">
-            Trace dependencies, find symbols, and give your AI assistant relevant context through
-            MCP. Your repository index stays on your machine.
-          </p>
-          <div class="hero-actions">
-            <a class="primary-action" href="#desktop-setup"
-              >Get started
-              <svg class="site-icon" aria-hidden="true"><use href="#icon-arrow-right"></use></svg
-            ></a>
-            <a class="secondary-action" href="#dashboard-preview"
-              >Preview dashboard
-              <svg class="site-icon" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg
-            ></a>
-          </div>
+      <div class="setup-intro">
+        <div>
+          <p class="product-kind">TokSmart desktop</p>
+          <h1>Start your local dashboard.</h1>
+          <p>Index a repository, trace its connections, and find the code you need.</p>
         </div>
-
-        <section class="sample-graph" aria-labelledby="sample-title">
-          <header class="sample-header">
-            <h2 id="sample-title">
-              <svg class="site-icon" aria-hidden="true"><use href="#icon-git-fork"></use></svg>
-              sample-api
-            </h2>
-            <span>Select a file</span>
+        <a class="secondary-action" href="#dashboard-preview"
+          >Preview dashboard
+          <svg class="site-icon" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg>
+        </a>
+      </div>
+      <div class="setup-grid">
+        <section
+          id="desktop-setup"
+          class="setup-instructions"
+          aria-labelledby="desktop-setup-title"
+          tabindex="-1"
+        >
+          <header class="setup-heading">
+            <span class="setup-icon"
+              ><svg class="site-icon" aria-hidden="true"><use href="#icon-terminal"></use></svg
+            ></span>
+            <div>
+              <h2 id="desktop-setup-title">Install and run</h2>
+              <p>Requires Node.js 18+ and Python 3.11+.</p>
+            </div>
           </header>
-          <fieldset class="sample-canvas">
-            <legend class="visually-hidden">Inspect a file in the sample repository</legend>
-            <svg
-              class="sample-edges"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <path class="is-active" data-connects="router auth" d="M15 31H24L37 64" />
-              <path class="is-active" data-connects="auth sessions" d="M37 64H46L63 31" />
-              <path data-connects="sessions storage" d="M63 31H72L85 64" />
-            </svg>
-            <label class="sample-node" style="--x: 15%; --y: 31%">
-              <input type="radio" name="sample-file" value="router" class="visually-hidden" />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-network"></use></svg
-              ></span>
-              <span>router.py</span>
-            </label>
-            <label class="sample-node" style="--x: 37%; --y: 64%">
-              <input type="radio" name="sample-file" value="auth" class="visually-hidden" checked />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-file-code"></use></svg
-              ></span>
-              <span>auth.py</span>
-            </label>
-            <label class="sample-node" style="--x: 63%; --y: 31%">
-              <input type="radio" name="sample-file" value="sessions" class="visually-hidden" />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-layers"></use></svg
-              ></span>
-              <span>sessions.py</span>
-            </label>
-            <label class="sample-node" style="--x: 85%; --y: 64%">
-              <input type="radio" name="sample-file" value="storage" class="visually-hidden" />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-database"></use></svg
-              ></span>
-              <span>storage.py</span>
-            </label>
-          </fieldset>
-          <output class="sample-evidence">
-            <span class="evidence-meta"
-              ><strong>auth.py:1</strong><span>Imports sessions.py</span></span
-            >
-            <code>from sessions import SessionStore</code>
-          </output>
-        </section>
-      </section>
-
-      <section
-        id="desktop-setup"
-        class="setup-instructions"
-        aria-labelledby="desktop-setup-title"
-        tabindex="-1"
-      >
-        <header class="setup-heading">
-          <span class="setup-icon"
-            ><svg class="site-icon" aria-hidden="true"><use href="#icon-terminal"></use></svg
-          ></span>
-          <div>
-            <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
-            <p>Requires Node.js 18+ and Python 3.11+.</p>
+          <div class="setup-copy">
+            <p class="command-label">Quick start</p>
+            <div class="terminal-card">
+              <span class="terminal-prompt" aria-hidden="true">$</span>
+              <code id="launch-command">npx toksmart@latest serve</code>
+              <button type="button" class="copy-button" aria-label="Copy launch command">
+                Copy
+              </button>
+            </div>
+            <p class="setup-help">
+              Run this in your terminal. The first run may take a moment. Keep the terminal open
+              while you use the dashboard.
+            </p>
           </div>
-        </header>
-        <div class="setup-copy">
-          <div class="terminal-card">
-            <span class="terminal-prompt" aria-hidden="true">$</span>
-            <code id="launch-command">npx toksmart@latest serve</code>
-            <button type="button" class="copy-button" aria-label="Copy launch command">Copy</button>
-          </div>
+          <details class="install-options">
+            <summary>Install globally</summary>
+            <p class="command-label">Install once</p>
+            <div class="terminal-card">
+              <span class="terminal-prompt" aria-hidden="true">$</span>
+              <code>npm install --global toksmart</code>
+              <button type="button" class="copy-button" aria-label="Copy install command">
+                Copy
+              </button>
+            </div>
+            <p class="command-label">Start after installing</p>
+            <div class="terminal-card">
+              <span class="terminal-prompt" aria-hidden="true">$</span>
+              <code>toksmart serve</code>
+              <button type="button" class="copy-button" aria-label="Copy installed launch command">
+                Copy
+              </button>
+            </div>
+          </details>
           <p id="step-1-badge" class="copy-hint" role="status"></p>
-          <p class="setup-help">
-            Keep the terminal open, then <a href="http://127.0.0.1:8765/">open the dashboard</a>.
-          </p>
-        </div>
-        <details class="install-options">
-          <summary>Install for regular use</summary>
-          <p>Run <code>npm install --global toksmart</code>, then <code>toksmart serve</code>.</p>
-        </details>
-      </section>
+        </section>
+        <section
+          class="server-card"
+          id="server-status"
+          data-state="checking"
+          aria-labelledby="server-title"
+        >
+          <header class="setup-heading">
+            <span class="setup-icon"
+              ><svg class="site-icon" aria-hidden="true"><use href="#icon-network"></use></svg
+            ></span>
+            <div>
+              <h2 id="server-title">Local server</h2>
+              <p><code>127.0.0.1:8765</code></p>
+            </div>
+          </header>
+          <div class="server-signal">
+            <span class="signal-dot" aria-hidden="true"></span>
+            <strong id="server-state" role="status">Checking server…</strong>
+          </div>
+          <p id="server-detail">Looking for TokSmart on this computer.</p>
+          <dl class="server-metrics">
+            <div>
+              <dt>Ping</dt>
+              <dd id="server-ping">—</dd>
+            </div>
+            <div>
+              <dt>Last checked</dt>
+              <dd id="server-checked">—</dd>
+            </div>
+          </dl>
+          <div class="server-actions">
+            <a
+              class="open-dashboard"
+              id="open-dashboard"
+              href="http://127.0.0.1:8765/"
+              target="_blank"
+              rel="noopener"
+              >Open dashboard
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-arrow-up-right"></use>
+              </svg>
+            </a>
+            <button type="button" id="check-server">Check now</button>
+          </div>
+          <details class="install-options">
+            <summary>Server running but still waiting?</summary>
+            <p>
+              Allow local network access if your browser asks. If TokSmart uses a different port,
+              open the address printed in your terminal.
+            </p>
+          </details>
+        </section>
+      </div>
 
       <tab-container id="dashboard-preview" class="desktop-preview" tabindex="-1">
         <div class="preview-header" slot="tablist-wrapper">
@@ -337,6 +339,65 @@
           </a>
         </div>
       </tab-container>
+      <details class="sample-disclosure">
+        <summary>Try the interactive sample graph</summary>
+        <section class="sample-graph" aria-labelledby="sample-title">
+          <header class="sample-header">
+            <h2 id="sample-title">
+              <svg class="site-icon" aria-hidden="true"><use href="#icon-git-fork"></use></svg>
+              sample-api
+            </h2>
+            <span>Select a file</span>
+          </header>
+          <fieldset class="sample-canvas">
+            <legend class="visually-hidden">Inspect a file in the sample repository</legend>
+            <svg
+              class="sample-edges"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path class="is-active" data-connects="router auth" d="M15 31H24L37 64" />
+              <path class="is-active" data-connects="auth sessions" d="M37 64H46L63 31" />
+              <path data-connects="sessions storage" d="M63 31H72L85 64" />
+            </svg>
+            <label class="sample-node" style="--x: 15%; --y: 31%">
+              <input type="radio" name="sample-file" value="router" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-network"></use></svg
+              ></span>
+              <span>router.py</span>
+            </label>
+            <label class="sample-node" style="--x: 37%; --y: 64%">
+              <input type="radio" name="sample-file" value="auth" class="visually-hidden" checked />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-file-code"></use></svg
+              ></span>
+              <span>auth.py</span>
+            </label>
+            <label class="sample-node" style="--x: 63%; --y: 31%">
+              <input type="radio" name="sample-file" value="sessions" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-layers"></use></svg
+              ></span>
+              <span>sessions.py</span>
+            </label>
+            <label class="sample-node" style="--x: 85%; --y: 64%">
+              <input type="radio" name="sample-file" value="storage" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-database"></use></svg
+              ></span>
+              <span>storage.py</span>
+            </label>
+          </fieldset>
+          <output class="sample-evidence">
+            <span class="evidence-meta"
+              ><strong>auth.py:1</strong><span>Imports sessions.py</span></span
+            >
+            <code>from sessions import SessionStore</code>
+          </output>
+        </section>
+      </details>
     </main>
   </body>
 </html>

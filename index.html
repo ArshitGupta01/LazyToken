@@ -80,9 +80,11 @@
         <div
           class="header-meta"
           id="header-server-status"
-          title="Connected to local server at 127.0.0.1:8765"
+          data-connection="checking"
+          title="Local server status"
         >
-          <span class="live-dot" aria-hidden="true"></span> Local server
+          <span class="live-dot" aria-hidden="true"></span>
+          <span id="header-connection-label">Checking server</span>
         </div>
         <label class="theme-control">
           <span>Theme</span>
@@ -158,6 +160,16 @@
                 <kbd aria-hidden="true">/</kbd>
               </label>
               <div class="graph-actions">
+                <button
+                  id="focus-neighbors"
+                  class="small-button"
+                  type="button"
+                  aria-pressed="false"
+                  title="Show only the selected node and its direct neighbors"
+                  disabled
+                >
+                  Neighbors
+                </button>
                 <div class="view-toggle" role="group" aria-label="Graph view">
                   <button id="view-2d" class="active" aria-pressed="true">2D</button>
                   <button id="view-3d" aria-pressed="false">3D</button>
@@ -207,6 +219,7 @@
           </div>
 
           <footer class="graph-footer">
+            <span id="graph-focus-label" class="graph-focus-label" hidden>Direct neighbors</span>
             <div class="stat"><strong id="node-count">—</strong><span>Nodes</span></div>
             <div class="stat"><strong id="edge-count">—</strong><span>Relationships</span></div>
             <div class="stat">
