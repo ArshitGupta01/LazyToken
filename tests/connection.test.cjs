@@ -107,6 +107,13 @@ function hostedSetup(fetch) {
       elements.set(id, {
         dataset: {},
         textContent: '',
+        href: id === 'open-dashboard' ? 'http://127.0.0.1:8765/' : undefined,
+        setAttribute(name, value) {
+          this[name] = value;
+        },
+        removeAttribute(name) {
+          delete this[name];
+        },
         addEventListener: (name, handler) => {
           listeners[id + ':' + name] = handler;
         }
@@ -121,7 +128,7 @@ function hostedSetup(fetch) {
     },
     getElementById: element
   };
-  const window = { location: { replace: (url) => redirects.push(url) } };
+  const window = { location: { assign: (url) => redirects.push(url) } };
   const context = {
     document,
     window,
@@ -142,7 +149,17 @@ function hostedSetup(fetch) {
   };
   vm.runInNewContext(readFileSync(join(__dirname, '..', 'web/app.js'), 'utf8'), context);
   listeners.DOMContentLoaded();
-  return { element, redirects, retry: () => listeners['check-server:click'](), poll: () => poll() };
+  return {
+    element,
+    redirects,
+    retry: () => listeners['check-server:click'](),
+    poll: () => poll(),
+    copyLaunch: () => listeners['toksmart:launch-copied'](),
+    enableAutoOpen() {
+      element('auto-open').checked = true;
+      listeners['auto-open:change']();
+    }
+  };
 }
 
 test('hosted setup reports readiness and latency after the server starts, then resumes waiting', async () => {
@@ -164,6 +181,10 @@ test('hosted setup reports readiness and latency after the server starts, then r
   assert.equal(element('server-state').textContent, 'Waiting for server');
   assert.equal(element('server-ping').textContent, '—');
   assert.equal(element('check-server').disabled, false);
+  assert.equal(element('launch-step-run')['aria-current'], 'step');
+  setup.copyLaunch();
+  assert.equal(element('launch-step-connect')['aria-current'], 'step');
+  assert.equal(element('launch-step-run').dataset.progress, 'complete');
 
   alive = true;
   await setup.retry();
@@ -173,12 +194,15 @@ test('hosted setup reports readiness and latency after the server starts, then r
   assert.equal(element('server-ping').textContent, '<1 ms');
   assert(element('server-checked').textContent);
   assert.deepEqual(setup.redirects, []);
+  assert.equal(element('launch-step-open')['aria-current'], 'step');
+  assert.equal(element('launch-step-connect').dataset.progress, 'complete');
 
   alive = false;
   setup.poll();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(element('server-state').textContent, 'Waiting for server');
   assert.equal(element('server-ping').textContent, '—');
+  assert.equal(element('launch-step-connect')['aria-current'], 'step');
 });
 
 test('hosted setup rejects a response from a different local service', async () => {
@@ -189,4 +213,24 @@ test('hosted setup rejects a response from a different local service', async () 
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(element('server-status').dataset.state, 'unexpected');
   assert.equal(element('server-ping').textContent, '—');
+});
+
+test('opt-in opens only after a verified health response and is consumed once', async () => {
+  let service = 'unrelated';
+  const setup = hostedSetup(async () => ({
+    ok: true,
+    json: async () => ({ status: 'ok', service })
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+  setup.enableAutoOpen();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(setup.redirects, []);
+  assert.equal(setup.element('auto-open').checked, true);
+
+  service = 'toksmart';
+  await setup.retry();
+  assert.deepEqual(setup.redirects, ['http://127.0.0.1:8765/']);
+  assert.equal(setup.element('auto-open').checked, false);
+  await setup.retry();
+  assert.deepEqual(setup.redirects, ['http://127.0.0.1:8765/']);
 });

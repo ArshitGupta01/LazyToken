@@ -27,7 +27,7 @@ You need **Node.js 18+**, **Python 3.11+**, and a local repository. The npm pack
 npx toksmart@latest serve
 ```
 
-Keep this terminal open. The [hosted launcher](https://toksmart.vercel.app) shows the last health check and ping once the server responds. When it says **Server ready**, click **Open dashboard**. You can also open [http://127.0.0.1:8765](http://127.0.0.1:8765) on the same computer.
+Keep this terminal open. The [hosted launcher](https://toksmart.vercel.app) shows the last health check and ping once the server responds. When it says **Server ready**, click **Open dashboard** or use **Open automatically when ready**. The hosted launcher provides a `--no-browser` variant of the command so it can handle opening the dashboard. You can also open [http://127.0.0.1:8765](http://127.0.0.1:8765) on the same computer.
 
 **2. Index a repository.** In a second terminal, change to your repository root and run the matching command.
 

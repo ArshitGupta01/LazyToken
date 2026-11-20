@@ -128,21 +128,14 @@
   gap: 12px 25px;
   padding-block: clamp(31px, 5vw, 57px) 23px;
 }
-.product-kind {
-  margin: 0 0 12px;
-  color: var(--accent);
-  font: 600 12px/1.35 var(--mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
 .setup-intro h1 {
   margin: 0;
-  max-width: 17ch;
+  max-width: 19ch;
   font-size: clamp(37px, 5vw, 64px);
   line-height: 1;
   letter-spacing: -0.065em;
 }
-.setup-intro p:not(.product-kind) {
+.setup-intro p {
   margin: 10px 0 0;
   color: var(--muted);
   font-size: 16px;
@@ -308,35 +301,131 @@
   font: 13px/1.45 var(--mono);
 }
 
+.launch-console {
+  margin-bottom: 26px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+}
+.launch-stages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+}
+.launch-stages li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 53px;
+  padding: 8px clamp(8px, 2.5vw, 29px);
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.2;
+}
+.launch-stages li + li {
+  border-inline-start: 1px solid var(--line);
+}
+.launch-stages li[data-progress='current'] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+.stage-number {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: 600 12px var(--mono);
+}
+.launch-stages [data-progress='current'] .stage-number,
+.launch-stages [data-progress='complete'] .stage-number {
+  border-color: var(--accent-tint);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.launch-stages [data-progress='complete'] .stage-number {
+  font-size: 0;
+}
+.launch-stages [data-progress='complete'] .stage-number::after {
+  grid-area: 1 / 1;
+  width: 10px;
+  height: 6px;
+  transform: rotate(-45deg);
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  content: '';
+}
 .setup-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  align-items: start;
-  gap: 14px;
-  margin-bottom: 24px;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
 }
 .setup-instructions,
 .server-card {
   min-width: 0;
-  padding: clamp(15px, 2.25vw, 26px);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+  padding: clamp(15px, 2.5vw, 29px);
 }
 .setup-instructions {
   scroll-margin-block-start: 22px;
 }
-.setup-copy {
-  margin-top: 21px;
+.server-card {
+  border-inline-start: 1px solid var(--line);
 }
-.setup-copy .setup-help {
-  max-width: 56ch;
+.install-mode {
+  display: block;
+  min-width: 0;
+  margin-top: 20px;
+}
+.install-mode-tabs {
+  display: inline-flex;
+  gap: 3px;
+  margin-bottom: 13px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.install-mode-tabs button {
+  min-height: 39px;
+  padding-inline: 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.install-mode-tabs button:hover {
+  color: var(--ink);
+}
+.install-mode-tabs button[aria-selected='true'] {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.install-mode-tabs button:focus-visible {
+  outline-offset: -2px;
+}
+.server-monitor {
+  margin: 19px 0 13px;
+  padding: 12px 13px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.server-card[data-state='online'] .server-monitor {
+  border-color: var(--accent);
 }
 .server-signal {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-top: 19px;
 }
 .signal-dot {
   width: 9px;
@@ -362,8 +451,8 @@
 .server-metrics {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
-  margin: 0 0 13px;
-  border-block: 1px solid var(--line);
+  margin: 0;
+  border-top: 1px solid var(--line);
 }
 .server-metrics div {
   padding-block: 9px;
@@ -384,6 +473,23 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.auto-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 40px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.auto-open input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 .server-actions button,
 .open-dashboard {
@@ -440,9 +546,10 @@
 }
 
 .setup-heading p,
-.setup-copy p,
 .command-label,
-.install-options {
+.command-help,
+.install-options,
+.setup-requirements {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -475,7 +582,7 @@
 
 .copy-button {
   min-width: 65px;
-  min-height: 38px;
+  min-height: 42px;
   padding-inline: 10px;
   border: 1px solid var(--lime);
   border-radius: 5px;
@@ -504,13 +611,17 @@
   margin: 0;
 }
 .setup-instructions .command-label {
-  margin-bottom: 5px;
+  margin: 12px 0 5px;
   color: var(--ink);
   font-weight: 600;
 }
-
+.setup-requirements {
+  margin-top: 19px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
 .install-options {
-  margin-top: 12px;
+  margin-top: 1px;
 }
 
 .install-options summary {
@@ -519,11 +630,6 @@
 
 .install-options p {
   margin: 4px 0 0;
-}
-
-.install-options code {
-  font: 12px var(--mono);
-  overflow-wrap: anywhere;
 }
 
 .desktop-preview {
@@ -620,6 +726,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .server-card {
+    border-inline-start: 0;
+    border-top: 1px solid var(--line);
+  }
+
   .site-header {
     flex-wrap: wrap;
     padding-block: 6px;
@@ -647,6 +758,16 @@
 
   .desktop-theme .site-icon {
     right: 8px;
+  }
+
+  .launch-stages li {
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .stage-number {
+    width: 21px;
+    height: 21px;
   }
 
   .sample-node {

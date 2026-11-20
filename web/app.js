@@ -23,10 +23,29 @@
     const ping = document.getElementById('server-ping');
     const checked = document.getElementById('server-checked');
     const retry = document.getElementById('check-server');
+    const autoOpen = document.getElementById('auto-open');
+    const dashboard = document.getElementById('open-dashboard');
+    const steps = ['run', 'connect', 'open'].map((step) =>
+      document.getElementById('launch-step-' + step)
+    );
+    let launchCopied = false;
     const clock = new Intl.DateTimeFormat(undefined, { timeStyle: 'medium' });
 
+    function updateProgress() {
+      const current = card.dataset.state === 'online' ? 2 : launchCopied ? 1 : 0;
+      steps.forEach((step, index) => {
+        step.dataset.progress =
+          index === current ? 'current' : index < current ? 'complete' : 'pending';
+        if (index === current) step.setAttribute('aria-current', 'step');
+        else step.removeAttribute('aria-current');
+      });
+    }
+
     function updateStatus(mode, title, description, latency = '—') {
-      card.dataset.state = mode;
+      if (card.dataset.state !== mode) {
+        card.dataset.state = mode;
+        updateProgress();
+      }
       if (state.textContent !== title) state.textContent = title;
       if (detail.textContent !== description) detail.textContent = description;
       if (ping.textContent !== latency) ping.textContent = latency;
@@ -61,6 +80,10 @@
             'TokSmart' + version + ' is ready to open.',
             elapsed ? elapsed + ' ms' : '<1 ms'
           );
+          if (autoOpen.checked) {
+            autoOpen.checked = false;
+            window.location.assign(dashboard.href);
+          }
         } else {
           updateStatus(
             'unexpected',
@@ -74,7 +97,7 @@
           'Waiting for server',
           controller.signal.aborted
             ? 'The check timed out. TokSmart may still be starting. Retrying automatically.'
-            : 'Run the launch command or check local network access. Retrying automatically.'
+            : 'Leave this page open. It checks automatically while TokSmart starts.'
         );
       } finally {
         clearTimeout(timeout);
@@ -84,12 +107,19 @@
     }
 
     retry.addEventListener('click', checkServer);
+    autoOpen.addEventListener('change', () => {
+      if (autoOpen.checked) checkServer();
+    });
+    document.addEventListener('toksmart:launch-copied', () => {
+      launchCopied = true;
+      updateProgress();
+    });
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) checkServer();
     });
     checkServer();
     setInterval(() => {
-      if (!document.hidden) checkServer();
+      if (!document.hidden || autoOpen.checked) checkServer();
     }, POLL_INTERVAL);
   }
 

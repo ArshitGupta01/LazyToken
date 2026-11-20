@@ -30,7 +30,12 @@ document.querySelector('.setup-instructions').addEventListener('click', async (e
   }
 
   button.textContent = 'Copied';
-  copyHint.textContent = 'Command copied.';
+  copyHint.textContent = button.hasAttribute('data-starts-server')
+    ? 'Command copied. Paste it into your terminal to start TokSmart.'
+    : 'Install command copied.';
+  if (button.hasAttribute('data-starts-server')) {
+    document.dispatchEvent(new Event('toksmart:launch-copied'));
+  }
   resetCopy = setTimeout(() => {
     button.textContent = 'Copy';
     copyHint.textContent = '';
