@@ -90,7 +90,7 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
       (node.z || 0) * 0.7
     );
   }
-  function setState({ nodes, edges, selected: pick, hovered: over, width, height }) {
+  function setState({ nodes, edges, selected: pick, hovered: over, width, height, visuals }) {
     selected = pick;
     hovered = over;
     const key = JSON.stringify([
@@ -138,7 +138,7 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
           b = positions.get(e.b.id);
         if (!a || !b) continue;
         coords.push(a.x, a.y, a.z, b.x, b.y, b.z);
-        const c = new THREE.Color(e.scope === '*' ? '#a99a84' : '#867b6c');
+        const c = new THREE.Color(e.scope === '*' ? visuals.sharedEdge : visuals.projectEdge);
         colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
         renderedEdges.push(e);
       }
@@ -172,7 +172,9 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
       mesh.scale.setScalar(
         (mesh.userData.node.r || 9) * (isSelected ? 1.35 : isHovered ? 1.15 : 1)
       );
-      mesh.material.color.set(color(mesh.userData.node.kind)).multiplyScalar(dim ? 0.2 : 0.61);
+      const tint = color(mesh.userData.node.kind);
+      mesh.material.color.set(tint).multiplyScalar(dim ? 0.2 : 0.61);
+      mesh.material.emissive.set(tint);
       mesh.material.emissiveIntensity = dim ? 0.06 : isSelected ? 0.5 : 0.3;
     }
     if (edgeLines) {
@@ -180,7 +182,11 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
       renderedEdges.forEach((edge, i) => {
         const activeEdge = focused && (edge.a.id === focused.id || edge.b.id === focused.id);
         const tint = new THREE.Color(
-          activeEdge ? '#f1ab84' : edge.scope === '*' ? '#a99a84' : '#867b6c'
+          activeEdge
+            ? visuals.activeEdge
+            : edge.scope === '*'
+              ? visuals.sharedEdge
+              : visuals.projectEdge
         ).multiplyScalar(focused && !activeEdge ? 0.2 : 1);
         attribute.setXYZ(i * 2, tint.r, tint.g, tint.b);
         attribute.setXYZ(i * 2 + 1, tint.r, tint.g, tint.b);
@@ -323,9 +329,25 @@ export function createGraph3D(host, { onSelect, onHover, color, onUnavailable })
       }
     },
     resize,
-    reset() {
-      camera.position.set(0, 85, 720);
-      controls.target.set(0, 0, 0);
+    fit() {
+      if (!nodeMeshes.length) return;
+      const bounds = new THREE.Box3();
+      const point = new THREE.Vector3();
+      for (const mesh of nodeMeshes) {
+        const radius = mesh.scale.x + 8;
+        bounds.expandByPoint(point.copy(mesh.position).addScalar(-radius));
+        bounds.expandByPoint(point.copy(mesh.position).addScalar(radius));
+      }
+      const { center, radius } = bounds.getBoundingSphere(new THREE.Sphere());
+      const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
+      const horizontal = Math.atan(Math.tan(vertical) * camera.aspect);
+      const distance = (radius * 1.12) / Math.sin(Math.min(vertical, horizontal));
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      controls.maxDistance = Math.max(1800, distance);
+      controls.target.copy(center);
+      camera.position
+        .copy(center)
+        .addScaledVector(direction, Math.max(controls.minDistance, distance));
       target = null;
       controls.update();
       renderOnce();

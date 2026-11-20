@@ -10,6 +10,7 @@
     />
     <title>TokSmart · Desktop setup</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
   </head>
@@ -19,10 +20,20 @@
         <img class="toksmart-logo" src="logo.svg" alt="" />
         TokSmart
       </a>
-      <nav aria-label="Site links">
-        <a href="mobile.html">Phone prompts</a>
-        <a href="https://github.com/ArshitGupta01/TokSmart">GitHub</a>
-      </nav>
+      <div class="site-header-actions">
+        <nav aria-label="Site links">
+          <a href="mobile.html">Phone prompts</a>
+          <a href="https://github.com/ArshitGupta01/TokSmart">GitHub</a>
+        </nav>
+        <label class="theme-control">
+          <span>Theme</span>
+          <select data-theme-control aria-label="Theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
     </header>
     <main class="setup-layout">
       <div class="setup-column">
@@ -35,7 +46,7 @@
           <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
           <p>Run this on your computer with Node.js 18+ and Python 3.11+.</p>
           <div class="terminal-card">
-            <code>npx toksmart@latest serve</code>
+            <code id="launch-command">npx toksmart@latest serve</code>
             <button
               type="button"
               class="copy-button"

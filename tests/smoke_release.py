@@ -166,6 +166,7 @@ def smoke(package):
             else:
                 raise AssertionError("Dashboard did not start")
             for asset in (
+                "theme.js",
                 "graph3d.js",
                 "vendor/three.module.js",
                 "vendor/three.core.js",

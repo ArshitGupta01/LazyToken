@@ -3,13 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#050913" />
+    <meta name="theme-color" content="#f4efe5" />
     <meta
       name="description"
       content="Local-first AI coding memory, context & interactive 2D/3D knowledge graph visualizer."
     />
     <title>TokSmart · Knowledge graph</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
     <script src="features-ui.js" defer></script>
@@ -17,17 +18,27 @@
   <body>
     <div id="connect-screen">
       <main class="reconnect-panel" aria-labelledby="connect-title">
-        <a class="brand" href="/" aria-label="TokSmart home">
-          <img class="toksmart-logo" src="logo.svg" alt="" />
-          TokSmart
-        </a>
+        <header class="reconnect-header">
+          <a class="brand" href="/" aria-label="TokSmart home">
+            <img class="toksmart-logo" src="logo.svg" alt="" />
+            TokSmart
+          </a>
+          <label class="theme-control">
+            <span>Theme</span>
+            <select data-theme-control aria-label="Theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+        </header>
         <h1 id="connect-title" tabindex="-1">Connect to TokSmart</h1>
         <p id="connection-status" role="status">Checking the local server…</p>
         <button id="manual-connect-btn" class="small-button" type="button" hidden>Connect</button>
         <div class="local-command">
           <div>
             <p>Start the server from your terminal</p>
-            <code>npx toksmart@latest serve</code>
+            <code id="launch-command">npx toksmart@latest serve</code>
           </div>
           <button
             class="small-button copy-button"
@@ -73,6 +84,14 @@
         >
           <span class="live-dot"></span> <span id="header-port-label">127.0.0.1:8765</span>
         </div>
+        <label class="theme-control">
+          <span>Theme</span>
+          <select data-theme-control aria-label="Theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
         <button
           id="disconnect-btn"
           class="header-disconnect-btn"

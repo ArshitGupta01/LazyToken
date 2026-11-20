@@ -22,10 +22,34 @@
   --line: #c4b9a8;
   --accent: #983d25;
   --accent-tint: #ead8ce;
+  --logo-brightness: 0.6;
+  --track: #e6ddce;
+  --chart-output: #8b7056;
+  --chart-quality: #596747;
+  --disabled: #6f655a;
+  --terminal: #25231e;
+  --terminal-line: #474137;
   --display: Newsreader, Georgia, serif;
   --sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   --mono: 'SFMono-Regular', Consolas, monospace;
   font-family: var(--sans);
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #1b1b18;
+  --surface: #25231f;
+  --ink: #f0ece1;
+  --muted: #c0b8a8;
+  --line: #514c42;
+  --accent: #f1ab84;
+  --accent-tint: #413027;
+  --logo-brightness: 1.45;
+  --track: #3b362e;
+  --chart-output: #d6ad79;
+  --chart-quality: #b0c19a;
+  --disabled: #9d9588;
+  --terminal: #23211d;
+  --terminal-line: #696051;
 }
 * {
   box-sizing: border-box;
@@ -73,7 +97,7 @@ a {
   width: 23px;
   height: 23px;
   flex: none;
-  filter: grayscale(1) brightness(0.6);
+  filter: grayscale(1) brightness(var(--logo-brightness));
 }
 .launch-btn {
   display: inline-flex;
@@ -170,9 +194,9 @@ a {
   gap: 8px;
   margin-top: 14px;
   padding: 7px 9px 7px 12px;
-  border: 1px solid #302d25;
+  border: 1px solid var(--terminal-line);
   border-radius: 2px;
-  background: #25231e;
+  background: var(--terminal);
 }
 .terminal-card code {
   color: #f0e7d7;
@@ -236,7 +260,7 @@ a {
   display: block;
   width: 100%;
   height: auto;
-  border: 1px solid #635b4b;
+  border: 1px solid var(--line);
 }
 .desktop-preview figcaption {
   margin-top: 7px;
@@ -259,5 +283,34 @@ a {
 @media (max-width: 370px) {
   .site-header nav a {
     font-size: 13px;
+  }
+}
+
+.site-header-actions {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2.5vw, 26px);
+}
+.theme-control {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.theme-control select {
+  min-height: 44px;
+  padding-inline: 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+@media (max-width: 465px) {
+  .site-header {
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    padding-block: 7px;
   }
 }

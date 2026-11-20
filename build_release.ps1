@@ -36,6 +36,7 @@ foreach ($Asset in $Assets) {
 $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot 'benchmark\corpus.json');benchmark")
 $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot 'web\prompts.json');web")
 foreach ($Doc in @('CLI.md','CLIENT_COMPATIBILITY.md')) { $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot ('docs\'+$Doc));docs") }
+$PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot 'web/theme.js');web")
 foreach ($Asset in @('three.module.js','three.core.js','OrbitControls.js','THREE-LICENSE.txt','TOKENIZERS-LICENSE.txt')) { $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot ('vendor\'+$Asset));vendor") }
 foreach ($Asset in @('README.md','notebook.py','test_notebook.py')) { $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot ('benchmark\fixture_notebook\'+$Asset));benchmark\fixture_notebook") }
 foreach ($Support in @('install.ps1','manage_install.ps1','dispatch.ps1')) { $PyArgs += @('--add-data',"$(Join-Path $PSScriptRoot $Support);distribution") }

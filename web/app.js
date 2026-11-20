@@ -56,7 +56,18 @@
           }
         }
         if (!copied) {
-          if (badge) badge.textContent = 'Select and copy the command from the terminal box.';
+          const selection = window.getSelection();
+          if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(document.getElementById('launch-command'));
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          if (badge) {
+            badge.textContent = selection
+              ? 'Command selected. Copy it manually.'
+              : 'Select and copy the command from the terminal box.';
+          }
           return;
         }
         button.classList.add('copied');

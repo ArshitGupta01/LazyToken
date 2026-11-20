@@ -84,21 +84,46 @@
     }
   }
 
-  document.querySelectorAll('[data-panel]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const selected = button.dataset.panel;
-      document.querySelectorAll('[data-panel]').forEach((tab) => {
-        tab.setAttribute('aria-pressed', String(tab === button));
-        get(`${tab.dataset.panel}-panel`).hidden = tab.dataset.panel !== selected;
-      });
-      get(
-        { prompts: 'pocket-title', benchmarks: 'benchmarks-title', help: 'help-title' }[selected]
-      ).focus({
-        preventScroll: true
-      });
+  const tabs = document.querySelectorAll('[data-panel]');
+  const headings = new Map([
+    ['prompts', 'pocket-title'],
+    ['benchmarks', 'benchmarks-title'],
+    ['help', 'help-title']
+  ]);
+  let activePanel;
+
+  function selectPanel(panel, moveFocus) {
+    activePanel = panel;
+    tabs.forEach((tab) => {
+      const active = tab.dataset.panel === panel;
+      tab.setAttribute('aria-pressed', String(active));
+      get(`${tab.dataset.panel}-panel`).hidden = !active;
+    });
+    if (moveFocus) {
+      get(headings.get(panel)).focus({ preventScroll: true });
       window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }
+
+  function panelFromUrl() {
+    const panel = window.location.hash.slice(1);
+    return headings.has(panel) ? panel : 'prompts';
+  }
+
+  selectPanel(panelFromUrl(), false);
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const panel = tab.dataset.panel;
+      if (panel !== activePanel) window.history.pushState(null, '', `#${panel}`);
+      selectPanel(panel, true);
     });
   });
+  function followUrl() {
+    const panel = panelFromUrl();
+    if (panel !== activePanel) selectPanel(panel, true);
+  }
+  window.addEventListener('hashchange', followUrl);
+  window.addEventListener('popstate', followUrl);
   get('copy-fallback').addEventListener('close', () => {
     fallbackOpener?.focus();
     fallbackOpener = null;

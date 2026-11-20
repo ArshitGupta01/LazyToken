@@ -92,7 +92,8 @@ function setup({
   denyClipboard = false,
   failFetch = false,
   saved = new Map(),
-  denyStorage = false
+  denyStorage = false,
+  hash = ''
 } = {}) {
   const nodes = new Map();
   const node = (id) => {
@@ -106,6 +107,8 @@ function setup({
   });
   const copied = [];
   const downloads = [];
+  const events = new Map();
+  const location = { hash };
   const context = {
     document: {
       getElementById: node,
@@ -138,7 +141,17 @@ function setup({
         saved.delete(key);
       }
     },
-    window: { scrollTo() {}, confirm: () => false },
+    window: {
+      scrollTo() {},
+      confirm: () => false,
+      location,
+      history: {
+        pushState(_state, _title, nextHash) {
+          location.hash = nextHash;
+        }
+      },
+      addEventListener: (name, handler) => events.set(name, handler)
+    },
     TokSmartMetrics: metrics,
     URL: {
       createObjectURL: (blob) => {
@@ -157,7 +170,7 @@ function setup({
     target.files = [{ size: JSON.stringify(data).length, text: async () => JSON.stringify(data) }];
     await target.listeners.change({ target });
   };
-  return { node, tabs, copied, saved, context, downloads, importReport };
+  return { node, tabs, copied, saved, context, downloads, importReport, events };
 }
 
 test('each of the three modes has one copy button using the exact canonical prompt', async () => {
@@ -217,6 +230,19 @@ test('navigation updates the selected section and touch-friendly button state', 
   assert.equal(page.node('help-panel').hidden, false);
   assert.equal(page.tabs[1].attributes['aria-pressed'], 'false');
   assert.equal(page.node('help-title').focused, true);
+});
+
+test('phone sections open from a URL and follow browser history', () => {
+  const page = setup({ hash: '#benchmarks' });
+  assert.equal(page.node('benchmarks-panel').hidden, false);
+  assert.equal(page.node('benchmarks-title').focused, undefined);
+  page.tabs[2].click();
+  assert.equal(page.context.window.location.hash, '#help');
+  page.context.window.location.hash = '#benchmarks';
+  page.events.get('popstate')();
+  assert.equal(page.node('benchmarks-panel').hidden, false);
+  assert.equal(page.node('help-panel').hidden, true);
+  assert.equal(page.node('benchmarks-title').focused, true);
 });
 
 test('benchmark imports persist, deduplicate, export and require reset confirmation', async () => {

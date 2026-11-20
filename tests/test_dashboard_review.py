@@ -263,6 +263,7 @@ class LocalReviewTests(unittest.TestCase):
                 host = f"127.0.0.1:{port}"
                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
                 for asset in (
+                    "/theme.js",
                     "/graph3d.js",
                     "/vendor/three.module.js",
                     "/vendor/three.core.js",

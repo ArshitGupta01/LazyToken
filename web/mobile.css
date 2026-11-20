@@ -178,7 +178,7 @@
   margin: 11px 0 14px;
 }
 .mobile-page button:disabled {
-  color: #6f655a;
+  color: var(--disabled);
   border-color: var(--line);
   cursor: default;
 }
@@ -262,7 +262,7 @@
   height: 7px;
   display: flex;
   margin-top: 4px;
-  background: #e6ddce;
+  background: var(--track);
   overflow: hidden;
 }
 .bar-track span {
@@ -270,10 +270,10 @@
   background: var(--accent);
 }
 .bar-track .output-bar {
-  background: #8b7056;
+  background: var(--chart-output);
 }
 .bar-track .quality-bar {
-  background: #596747;
+  background: var(--chart-quality);
 }
 .run-details {
   border-top: 1px solid var(--line);

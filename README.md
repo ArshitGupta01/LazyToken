@@ -17,6 +17,8 @@ TokSmart indexes a repository on your computer and gives you or your coding assi
 
 ## Quickstart
 
+Use the **Theme** menu to follow your system or select Light or Dark. The hosted pages share a choice, and the local dashboard saves its own choice in your browser.
+
 You need **Node.js 18+**, **Python 3.11+**, and a local repository. The npm package ships the TokSmart engine. Install Python separately and make sure it is available in your terminal.
 
 **1. Start the desktop dashboard.**

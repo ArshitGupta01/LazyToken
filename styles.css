@@ -1,15 +1,36 @@
 :root {
+  color-scheme: light;
+  --canvas: #f4efe5;
+  --panel: #fbf7ef;
+  --control: #eee7db;
+  --line: #c5baaa;
+  --ink: #24211c;
+  --muted: #5d544a;
+  --accent: #983d25;
+  --active: #ead8ce;
+  --graph-surface: #f6f0e5;
+  --graph-grid: #e9dfd0;
+  --online: #446543;
+  --logo-brightness: 0.6;
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --sans: 'Segoe UI', system-ui, sans-serif;
+  font: 14px var(--sans);
+}
+
+:root[data-theme='dark'] {
   color-scheme: dark;
   --canvas: #1b1b18;
   --panel: #24231f;
   --control: #2d2b25;
-  --line: #454239;
+  --line: #514c42;
   --ink: #f0ece1;
   --muted: #c0b8a8;
   --accent: #f1ab84;
-  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-  --sans: 'Segoe UI', system-ui, sans-serif;
-  font: 14px var(--sans);
+  --active: #49372c;
+  --graph-surface: #1d1c18;
+  --graph-grid: #28261f;
+  --online: #9bb58c;
+  --logo-brightness: 1.45;
 }
 
 * {
@@ -127,7 +148,7 @@ body.server-connected .app-shell {
   width: 22px;
   height: 22px;
   flex: none;
-  filter: grayscale(1) brightness(1.45);
+  filter: grayscale(1) brightness(var(--logo-brightness));
 }
 .topnav {
   display: flex;
@@ -168,7 +189,7 @@ body.server-connected .app-shell {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #9bb58c;
+  background: var(--online);
 }
 .icon-button,
 .round-button,
@@ -405,7 +426,7 @@ kbd {
   font-size: 12px;
 }
 .view-toggle button.active {
-  background: #49372c;
+  background: var(--active);
   color: var(--accent);
 }
 
@@ -414,9 +435,13 @@ kbd {
   flex: 1;
   min-height: 230px;
   overflow: hidden;
-  background-color: #1d1c18;
-  background-image: repeating-linear-gradient(0deg, transparent 0 33px, #28261f 33px 34px),
-    repeating-linear-gradient(90deg, transparent 0 33px, #28261f 33px 34px);
+  background-color: var(--graph-surface);
+  background-image: repeating-linear-gradient(
+      0deg,
+      transparent 0 33px,
+      var(--graph-grid) 33px 34px
+    ),
+    repeating-linear-gradient(90deg, transparent 0 33px, var(--graph-grid) 33px 34px);
 }
 .canvas-wrap > canvas,
 .webgl-host canvas {
@@ -782,7 +807,7 @@ kbd {
 @media (max-width: 630px) {
   .topbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     gap: 6px;
     padding: 5px 10px 0;
   }
@@ -862,5 +887,53 @@ kbd {
 @media (min-width: 631px) and (max-height: 600px) {
   .workspace {
     min-height: 490px;
+  }
+}
+
+.reconnect-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.theme-control {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.theme-control select {
+  min-height: 36px;
+  padding-inline: 5px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--control);
+  color: var(--ink);
+}
+@media (max-width: 960px) {
+  .header-meta {
+    display: none;
+  }
+}
+@media (max-width: 630px) {
+  .theme-control > span {
+    display: none;
+  }
+  .theme-control select {
+    min-height: 42px;
+  }
+}
+@media (max-width: 370px) {
+  .topbar .brand {
+    gap: 4px;
+    font-size: 14px;
+  }
+  .topbar .toksmart-logo {
+    width: 18px;
+    height: 18px;
+  }
+  .topbar .header-disconnect-btn {
+    padding-inline: 5px;
   }
 }

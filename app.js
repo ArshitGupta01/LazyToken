@@ -55,7 +55,16 @@
           await navigator.clipboard.writeText(button.dataset.command);
           status.textContent = 'Command copied.';
         } catch {
-          status.textContent = 'Select and copy the command manually.';
+          const selection = window.getSelection();
+          if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(document.getElementById('launch-command'));
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          status.textContent = selection
+            ? 'Command selected. Copy it manually.'
+            : 'Select and copy the command manually.';
         }
       });
     });
@@ -228,20 +237,41 @@
     const canvas = $('#graph'),
       ctx = canvas.getContext('2d'),
       host = $('#webgl-host');
-    const palette = {
-      project: '#f0ad81',
-      framework: '#b6bc8e',
-      library: '#8db3a5',
-      platform: '#c6aa78',
-      pattern: '#beb1cb',
-      component: '#cfbca7',
-      skill: '#b7a9a0',
-      plugin: '#9cbaad',
-      decision: '#e0ab89',
-      lesson: '#d1bb80',
-      technology: '#b9b6a7'
+    const root = document.documentElement;
+    const palettes = {
+      project: ['#9a4325', '#f0ad81'],
+      framework: ['#59623d', '#b6bc8e'],
+      library: ['#3b6c5d', '#8db3a5'],
+      platform: ['#795629', '#c6aa78'],
+      pattern: ['#695078', '#beb1cb'],
+      component: ['#755c44', '#cfbca7'],
+      skill: ['#72574e', '#b7a9a0'],
+      plugin: ['#3e685a', '#9cbaad'],
+      decision: ['#934c2d', '#e0ab89'],
+      lesson: ['#795d24', '#d1bb80'],
+      technology: ['#66634b', '#b9b6a7']
     };
-    const color = (kind) => palette[kind] || '#cbbca8';
+    const themeColors = {
+      light: {
+        activeEdge: '#983d25',
+        sharedEdge: '#746659',
+        projectEdge: '#85776a',
+        label: '#24211c',
+        edgeLabel: '#813920',
+        focus: '#523c2d'
+      },
+      dark: {
+        activeEdge: '#f1ab84',
+        sharedEdge: '#a99a84',
+        projectEdge: '#867b6c',
+        label: '#f0ece1',
+        edgeLabel: '#e6c6ac',
+        focus: '#f4e5cf'
+      }
+    };
+    const activeTheme = () => (root?.dataset?.theme === 'dark' ? 'dark' : 'light');
+    const color = (kind) =>
+      (palettes[kind] || palettes.technology)[activeTheme() === 'dark' ? 1 : 0];
     const esc = (value = '') =>
       String(value).replace(
         /[&<>"']/g,
@@ -273,15 +303,23 @@
       projectsLoaded = false;
 
     // Keep the selection intact while giving the graph the inspector's space.
-    function setInspectorMinimized(minimized) {
+    function setInspectorMinimized(minimized, moveFocus = false) {
       document.querySelector('.app-shell').classList.toggle('inspector-minimized', minimized);
       $('#inspector').hidden = minimized;
       $('#inspector-restore').hidden = !minimized;
       $('#inspector-restore').setAttribute('aria-expanded', String(!minimized));
-      (minimized ? $('#inspector-restore') : $('#inspector-minimize')).focus();
+      if (moveFocus) (minimized ? $('#inspector-restore') : $('#inspector-minimize')).focus();
     }
-    $('#inspector-minimize').onclick = () => setInspectorMinimized(true);
-    $('#inspector-restore').onclick = () => setInspectorMinimized(false);
+    $('#inspector-minimize').onclick = () => setInspectorMinimized(true, true);
+    $('#inspector-restore').onclick = () => setInspectorMinimized(false, true);
+    root?.addEventListener('toksmart-themechange', () => {
+      $('#filters')
+        .querySelectorAll('input')
+        .forEach((input) => {
+          input.parentElement.style.setProperty('--type-color', color(input.value));
+        });
+      draw();
+    });
 
     async function loadProjects() {
       try {
@@ -555,7 +593,8 @@
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const { shown, links } = filtered(),
-          focus = hover || selected;
+          focus = hover || selected,
+          visuals = themeColors[activeTheme()];
         updateCounts(shown, links);
         const signature = shown.map((n) => n.id + ':' + n.name).join('|');
         if (signature !== jumpSignature) {
@@ -585,7 +624,15 @@
               ? 'No global relationships. Select a project to see its connections.'
               : 'No relationships recorded yet.';
         if (view3d && gl) {
-          gl.setState({ nodes: shown, edges: links, selected, hovered: hover, width, height });
+          gl.setState({
+            nodes: shown,
+            edges: links,
+            selected,
+            hovered: hover,
+            width,
+            height,
+            visuals
+          });
           return;
         }
         ctx.clearRect(0, 0, width, height);
@@ -599,14 +646,18 @@
           ctx.moveTo(edge.a.x, edge.a.y);
           ctx.lineTo(edge.b.x, edge.b.y);
           ctx.setLineDash(edge.scope === '*' ? [] : [4, 4]);
-          ctx.strokeStyle = active ? '#f1ab84' : '#80786b';
+          ctx.strokeStyle = active
+            ? visuals.activeEdge
+            : edge.scope === '*'
+              ? visuals.sharedEdge
+              : visuals.projectEdge;
           ctx.lineWidth = active ? 2 : 0.9 + Math.max(0, Math.min(1, Number(edge.weight) || 0));
           ctx.stroke();
           ctx.setLineDash([]);
           if (active) {
             const x = (edge.a.x + edge.b.x) / 2,
               y = (edge.a.y + edge.b.y) / 2;
-            ctx.fillStyle = '#e6c6ac';
+            ctx.fillStyle = visuals.edgeLabel;
             ctx.font = '11px Consolas, monospace';
             ctx.textAlign = 'center';
             ctx.fillText(edge.relation.replaceAll('_', ' '), x, y - 7);
@@ -631,12 +682,12 @@
             ctx.beginPath();
             ctx.arc(n.x, n.y, n.r * 0.68 + 4, 0, Math.PI * 2);
             ctx.lineWidth = 1.3;
-            ctx.strokeStyle = '#f4e5cf';
+            ctx.strokeStyle = visuals.focus;
             ctx.stroke();
           }
           ctx.font = `${isSelected ? '600 ' : ''}12px Segoe UI, sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillStyle = '#f0ece1';
+          ctx.fillStyle = visuals.label;
           if (shown.length <= 60 || isSelected || near || n === hover)
             ctx.fillText(n.name, n.x, n.y + n.r + 13);
           ctx.globalAlpha = 1;
@@ -716,12 +767,16 @@
               ? 0
               : available.length - 1
             : (index + step + available.length) % available.length;
+        setInspectorMinimized(false);
         inspector(available[index]);
       } else if (selected) {
         pan.x = (width / 2 - selected.x) * zoom;
         pan.y = (height / 2 - selected.y) * zoom;
         draw();
-      } else inspector(available[0]);
+      } else {
+        setInspectorMinimized(false);
+        inspector(available[0]);
+      }
     });
     canvas.addEventListener('pointerdown', (event) => {
       canvas.setPointerCapture(event.pointerId);
@@ -899,6 +954,7 @@
       if (e.key === 'Enter' && query) {
         const match = nodes.find((n) => baseVisible(n) && matchesQuery(n));
         if (match) {
+          setInspectorMinimized(false);
           inspector(match);
           if (view3d && gl) gl.focus(match);
           else {
@@ -920,12 +976,38 @@
         })
     );
     $('#fit').onclick = () => {
-      if (view3d && gl) gl.reset();
-      else {
+      if (view3d && gl) {
+        gl.fit();
+        return;
+      }
+      const { shown } = filtered();
+      if (!shown.length) {
         zoom = 1;
         pan = { x: 0, y: 0 };
         draw();
+        return;
       }
+      ctx.save();
+      ctx.font = '600 12px Segoe UI, sans-serif';
+      const bounds = shown.map((node) => ({
+        node,
+        halfWidth: Math.max(node.r + 4, ctx.measureText(node.name).width / 2)
+      }));
+      ctx.restore();
+      const left = Math.min(...bounds.map(({ node, halfWidth }) => node.x - halfWidth));
+      const right = Math.max(...bounds.map(({ node, halfWidth }) => node.x + halfWidth));
+      const top = Math.min(...shown.map((node) => node.y - node.r - 4));
+      const bottom = Math.max(...shown.map((node) => node.y + node.r + 16));
+      const padding = 24;
+      zoom = Math.max(
+        0.1,
+        Math.min(1, (width - 2 * padding) / (right - left), (height - 2 * padding) / (bottom - top))
+      );
+      pan = {
+        x: ((width - left - right) / 2) * zoom,
+        y: ((height - top - bottom) / 2) * zoom
+      };
+      draw();
     };
     $('#zoom-in').onclick = () => {
       if (view3d && gl) gl.zoom(0.82);

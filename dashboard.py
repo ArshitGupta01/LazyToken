@@ -228,6 +228,7 @@ class Handler(BaseHTTPRequestHandler):
             "/",
             "/index.html",
             "/app.js",
+            "/theme.js",
             "/features-ui.js",
             "/styles.css",
             "/logo.svg",
@@ -240,6 +241,8 @@ class Handler(BaseHTTPRequestHandler):
         target = HERE / (
             "index.html" if parsed.path in ("/", "/index.html") else parsed.path.lstrip("/")
         )
+        if parsed.path == "/theme.js":
+            target = HERE / "web" / "theme.js"
         try:
             resolved_target = target.resolve()
             resolved_here = HERE.resolve()

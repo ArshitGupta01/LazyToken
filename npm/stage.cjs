@@ -20,7 +20,7 @@ const files = [
   "app_entry.py", "broker.py", "dashboard.py", "data_ops.py", "diagnostics.py",
   "features.py", "frameworks.py", "kn.py", "learning.py", "mcp_schema.py", "migration.py",
   "onboarding.py", "retrieval_eval.py", "source_index.py", "token_budget.py", "watcher.py",
-  "index.html", "styles.css", "logo.svg", "app.js", "features-ui.js", "graph3d.js", "POLICY.md", "LICENSE",
+  "index.html", "styles.css", "web/theme.js", "logo.svg", "app.js", "features-ui.js", "graph3d.js", "POLICY.md", "LICENSE",
   "vendor/OrbitControls.js", "vendor/three.core.js", "vendor/three.module.js", "vendor/THREE-LICENSE.txt",
   "benchmark/__init__.py", "benchmark/harness.py", "benchmark/corpus.json",
   "benchmark/prompt_modes.py", "web/prompts.json",
