@@ -105,76 +105,36 @@
       </div>
     </header>
     <main class="setup-layout">
-      <div class="setup-intro">
-        <div>
-          <h1>Launch TokSmart.</h1>
-          <p>Run TokSmart on this computer and connect to your local dashboard.</p>
-        </div>
-        <a class="secondary-action" href="#dashboard-preview"
-          >Preview dashboard
-          <svg class="site-icon" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg>
-        </a>
-      </div>
+      <section class="setup-stage" aria-labelledby="setup-title">
+        <div class="launch-console">
+          <header class="setup-intro">
+            <span class="setup-icon"
+              ><svg class="site-icon" aria-hidden="true"><use href="#icon-terminal"></use></svg
+            ></span>
+            <div>
+              <h1 id="setup-title">Start your local dashboard</h1>
+              <p>Run TokSmart in your terminal and keep it open while you work.</p>
+            </div>
+          </header>
 
-      <div class="launch-console">
-        <ol class="launch-stages" aria-label="Setup progress">
-          <li id="launch-step-run" data-progress="current" aria-current="step">
-            <span class="stage-number" aria-hidden="true">1</span><span>Copy command</span>
-          </li>
-          <li id="launch-step-connect">
-            <span class="stage-number" aria-hidden="true">2</span><span>Detect server</span>
-          </li>
-          <li id="launch-step-open">
-            <span class="stage-number" aria-hidden="true">3</span><span>Open dashboard</span>
-          </li>
-        </ol>
-        <div class="setup-grid">
-          <section
-            id="desktop-setup"
-            class="setup-instructions"
-            aria-labelledby="desktop-setup-title"
-            tabindex="-1"
-          >
-            <header class="setup-heading">
-              <span class="setup-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-terminal"></use></svg
-              ></span>
-              <div>
-                <h2 id="desktop-setup-title">Run in your terminal</h2>
-                <p>Keep the terminal open while you use TokSmart.</p>
+          <ol class="launch-stages" role="list" aria-label="Setup progress">
+            <li
+              class="launch-step setup-instructions"
+              id="launch-step-run"
+              data-progress="current"
+              aria-current="step"
+            >
+              <div class="step-heading">
+                <span class="stage-number" aria-hidden="true">1</span>
+                <h2>Copy a launch command</h2>
               </div>
-            </header>
-            <tab-container class="install-mode">
-              <div class="install-mode-tabs" role="tablist" aria-label="Installation method">
-                <button
-                  type="button"
-                  role="tab"
-                  id="quick-start-tab"
-                  aria-controls="quick-start"
-                  aria-selected="true"
-                >
-                  Quick start
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="global-install-tab"
-                  aria-controls="global-install"
-                  aria-selected="false"
-                  tabindex="-1"
-                >
-                  Global install
-                </button>
-              </div>
-              <div
-                id="quick-start"
-                role="tabpanel"
-                aria-labelledby="quick-start-tab"
-                data-tab-container-no-tabstop
-              >
-                <div class="terminal-card">
+              <div class="step-body">
+                <p class="command-label" id="quick-start-label">Quick start</p>
+                <div class="terminal-card" role="group" aria-labelledby="quick-start-label">
                   <span class="terminal-prompt" aria-hidden="true">$</span>
-                  <code id="launch-command">npx toksmart@latest serve --no-browser</code>
+                  <code id="launch-command"
+                    >npx toksmart@latest serve <span>--no-browser</span></code
+                  >
                   <button
                     type="button"
                     class="copy-button"
@@ -184,106 +144,115 @@
                     Copy
                   </button>
                 </div>
-                <p class="command-help">
-                  On the first run, npm may ask to download TokSmart. Confirm to continue.
-                </p>
+
+                <p class="command-label" id="global-install-label">Or install globally</p>
+                <div class="terminal-stack" role="group" aria-labelledby="global-install-label">
+                  <div class="terminal-card">
+                    <span class="terminal-prompt" aria-hidden="true">$</span>
+                    <code>npm install --global toksmart</code>
+                    <button type="button" class="copy-button" aria-label="Copy install command">
+                      Copy
+                    </button>
+                  </div>
+                  <div class="terminal-card">
+                    <span class="terminal-prompt" aria-hidden="true">$</span>
+                    <code>toksmart serve <span>--no-browser</span></code>
+                    <button
+                      type="button"
+                      class="copy-button"
+                      data-starts-server
+                      aria-label="Copy installed launch command"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <p id="step-1-badge" class="copy-hint" role="status"></p>
+              </div>
+            </li>
+
+            <li class="launch-step" id="launch-step-connect">
+              <div class="step-heading">
+                <span class="stage-number" aria-hidden="true">2</span>
+                <h2 id="server-title">Detect the server</h2>
               </div>
               <div
-                id="global-install"
-                role="tabpanel"
-                aria-labelledby="global-install-tab"
-                data-tab-container-no-tabstop
-                hidden
+                class="step-body server-card"
+                id="server-status"
+                data-state="checking"
+                role="group"
+                aria-labelledby="server-title"
               >
-                <p class="command-label">Install once</p>
-                <div class="terminal-card">
-                  <span class="terminal-prompt" aria-hidden="true">$</span>
-                  <code>npm install --global toksmart</code>
-                  <button type="button" class="copy-button" aria-label="Copy install command">
-                    Copy
-                  </button>
-                </div>
-                <p class="command-label">Then start TokSmart</p>
-                <div class="terminal-card">
-                  <span class="terminal-prompt" aria-hidden="true">$</span>
-                  <code>toksmart serve --no-browser</code>
-                  <button
-                    type="button"
-                    class="copy-button"
-                    data-starts-server
-                    aria-label="Copy installed launch command"
-                  >
-                    Copy
-                  </button>
+                <div class="server-monitor">
+                  <div class="server-signal">
+                    <span class="signal-dot" aria-hidden="true"></span>
+                    <strong id="server-state" role="status">Checking server…</strong>
+                  </div>
+                  <p id="server-detail">Looking for TokSmart on this computer.</p>
+                  <div class="server-monitor-footer">
+                    <dl class="server-metrics">
+                      <div>
+                        <dt>Ping</dt>
+                        <dd id="server-ping">—</dd>
+                      </div>
+                      <div>
+                        <dt>Last checked</dt>
+                        <dd id="server-checked">—</dd>
+                      </div>
+                    </dl>
+                    <button type="button" id="check-server">Check now</button>
+                  </div>
                 </div>
               </div>
-            </tab-container>
-            <p id="step-1-badge" class="copy-hint" role="status"></p>
-            <p class="setup-requirements">
-              Requires <strong>Node.js 18+</strong> and <strong>Python 3.11+</strong>.
-            </p>
-          </section>
+            </li>
 
-          <section
-            class="server-card"
-            id="server-status"
-            data-state="checking"
-            aria-labelledby="server-title"
-          >
-            <header class="setup-heading">
-              <span class="setup-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-network"></use></svg
-              ></span>
-              <div>
-                <h2 id="server-title">Connect to the dashboard</h2>
-                <p><code>127.0.0.1:8765</code></p>
+            <li class="launch-step" id="launch-step-open">
+              <div class="step-heading">
+                <span class="stage-number" aria-hidden="true">3</span>
+                <h2>Open the dashboard</h2>
               </div>
-            </header>
-            <div class="server-monitor">
-              <div class="server-signal">
-                <span class="signal-dot" aria-hidden="true"></span>
-                <strong id="server-state" role="status">Checking server…</strong>
+              <div class="step-body">
+                <div class="launch-actions">
+                  <a
+                    class="open-dashboard"
+                    id="open-dashboard"
+                    href="http://127.0.0.1:8765/"
+                    target="_blank"
+                    rel="noopener"
+                    >Open dashboard
+                    <svg class="site-icon" aria-hidden="true">
+                      <use href="#icon-arrow-up-right"></use>
+                    </svg>
+                  </a>
+                  <label class="auto-open"
+                    ><input type="checkbox" id="auto-open" /> <span>Open when ready</span></label
+                  >
+                </div>
+                <details class="setup-help">
+                  <summary>Server running but still waiting?</summary>
+                  <p>
+                    Allow local network access if your browser asks. If you used a different port,
+                    open the address printed in your terminal.
+                  </p>
+                </details>
               </div>
-              <p id="server-detail">Looking for TokSmart on this computer.</p>
-              <dl class="server-metrics">
-                <div>
-                  <dt>Ping</dt>
-                  <dd id="server-ping">—</dd>
-                </div>
-                <div>
-                  <dt>Last checked</dt>
-                  <dd id="server-checked">—</dd>
-                </div>
-              </dl>
+            </li>
+          </ol>
+
+          <footer class="setup-footer">
+            <div class="setup-requirements">
+              <span>Node.js 18+ · Python 3.11+</span>
+              <code>127.0.0.1:8765</code>
             </div>
-            <div class="server-actions">
-              <a
-                class="open-dashboard"
-                id="open-dashboard"
-                href="http://127.0.0.1:8765/"
-                target="_blank"
-                rel="noopener"
-                >Open dashboard
-                <svg class="site-icon" aria-hidden="true">
-                  <use href="#icon-arrow-up-right"></use>
-                </svg>
-              </a>
-              <button type="button" id="check-server">Check now</button>
-            </div>
-            <label class="auto-open"
-              ><input type="checkbox" id="auto-open" />
-              <span>Open automatically when ready</span></label
-            >
-            <details class="install-options">
-              <summary>Server running but still waiting?</summary>
-              <p>
-                Allow local network access if your browser asks. You can also open the address shown
-                in your terminal, especially if you started TokSmart on a different port.
-              </p>
-            </details>
-          </section>
+            <a class="secondary-action" href="#dashboard-preview"
+              >Preview dashboard
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-arrow-up-right"></use>
+              </svg>
+            </a>
+          </footer>
         </div>
-      </div>
+      </section>
 
       <tab-container id="dashboard-preview" class="desktop-preview" tabindex="-1">
         <div class="preview-header" slot="tablist-wrapper">
