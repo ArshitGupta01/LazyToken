@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import secrets
@@ -364,7 +365,7 @@ def main() -> None:
     except OSError as err:
         if (
             getattr(err, "winerror", None) == 10048
-            or getattr(err, "errno", None) in (48, 98, 10048)
+            or err.errno in (errno.EADDRINUSE, 10048)
             or "10048" in str(err)
         ):
             if not dashboard_is_running(args.port):
