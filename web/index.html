@@ -27,24 +27,7 @@
         <path d="M7 7h10v10" />
         <path d="M7 17 17 7" />
       </symbol>
-      <symbol id="icon-box" viewBox="0 0 24 24">
-        <path
-          d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"
-        />
-        <path d="m3.3 7 8.7 5 8.7-5" />
-        <path d="M12 22V12" />
-      </symbol>
-      <symbol id="icon-brackets" viewBox="0 0 24 24">
-        <path d="M16 3h3a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-3" />
-        <path d="M8 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3" />
-      </symbol>
-      <symbol id="icon-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
       <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
-      <symbol id="icon-code-xml" viewBox="0 0 24 24">
-        <path d="m18 16 4-4-4-4" />
-        <path d="m6 8-4 4 4 4" />
-        <path d="m14.5 4-5 16" />
-      </symbol>
       <symbol id="icon-database" viewBox="0 0 24 24">
         <ellipse cx="12" cy="5" rx="9" ry="3" />
         <path d="M3 5V19A9 3 0 0 0 21 19V5" />
@@ -57,11 +40,6 @@
         <path d="M14 2v5a1 1 0 0 0 1 1h5" />
         <path d="M10 12.5 8 15l2 2.5" />
         <path d="m14 12.5 2 2.5-2 2.5" />
-      </symbol>
-      <symbol id="icon-folder" viewBox="0 0 24 24">
-        <path
-          d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
-        />
       </symbol>
       <symbol id="icon-git-fork" viewBox="0 0 24 24">
         <circle cx="12" cy="18" r="3" />
@@ -76,11 +54,6 @@
         />
         <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
         <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
-      </symbol>
-      <symbol id="icon-monitor" viewBox="0 0 24 24">
-        <rect width="20" height="14" x="2" y="3" rx="2" />
-        <line x1="8" x2="16" y1="21" y2="21" />
-        <line x1="12" x2="12" y1="17" y2="21" />
       </symbol>
       <symbol id="icon-network" viewBox="0 0 24 24">
         <rect x="16" y="16" width="6" height="6" rx="1" />
@@ -100,11 +73,6 @@
       <symbol id="icon-terminal" viewBox="0 0 24 24">
         <path d="M12 19h8" />
         <path d="m4 17 6-6-6-6" />
-      </symbol>
-      <symbol id="icon-zap" viewBox="0 0 24 24">
-        <path
-          d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"
-        />
       </symbol>
     </svg>
 
@@ -143,125 +111,81 @@
     <main class="setup-layout">
       <section class="product-hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="product-kind">
-            <svg class="site-icon" aria-hidden="true">
-              <use href="#icon-zap"></use>
-            </svg>
-            Local code intelligence
-          </p>
-          <h1 id="hero-title">Trace and reuse your codebase. <span>Use fewer tokens.</span></h1>
+          <p class="product-kind">Local code intelligence</p>
+          <h1 id="hero-title">See how your <span>code connects.</span></h1>
           <p class="hero-lead">
-            Map how your code connects, find what matters, and give your AI assistant the context it
-            needs. Your index stays on your computer.
+            Trace dependencies, find symbols, and give your AI assistant relevant context through
+            MCP. Your repository index stays on your machine.
           </p>
           <div class="hero-actions">
             <a class="primary-action" href="#desktop-setup"
               >Get started
-              <svg class="site-icon" aria-hidden="true">
-                <use href="#icon-arrow-right"></use></svg
+              <svg class="site-icon" aria-hidden="true"><use href="#icon-arrow-right"></use></svg
             ></a>
-            <a class="secondary-action" href="https://github.com/ArshitGupta01/TokSmart"
-              >View on GitHub
-              <svg class="site-icon" aria-hidden="true">
-                <use href="#icon-arrow-up-right"></use></svg
+            <a class="secondary-action" href="#dashboard-preview"
+              >Preview dashboard
+              <svg class="site-icon" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg
             ></a>
           </div>
         </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="graph-window">
-            <div class="window-bar">
-              <span class="window-dots"><i></i><i></i><i></i></span>
-              <span>TokSmart / Knowledge graph</span>
-            </div>
-            <div class="window-content">
-              <div class="window-rail">
-                <svg class="site-icon" aria-hidden="true">
-                  <use href="#icon-folder"></use></svg
-                ><svg class="site-icon" aria-hidden="true">
-                  <use href="#icon-network"></use></svg
-                ><svg class="site-icon" aria-hidden="true">
-                  <use href="#icon-search"></use></svg
-                ><svg class="site-icon" aria-hidden="true">
-                  <use href="#icon-layers"></use>
-                </svg>
-              </div>
-              <div class="hero-network">
-                <i class="network-edge" style="--edge-length: 30.89%; --angle: -150.95deg"></i
-                ><i class="network-edge" style="--edge-length: 29.87%; --angle: -36.53deg"></i
-                ><i class="network-edge" style="--edge-length: 36.04%; --angle: -2.65deg"></i
-                ><i class="network-edge" style="--edge-length: 28.08%; --angle: 35.01deg"></i
-                ><i class="network-edge" style="--edge-length: 27.6%; --angle: 142.85deg"></i
-                ><i class="network-edge" style="--edge-length: 37.02%; --angle: 178.28deg"></i>
-                <div class="network-node" style="--x: 23%; --y: 23%">
-                  <svg class="site-icon" aria-hidden="true">
-                    <use href="#icon-folder"></use></svg
-                  ><span>routes/</span>
-                </div>
-                <div class="network-node" style="--x: 74%; --y: 18%">
-                  <svg class="site-icon" aria-hidden="true">
-                    <use href="#icon-file-code"></use></svg
-                  ><span>auth.py</span>
-                </div>
-                <div class="network-node" style="--x: 86%; --y: 47%">
-                  <svg class="site-icon" aria-hidden="true">
-                    <use href="#icon-brackets"></use></svg
-                  ><span>middleware</span>
-                </div>
-                <div class="network-node" style="--x: 73%; --y: 79%">
-                  <svg class="site-icon" aria-hidden="true">
-                    <use href="#icon-database"></use></svg
-                  ><span>storage</span>
-                </div>
-                <div class="network-node" style="--x: 28%; --y: 80%">
-                  <svg class="site-icon" aria-hidden="true">
-                    <use href="#icon-box"></use></svg
-                  ><span>dependencies</span>
-                </div>
-                <div class="network-node" style="--x: 13%; --y: 52%">
-                  <svg class="site-icon" aria-hidden="true">
-                    <use href="#icon-file-code"></use></svg
-                  ><span>sessions.py</span>
-                </div>
-                <div class="network-node network-root">
-                  <svg class="site-icon" aria-hidden="true">
-                    <use href="#icon-code-xml"></use>
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+
+        <section class="sample-graph" aria-labelledby="sample-title">
+          <header class="sample-header">
+            <h2 id="sample-title">
+              <svg class="site-icon" aria-hidden="true"><use href="#icon-git-fork"></use></svg>
+              sample-api
+            </h2>
+            <span>Select a file</span>
+          </header>
+          <fieldset class="sample-canvas">
+            <legend class="visually-hidden">Inspect a file in the sample repository</legend>
+            <svg
+              class="sample-edges"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path class="is-active" data-connects="router auth" d="M15 31H24L37 64" />
+              <path class="is-active" data-connects="auth sessions" d="M37 64H46L63 31" />
+              <path data-connects="sessions storage" d="M63 31H72L85 64" />
+            </svg>
+            <label class="sample-node" style="--x: 15%; --y: 31%">
+              <input type="radio" name="sample-file" value="router" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-network"></use></svg
+              ></span>
+              <span>router.py</span>
+            </label>
+            <label class="sample-node" style="--x: 37%; --y: 64%">
+              <input type="radio" name="sample-file" value="auth" class="visually-hidden" checked />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-file-code"></use></svg
+              ></span>
+              <span>auth.py</span>
+            </label>
+            <label class="sample-node" style="--x: 63%; --y: 31%">
+              <input type="radio" name="sample-file" value="sessions" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-layers"></use></svg
+              ></span>
+              <span>sessions.py</span>
+            </label>
+            <label class="sample-node" style="--x: 85%; --y: 64%">
+              <input type="radio" name="sample-file" value="storage" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-database"></use></svg
+              ></span>
+              <span>storage.py</span>
+            </label>
+          </fieldset>
+          <output class="sample-evidence">
+            <span class="evidence-meta"
+              ><strong>auth.py:1</strong><span>Imports sessions.py</span></span
+            >
+            <code>from sessions import SessionStore</code>
+          </output>
+        </section>
       </section>
-      <ul class="product-features" aria-label="TokSmart capabilities">
-        <li>
-          <svg class="site-icon" aria-hidden="true">
-            <use href="#icon-network"></use>
-          </svg>
-          <h2>Code graph</h2>
-          <p>See how files, symbols, and dependencies connect.</p>
-        </li>
-        <li>
-          <svg class="site-icon" aria-hidden="true">
-            <use href="#icon-search"></use>
-          </svg>
-          <h2>Code search</h2>
-          <p>Find symbols, source files, and saved project notes.</p>
-        </li>
-        <li>
-          <svg class="site-icon" aria-hidden="true">
-            <use href="#icon-layers"></use>
-          </svg>
-          <h2>Project context</h2>
-          <p>Give your coding assistant reviewed context through MCP.</p>
-        </li>
-        <li>
-          <svg class="site-icon" aria-hidden="true">
-            <use href="#icon-zap"></use>
-          </svg>
-          <h2>Token benchmarks</h2>
-          <p>Measure token usage against a baseline.</p>
-        </li>
-      </ul>
 
       <section
         id="desktop-setup"
@@ -269,59 +193,39 @@
         aria-labelledby="desktop-setup-title"
         tabindex="-1"
       >
+        <header class="setup-heading">
+          <span class="setup-icon"
+            ><svg class="site-icon" aria-hidden="true"><use href="#icon-terminal"></use></svg
+          ></span>
+          <div>
+            <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
+            <p>Requires Node.js 18+ and Python 3.11+.</p>
+          </div>
+        </header>
         <div class="setup-copy">
-          <header>
-            <span class="setup-icon"
-              ><svg class="site-icon" aria-hidden="true">
-                <use href="#icon-monitor"></use></svg
-            ></span>
-            <div>
-              <h2 id="desktop-setup-title">Start the desktop dashboard</h2>
-              <p>Run one command to open TokSmart on this computer.</p>
-            </div>
-          </header>
           <div class="terminal-card">
             <span class="terminal-prompt" aria-hidden="true">$</span>
             <code id="launch-command">npx toksmart@latest serve</code>
             <button type="button" class="copy-button" aria-label="Copy launch command">Copy</button>
           </div>
           <p id="step-1-badge" class="copy-hint" role="status"></p>
-          <p class="setup-requirements">Requires Node.js 18+ and Python 3.11+.</p>
           <p class="setup-help">
-            <span class="status-dot" aria-hidden="true"></span> Keep the terminal open, then
-            <a href="http://127.0.0.1:8765/">open the dashboard</a>.
+            Keep the terminal open, then <a href="http://127.0.0.1:8765/">open the dashboard</a>.
           </p>
-          <details class="install-options">
-            <summary>Install for regular use</summary>
-            <p>Run <code>npm install --global toksmart</code>, then <code>toksmart serve</code>.</p>
-          </details>
         </div>
-        <div class="example-terminal" aria-label="Example terminal output">
-          <div class="window-bar">
-            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span>Terminal</span>
-          </div>
-          <div class="example-output">
-            <code><span>$</span> npx toksmart@latest serve</code>
-            <p>TokSmart dashboard:</p>
-            <code class="example-address"
-              ><svg class="site-icon" aria-hidden="true">
-                <use href="#icon-check"></use>
-              </svg>
-              http://127.0.0.1:8765</code
-            >
-            <p>Loopback only · Ctrl+C to stop</p>
-          </div>
-        </div>
+        <details class="install-options">
+          <summary>Install for regular use</summary>
+          <p>Run <code>npm install --global toksmart</code>, then <code>toksmart serve</code>.</p>
+        </details>
       </section>
 
-      <tab-container class="desktop-preview">
+      <tab-container id="dashboard-preview" class="desktop-preview" tabindex="-1">
         <div class="preview-header" slot="tablist-wrapper">
           <span class="preview-heading"
             ><svg class="site-icon" aria-hidden="true">
               <use href="#icon-git-fork"></use>
             </svg>
-            Sample repository</span
+            Dashboard preview</span
           >
           <div class="preview-switch" role="tablist" aria-label="Dashboard preview views">
             <button
@@ -382,7 +286,7 @@
               alt="TokSmart knowledge graph with the Session store node selected and its relationships in the inspector."
               width="1064"
               height="665"
-              fetchpriority="high"
+              loading="lazy"
             />
           </a>
         </div>
