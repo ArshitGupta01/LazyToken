@@ -82,7 +82,7 @@
           id="header-server-status"
           title="Connected to local server at 127.0.0.1:8765"
         >
-          <span class="live-dot"></span> <span id="header-port-label">127.0.0.1:8765</span>
+          <span class="live-dot" aria-hidden="true"></span> Local server
         </div>
         <label class="theme-control">
           <span>Theme</span>
@@ -146,24 +146,28 @@
               <h1>Knowledge graph</h1>
               <span id="scope-label" class="scope-label">Shared knowledge</span>
             </div>
-            <label class="searchbox">
-              <input
-                id="search"
-                placeholder="Filter graph nodes…"
-                autocomplete="off"
-                aria-label="Search graph"
-                aria-keyshortcuts="/"
-              />
-              <kbd aria-hidden="true">/</kbd>
-            </label>
-            <div class="graph-actions">
-              <div class="view-toggle" role="group" aria-label="Graph view">
-                <button id="view-2d" class="active" aria-pressed="true">2D</button>
-                <button id="view-3d" aria-pressed="false">3D</button>
+            <div class="graph-tools">
+              <label class="searchbox">
+                <input
+                  id="search"
+                  placeholder="Filter graph nodes…"
+                  autocomplete="off"
+                  aria-label="Search graph"
+                  aria-keyshortcuts="/"
+                />
+                <kbd aria-hidden="true">/</kbd>
+              </label>
+              <div class="graph-actions">
+                <div class="view-toggle" role="group" aria-label="Graph view">
+                  <button id="view-2d" class="active" aria-pressed="true">2D</button>
+                  <button id="view-3d" aria-pressed="false">3D</button>
+                </div>
+                <div class="camera-controls" role="group" aria-label="Graph framing">
+                  <button id="fit" class="small-button" title="Fit graph to view">Fit</button>
+                  <button id="zoom-out" class="round-button" aria-label="Zoom out">−</button>
+                  <button id="zoom-in" class="round-button" aria-label="Zoom in">+</button>
+                </div>
               </div>
-              <button id="fit" class="small-button" title="Fit graph to view">Fit</button>
-              <button id="zoom-out" class="round-button" aria-label="Zoom out">−</button>
-              <button id="zoom-in" class="round-button" aria-label="Zoom in">+</button>
             </div>
           </div>
 

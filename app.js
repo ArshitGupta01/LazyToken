@@ -150,9 +150,7 @@
 
     window.API_BASE = getApiBase();
     const localAddress = window.location.host;
-    const portLabel = document.getElementById('header-port-label');
     const serverStatus = document.getElementById('header-server-status');
-    if (portLabel) portLabel.textContent = localAddress;
     if (serverStatus) serverStatus.title = 'Connected to local server at ' + localAddress;
 
     document.documentElement.classList.add('server-connected');
