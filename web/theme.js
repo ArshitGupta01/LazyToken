@@ -20,7 +20,7 @@
     const resolved = mode === 'system' ? (system.matches ? 'dark' : 'light') : mode;
     const changed = root.dataset.theme !== resolved;
     root.dataset.theme = resolved;
-    if (color) color.content = resolved === 'dark' ? '#0e1211' : '#edf1e9';
+    if (color) color.content = resolved === 'dark' ? '#081321' : '#e6f0f6';
     document.querySelectorAll('[data-theme-control]').forEach((control) => {
       control.value = mode;
     });

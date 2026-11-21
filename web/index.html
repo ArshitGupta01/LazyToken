@@ -3,434 +3,527 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0e1211" />
+    <meta name="theme-color" content="#081321" />
     <meta
       name="description"
-      content="Search a local repository, trace relationships, and review project memory with TokSmart."
+      content="TokSmart is a local code intelligence engine. Search your repository, trace relationships and give your coding assistant focused context from a local SQLite index."
     />
-    <title>TokSmart · Local code intelligence</title>
+    <title>TokSmart · Know your code before you change it</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <script>
+      if (new URLSearchParams(location.search).get('desktop') === '1')
+        location.replace('setup.html' + location.hash);
+    </script>
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="desktop.css" />
-    <script src="app.js" defer></script>
-    <script src="desktop-ui.js" type="module"></script>
+    <link rel="stylesheet" href="vendor/lenis.css" />
+    <link rel="stylesheet" href="home.css" />
+    <script src="vendor/lenis.min.js" defer></script>
+    <script src="home.js" defer></script>
+    <script type="module" src="vendor/desktop-components.js"></script>
   </head>
-  <body class="setup-page">
-    <!-- Lucide icons (see vendor/lucide-LICENSE.txt). -->
-    <svg class="visually-hidden" aria-hidden="true">
-      <symbol id="icon-arrow-up-right" viewBox="0 0 24 24">
-        <path d="M7 7h10v10" />
-        <path d="M7 17 17 7" />
-      </symbol>
-      <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
-      <symbol id="icon-database" viewBox="0 0 24 24">
-        <ellipse cx="12" cy="5" rx="9" ry="3" />
-        <path d="M3 5V19A9 3 0 0 0 21 19V5" />
-        <path d="M3 12A9 3 0 0 0 21 12" />
-      </symbol>
-      <symbol id="icon-file-code" viewBox="0 0 24 24">
-        <path
-          d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
-        />
-        <path d="M14 2v5a1 1 0 0 0 1 1h5" />
-        <path d="M10 12.5 8 15l2 2.5" />
-        <path d="m14 12.5 2 2.5-2 2.5" />
-      </symbol>
-      <symbol id="icon-git-fork" viewBox="0 0 24 24">
-        <circle cx="12" cy="18" r="3" />
-        <circle cx="6" cy="6" r="3" />
-        <circle cx="18" cy="6" r="3" />
-        <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
-        <path d="M12 12v3" />
-      </symbol>
-      <symbol id="icon-layers" viewBox="0 0 24 24">
-        <path
-          d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"
-        />
-        <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
-        <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
-      </symbol>
-      <symbol id="icon-network" viewBox="0 0 24 24">
-        <rect x="16" y="16" width="6" height="6" rx="1" />
-        <rect x="2" y="16" width="6" height="6" rx="1" />
-        <rect x="9" y="2" width="6" height="6" rx="1" />
-        <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
-        <path d="M12 12V8" />
-      </symbol>
-      <symbol id="icon-search" viewBox="0 0 24 24">
-        <path d="m21 21-4.34-4.34" />
-        <circle cx="11" cy="11" r="8" />
-      </symbol>
-      <symbol id="icon-smartphone" viewBox="0 0 24 24">
-        <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
-        <path d="M12 18h.01" />
-      </symbol>
-      <symbol id="icon-terminal" viewBox="0 0 24 24">
-        <path d="M12 19h8" />
-        <path d="m4 17 6-6-6-6" />
-      </symbol>
-    </svg>
-
-    <header class="site-header">
-      <a class="brand-badge" href="index.html?desktop=1" aria-label="TokSmart home">
-        <img class="toksmart-logo" src="logo.svg" alt="" />
-        <span>Tok<span class="brand-accent">Smart</span></span>
-      </a>
-      <div class="site-header-actions">
-        <nav aria-label="Site links">
-          <a class="phone-link" href="mobile.html"
-            ><svg class="site-icon" aria-hidden="true">
-              <use href="#icon-smartphone"></use>
-            </svg>
-            Phone prompts</a
-          >
-          <a href="https://github.com/ArshitGupta01/TokSmart"
-            >GitHub
-            <svg class="site-icon" aria-hidden="true">
-              <use href="#icon-arrow-up-right"></use></svg
-          ></a>
+  <body class="home-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="hero-frame" id="top">
+      <header class="home-header">
+        <a class="brand-badge" href="index.html" aria-label="TokSmart home"
+          ><img class="toksmart-logo" src="logo.svg" alt="" />TokSmart<span class="brand-period"
+            >.</span
+          ></a
+        >
+        <nav class="home-nav" aria-label="Primary navigation">
+          <a href="#platform">Platform</a><a href="#workflow">How it works</a
+          ><a href="#docs">Docs</a><a href="mobile.html">Phone prompts</a>
         </nav>
-        <label class="theme-control desktop-theme">
-          <span class="visually-hidden">Theme</span
-          ><svg class="site-icon" aria-hidden="true">
-            <use href="#icon-chevron-down"></use>
-          </svg>
-          <select data-theme-control aria-label="Theme">
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
-      </div>
-    </header>
-    <main class="setup-layout">
-      <section class="setup-stage" aria-labelledby="setup-title">
-        <div class="launch-console">
-          <header class="setup-intro">
-            <span class="setup-icon"
-              ><svg class="site-icon" aria-hidden="true"><use href="#icon-terminal"></use></svg
-            ></span>
-            <div>
-              <h1 id="setup-title">Start your local dashboard</h1>
-              <p>Run TokSmart in your terminal and keep it open while you work.</p>
-            </div>
-          </header>
-
-          <ol class="launch-stages" role="list" aria-label="Setup progress">
-            <li
-              class="launch-step setup-instructions"
-              id="launch-step-run"
-              data-progress="current"
-              aria-current="step"
-            >
-              <div class="step-heading">
-                <span class="stage-number" aria-hidden="true">1</span>
-                <h2>Copy a launch command</h2>
-              </div>
-              <div class="step-body">
-                <p class="command-label" id="quick-start-label">Quick start</p>
-                <div class="terminal-card" role="group" aria-labelledby="quick-start-label">
-                  <span class="terminal-prompt" aria-hidden="true">$</span>
-                  <code id="launch-command"
-                    >npx toksmart@latest serve <span>--no-browser</span></code
-                  >
-                  <button
-                    type="button"
-                    class="copy-button"
-                    data-starts-server
-                    aria-label="Copy launch command"
-                  >
-                    Copy
-                  </button>
-                </div>
-
-                <p class="command-label" id="global-install-label">Or install globally</p>
-                <div class="terminal-stack" role="group" aria-labelledby="global-install-label">
-                  <div class="terminal-card">
-                    <span class="terminal-prompt" aria-hidden="true">$</span>
-                    <code>npm install --global toksmart</code>
-                    <button type="button" class="copy-button" aria-label="Copy install command">
-                      Copy
-                    </button>
-                  </div>
-                  <div class="terminal-card">
-                    <span class="terminal-prompt" aria-hidden="true">$</span>
-                    <code>toksmart serve <span>--no-browser</span></code>
-                    <button
-                      type="button"
-                      class="copy-button"
-                      data-starts-server
-                      aria-label="Copy installed launch command"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-                <p id="step-1-badge" class="copy-hint" role="status"></p>
-              </div>
-            </li>
-
-            <li class="launch-step" id="launch-step-connect">
-              <div class="step-heading">
-                <span class="stage-number" aria-hidden="true">2</span>
-                <h2 id="server-title">Detect the server</h2>
-              </div>
-              <div
-                class="step-body server-card"
-                id="server-status"
-                data-state="checking"
-                role="group"
-                aria-labelledby="server-title"
+        <div class="header-right">
+          <label class="theme-control home-theme"
+            ><span class="visually-hidden">Theme</span
+            ><select data-theme-control aria-label="Theme">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select></label
+          >
+          <a class="header-cta" href="setup.html">Get started <span aria-hidden="true">→</span></a>
+        </div>
+      </header>
+      <main id="main">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span> Local code intelligence</p>
+            <h1 id="hero-title">Know your code.<br /><em>Change it with context.</em></h1>
+            <p class="hero-lead">
+              TokSmart turns a local repository into a searchable map of files, symbols and
+              relationships. Find what matters, trace the impact, and give your coding assistant a
+              focused task brief.
+            </p>
+            <div class="hero-actions">
+              <a class="pill pill-primary" href="setup.html"
+                >Get started <span class="arrow-disc" aria-hidden="true">→</span></a
+              ><a class="pill pill-secondary" href="#platform"
+                >Explore the platform <span aria-hidden="true">↓</span></a
               >
-                <div class="server-monitor">
-                  <div class="server-signal">
-                    <span class="signal-dot" aria-hidden="true"></span>
-                    <strong id="server-state" role="status">Checking server…</strong>
-                  </div>
-                  <p id="server-detail">Looking for TokSmart on this computer.</p>
-                  <div class="server-monitor-footer">
-                    <dl class="server-metrics">
-                      <div>
-                        <dt>Ping</dt>
-                        <dd id="server-ping">—</dd>
-                      </div>
-                      <div>
-                        <dt>Last checked</dt>
-                        <dd id="server-checked">—</dd>
-                      </div>
-                    </dl>
-                    <button type="button" id="check-server">Check now</button>
-                  </div>
-                </div>
-              </div>
-            </li>
-
-            <li class="launch-step" id="launch-step-open">
-              <div class="step-heading">
-                <span class="stage-number" aria-hidden="true">3</span>
-                <h2>Open the dashboard</h2>
-              </div>
-              <div class="step-body">
-                <div class="launch-actions">
-                  <a
-                    class="open-dashboard"
-                    id="open-dashboard"
-                    href="http://127.0.0.1:8765/"
-                    target="_blank"
-                    rel="noopener"
-                    >Open dashboard
-                    <svg class="site-icon" aria-hidden="true">
-                      <use href="#icon-arrow-up-right"></use>
-                    </svg>
-                  </a>
-                  <label class="auto-open"
-                    ><input type="checkbox" id="auto-open" /> <span>Open when ready</span></label
-                  >
-                </div>
-                <details class="setup-help">
-                  <summary>Server running but still waiting?</summary>
-                  <p>
-                    Allow local network access if your browser asks. If you used a different port,
-                    open the address printed in your terminal.
-                  </p>
-                </details>
-              </div>
-            </li>
-          </ol>
-
-          <footer class="setup-footer">
-            <div class="setup-requirements">
-              <span>Node.js 18+ · Python 3.11+</span>
-              <code>127.0.0.1:8765</code>
             </div>
-            <a class="secondary-action" href="#dashboard-preview"
-              >Preview dashboard
-              <svg class="site-icon" aria-hidden="true">
-                <use href="#icon-arrow-up-right"></use>
-              </svg>
-            </a>
-          </footer>
-        </div>
-      </section>
-
-      <tab-container id="dashboard-preview" class="desktop-preview" tabindex="-1">
-        <div class="preview-header" slot="tablist-wrapper">
-          <span class="preview-heading"
-            ><svg class="site-icon" aria-hidden="true">
-              <use href="#icon-git-fork"></use>
-            </svg>
-            Dashboard preview</span
-          >
-          <div class="preview-switch" role="tablist" aria-label="Dashboard preview views">
-            <button
-              type="button"
-              id="graph-tab"
-              role="tab"
-              aria-controls="graph-preview"
-              aria-selected="true"
-            >
-              <svg class="site-icon" aria-hidden="true">
-                <use href="#icon-network"></use>
-              </svg>
-              Graph
-            </button>
-            <button
-              type="button"
-              id="search-tab"
-              role="tab"
-              aria-controls="search-preview"
-              aria-selected="false"
-              tabindex="-1"
-            >
-              <svg class="site-icon" aria-hidden="true">
-                <use href="#icon-search"></use>
-              </svg>
-              Code search
-            </button>
-            <button
-              type="button"
-              id="project-tab"
-              role="tab"
-              aria-controls="project-preview"
-              aria-selected="false"
-              tabindex="-1"
-            >
-              <svg class="site-icon" aria-hidden="true">
-                <use href="#icon-layers"></use>
-              </svg>
-              Project view
-            </button>
+            <p class="hero-aside">
+              Runs on your computer · Node.js 18+ · Python 3.11+ <span aria-hidden="true">·</span>
+              <a href="mobile.html">Using a phone? Try prompts →</a>
+            </p>
           </div>
-        </div>
-        <div
-          id="graph-preview"
-          role="tabpanel"
-          aria-labelledby="graph-tab"
-          data-tab-container-no-tabstop
-        >
-          <a
-            class="preview-full-size"
-            href="desktop-preview.webp"
-            target="_blank"
-            rel="noopener"
-            aria-label="Open graph preview at full size"
-          >
-            <img
-              src="desktop-preview.webp"
-              alt="TokSmart knowledge graph with the Session store node selected and its relationships in the inspector."
-              width="1064"
-              height="665"
-              loading="lazy"
-            />
-          </a>
-        </div>
-        <div
-          id="search-preview"
-          role="tabpanel"
-          aria-labelledby="search-tab"
-          data-tab-container-no-tabstop
-          hidden
-        >
-          <a
-            class="preview-full-size"
-            href="search-preview.webp"
-            target="_blank"
-            rel="noopener"
-            aria-label="Open code search preview at full size"
-          >
-            <img
-              src="search-preview.webp"
-              alt="TokSmart code search for SessionStore showing the matching symbol and source file."
-              width="600"
-              height="665"
-              loading="lazy"
-            />
-          </a>
-        </div>
-        <div
-          id="project-preview"
-          role="tabpanel"
-          aria-labelledby="project-tab"
-          data-tab-container-no-tabstop
-          hidden
-        >
-          <a
-            class="preview-full-size"
-            href="project-preview.webp"
-            target="_blank"
-            rel="noopener"
-            aria-label="Open project preview at full size"
-          >
+          <div class="hero-product" aria-label="TokSmart dashboard preview">
+            <div class="product-window-bar">
+              <div class="window-mark">
+                <img src="logo.svg" alt="" /><strong>TokSmart</strong><span>/</span
+                ><span>sample-api</span>
+              </div>
+              <span class="window-state"><span></span> Local dashboard</span>
+            </div>
             <img
               src="project-preview.webp"
-              alt="TokSmart dashboard showing the sample API project, its connected graph, and the selected node inspector."
               width="1280"
               height="720"
-              loading="lazy"
+              alt="TokSmart local dashboard showing a project graph and selected node inspector"
+              fetchpriority="high"
             />
-          </a>
-        </div>
-      </tab-container>
-      <details class="sample-disclosure">
-        <summary>Try the interactive sample graph</summary>
-        <section class="sample-graph" aria-labelledby="sample-title">
-          <header class="sample-header">
-            <h2 id="sample-title">
-              <svg class="site-icon" aria-hidden="true"><use href="#icon-git-fork"></use></svg>
-              sample-api
-            </h2>
-            <span>Select a file</span>
-          </header>
-          <fieldset class="sample-canvas">
-            <legend class="visually-hidden">Inspect a file in the sample repository</legend>
-            <svg
-              class="sample-edges"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <path class="is-active" data-connects="router auth" d="M15 31H24L37 64" />
-              <path class="is-active" data-connects="auth sessions" d="M37 64H46L63 31" />
-              <path data-connects="sessions storage" d="M63 31H72L85 64" />
-            </svg>
-            <label class="sample-node" style="--x: 15%; --y: 31%">
-              <input type="radio" name="sample-file" value="router" class="visually-hidden" />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-network"></use></svg
-              ></span>
-              <span>router.py</span>
-            </label>
-            <label class="sample-node" style="--x: 37%; --y: 64%">
-              <input type="radio" name="sample-file" value="auth" class="visually-hidden" checked />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-file-code"></use></svg
-              ></span>
-              <span>auth.py</span>
-            </label>
-            <label class="sample-node" style="--x: 63%; --y: 31%">
-              <input type="radio" name="sample-file" value="sessions" class="visually-hidden" />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-layers"></use></svg
-              ></span>
-              <span>sessions.py</span>
-            </label>
-            <label class="sample-node" style="--x: 85%; --y: 64%">
-              <input type="radio" name="sample-file" value="storage" class="visually-hidden" />
-              <span class="node-icon"
-                ><svg class="site-icon" aria-hidden="true"><use href="#icon-database"></use></svg
-              ></span>
-              <span>storage.py</span>
-            </label>
-          </fieldset>
-          <output class="sample-evidence">
-            <span class="evidence-meta"
-              ><strong>auth.py:1</strong><span>Imports sessions.py</span></span
-            >
-            <code>from sessions import SessionStore</code>
-          </output>
+          </div>
         </section>
-      </details>
-    </main>
+      </main>
+    </div>
+
+    <div class="home-content">
+      <div class="home-container">
+        <div class="section-index" aria-label="Page overview">
+          <span>01 / UNDERSTAND</span><span>02 / START</span><span>03 / REFERENCE</span>
+        </div>
+        <section
+          id="platform"
+          class="platform-section section-spacing"
+          aria-labelledby="platform-title"
+        >
+          <div class="section-heading">
+            <p class="overline">The platform / 01</p>
+            <h2 id="platform-title">A clearer view of<br /><em>what connects.</em></h2>
+            <p>
+              TokSmart indexes your chosen repository without executing its source. Move from a name
+              to its callers, imports and surrounding files, then decide what to change.
+            </p>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card feature-large">
+              <span class="feature-number">01 / SEE</span>
+              <div class="feature-art graph-art" aria-hidden="true">
+                <span class="art-node art-a">auth.py</span
+                ><span class="art-node art-b">sessions.py</span
+                ><span class="art-node art-c">store.py</span
+                ><svg viewBox="0 0 560 220" preserveAspectRatio="none">
+                  <path d="M115 110 C 195 110, 210 58, 285 78 S 360 164, 440 130" />
+                </svg>
+              </div>
+              <h3>Follow the relationships.</h3>
+              <p>
+                Explore indexed files, symbols, imports and supported static call paths in the 2D
+                graph. Switch to 3D when you want a different view.
+              </p>
+            </article>
+            <article class="feature-card">
+              <span class="feature-number">02 / FIND</span>
+              <div class="feature-art search-art" aria-hidden="true">
+                <span>⌕ &nbsp; SessionStore</span
+                ><span><b>ƒ</b> &nbsp; store.py <small>SessionStore</small></span
+                ><span><b>→</b> &nbsp; test_sessions.py <small>caller</small></span>
+              </div>
+              <h3>Search beyond filenames.</h3>
+              <p>
+                Find indexed symbols and files, inspect source ranges and see relevant relationships
+                before opening an editor.
+              </p>
+            </article>
+            <article class="feature-card">
+              <span class="feature-number">03 / BRIEF</span>
+              <div class="feature-art brief-art" aria-hidden="true">
+                <span>task_context.json</span><span class="brief-line wide"></span
+                ><span class="brief-line"></span><span class="brief-line short"></span
+                ><span class="brief-tag">budget: 600 tokens</span>
+              </div>
+              <h3>Send less, with purpose.</h3>
+              <p>
+                Build a bounded context brief for a task. Session deduplication and checkpoints help
+                avoid repeating unchanged context.
+              </p>
+            </article>
+          </div>
+          <div class="honesty-strip">
+            <span class="star-mark" aria-hidden="true">◆</span>
+            <p>
+              <strong>Local by design.</strong> The SQLite index stays on your computer. You choose
+              which project to add and which context to send to an assistant. Assistant providers
+              handle anything you share with them under their own policies.
+            </p>
+          </div>
+        </section>
+
+        <section
+          id="workflow"
+          class="workflow-section section-spacing"
+          aria-labelledby="workflow-title"
+        >
+          <div class="section-heading compact">
+            <p class="overline">Start in minutes / 02</p>
+            <h2 id="workflow-title">From repository to<br /><em>relevant context.</em></h2>
+          </div>
+          <div class="workflow-grid">
+            <article class="workflow-step">
+              <span>01</span>
+              <h3>Start the server</h3>
+              <p>
+                Run TokSmart on your computer. The setup page watches the local health endpoint,
+                shows ping and opens the dashboard when you choose.
+              </p>
+              <a href="setup.html">Open guided setup →</a>
+            </article>
+            <article class="workflow-step">
+              <span>02</span>
+              <h3>Add a project</h3>
+              <p>
+                Index an explicitly selected repository. Search works as soon as supported files and
+                symbols have been indexed.
+              </p>
+              <code>toksmart add /path/to/project</code>
+            </article>
+            <article class="workflow-step">
+              <span>03</span>
+              <h3>Trace and retrieve</h3>
+              <p>
+                Use the dashboard, CLI or an MCP client to search, inspect impact and retrieve a
+                task brief with a chosen budget.
+              </p>
+              <a href="#docs">See commands →</a>
+            </article>
+          </div>
+          <div class="command-feature">
+            <div>
+              <p class="overline">Quick start / terminal</p>
+              <h3>One command to launch.</h3>
+              <p>
+                Keep the terminal running, then use the guided setup page to see the live connection
+                status.
+              </p>
+              <span>Node.js 18+ and Python 3.11+ required</span>
+            </div>
+            <div class="command-box">
+              <div class="command-top"><span>Terminal</span><span>01 — 02</span></div>
+              <div class="command-row">
+                <code><span>$</span> npx toksmart@latest serve --no-browser</code
+                ><button
+                  type="button"
+                  data-copy="npx toksmart@latest serve --no-browser"
+                  aria-label="Copy quick start command"
+                >
+                  Copy
+                </button>
+              </div>
+              <p id="command-feedback" role="status" aria-live="polite"></p>
+              <a href="setup.html">Continue to server setup <span aria-hidden="true">→</span></a>
+            </div>
+          </div>
+        </section>
+
+        <section class="product-section section-spacing" aria-labelledby="product-title">
+          <div class="section-heading compact">
+            <p class="overline">Inside the dashboard</p>
+            <h2 id="product-title">See the work<br /><em>before you do it.</em></h2>
+            <p>
+              Preview the real TokSmart interface. The dashboard runs locally after you start the
+              server.
+            </p>
+          </div>
+          <tab-container class="showcase" id="showcase">
+            <div class="showcase-tabs" slot="tablist-wrapper">
+              <span>TokSmart / sample project</span>
+              <div role="tablist" aria-label="Dashboard views">
+                <button
+                  type="button"
+                  role="tab"
+                  id="home-graph-tab"
+                  aria-controls="home-graph"
+                  aria-selected="true"
+                >
+                  Graph</button
+                ><button
+                  type="button"
+                  role="tab"
+                  id="home-search-tab"
+                  aria-controls="home-search"
+                  aria-selected="false"
+                  tabindex="-1"
+                >
+                  Code search</button
+                ><button
+                  type="button"
+                  role="tab"
+                  id="home-project-tab"
+                  aria-controls="home-project"
+                  aria-selected="false"
+                  tabindex="-1"
+                >
+                  Project view
+                </button>
+              </div>
+            </div>
+            <div
+              id="home-graph"
+              role="tabpanel"
+              aria-labelledby="home-graph-tab"
+              data-tab-container-no-tabstop
+            >
+              <img
+                src="desktop-preview.webp"
+                width="1064"
+                height="665"
+                loading="lazy"
+                alt="TokSmart graph view with a selected Session store node and related files"
+              />
+            </div>
+            <div
+              id="home-search"
+              role="tabpanel"
+              aria-labelledby="home-search-tab"
+              data-tab-container-no-tabstop
+              hidden
+            >
+              <img
+                src="search-preview.webp"
+                width="600"
+                height="665"
+                loading="lazy"
+                alt="Code search results for SessionStore"
+              />
+            </div>
+            <div
+              id="home-project"
+              role="tabpanel"
+              aria-labelledby="home-project-tab"
+              data-tab-container-no-tabstop
+              hidden
+            >
+              <img
+                src="project-preview.webp"
+                width="1280"
+                height="720"
+                loading="lazy"
+                alt="TokSmart project view showing a graph and node inspector"
+              />
+            </div>
+          </tab-container>
+        </section>
+
+        <section id="docs" class="docs-section section-spacing" aria-labelledby="docs-title">
+          <div class="section-heading compact">
+            <p class="overline">Reference / 03</p>
+            <h2 id="docs-title">Everything you need<br /><em>to get moving.</em></h2>
+            <p>
+              Commands and practical answers in one place. The repository has the complete CLI and
+              integration reference.
+            </p>
+          </div>
+          <div class="docs-layout">
+            <nav aria-label="Documentation sections" class="docs-nav">
+              <a href="#install">Install</a><a href="#index-project">Index a project</a
+              ><a href="#cli">Search and context</a><a href="#assistants">Connect an assistant</a
+              ><a href="#phone">Phone prompts</a><a href="#faq">Troubleshooting</a>
+            </nav>
+            <div class="docs-main">
+              <article id="install" class="doc-block">
+                <div class="doc-label">01 / INSTALL</div>
+                <div>
+                  <h3>Start the local dashboard</h3>
+                  <p>
+                    Install Node.js 18+ and Python 3.11+. Run the command on the computer with your
+                    repository. Keep the terminal open. The hosted setup page checks
+                    <code>127.0.0.1:8765</code> automatically; the dashboard itself is local.
+                  </p>
+                  <pre><code>npx toksmart@latest serve --no-browser</code></pre>
+                  <p>
+                    Prefer a stable command? Run <code>npm install --global toksmart</code>, then
+                    <code>toksmart serve --no-browser</code>.
+                  </p>
+                  <a href="setup.html">Start guided setup →</a>
+                </div>
+              </article>
+              <article id="index-project" class="doc-block">
+                <div class="doc-label">02 / INDEX</div>
+                <div>
+                  <h3>Add your repository</h3>
+                  <p>
+                    Open a second terminal at your project root. TokSmart indexes only the
+                    repository path you choose. Refresh the dashboard and select your project after
+                    the command finishes.
+                  </p>
+                  <pre><code># macOS or Linux
+toksmart add "$(pwd)"
+
+# Windows PowerShell
+toksmart add "$($PWD.Path)"</code></pre>
+                  <p>
+                    Run <code>toksmart projects</code> for index counts and errors, or
+                    <code>toksmart sync</code> after changes. A new project can have searchable code
+                    before it has memory nodes in the graph.
+                  </p>
+                </div>
+              </article>
+              <article id="cli" class="doc-block">
+                <div class="doc-label">03 / RETRIEVE</div>
+                <div>
+                  <h3>Search, trace, brief</h3>
+                  <p>
+                    Search indexed names and paths. Impact reports statically detected callers and
+                    dependencies, so dynamic calls can be missing. Context ranks metadata and
+                    approved lessons to fit the requested budget.
+                  </p>
+                  <pre><code>toksmart search "SessionStore" --project "/path/to/project"
+toksmart impact "SessionStore" --project "/path/to/project"
+toksmart context --project "/path/to/project" --task "Find session expiry" --budget 600 --session-id fix-1 --prompt</code></pre>
+                  <p>
+                    Reuse the session ID to suppress unchanged results. Use
+                    <code>toksmart checkpoint --project PATH --session-id fix-1</code> to recall a
+                    compact session summary.
+                  </p>
+                  <a href="https://github.com/ArshitGupta01/TokSmart/blob/main/docs/CLI.md"
+                    >Full CLI reference →</a
+                  >
+                </div>
+              </article>
+              <article id="assistants" class="doc-block">
+                <div class="doc-label">04 / CONNECT</div>
+                <div>
+                  <h3>Bring context into your assistant</h3>
+                  <p>
+                    Install the global launcher before setting up an MCP client. Preview the
+                    proposed configuration first, apply it when ready, and restart your client.
+                    Codex and Antigravity have setup options; other stdio clients can run
+                    <code>toksmart mcp --compact-tools</code>.
+                  </p>
+                  <pre><code>toksmart setup --project "/path/to/project" --client codex
+toksmart setup --project "/path/to/project" --client codex --apply
+toksmart setup --test-connection</code></pre>
+                  <p>
+                    Agents can propose lessons; only an operator can approve them for later
+                    retrieval.
+                  </p>
+                  <a
+                    href="https://github.com/ArshitGupta01/TokSmart/blob/main/docs/CLIENT_COMPATIBILITY.md"
+                    >Client compatibility →</a
+                  >
+                </div>
+              </article>
+              <article id="phone" class="doc-block">
+                <div class="doc-label">05 / PHONE</div>
+                <div>
+                  <h3>Prompts without the desktop server</h3>
+                  <p>
+                    On a phone, choose Lite for quick requests, Pro for longer work or Coding for
+                    reuse-first development. Copy a prompt and paste it into your AI assistant
+                    before your task. This page does not require TokSmart to be running.
+                  </p>
+                  <a href="mobile.html">Explore phone prompts →</a>
+                </div>
+              </article>
+            </div>
+          </div>
+          <div class="resource-heading">
+            <h3>Go deeper.</h3>
+            <p>Full references, measurement methods and maintenance guides live with the source.</p>
+          </div>
+          <div class="resource-grid">
+            <a href="https://github.com/ArshitGupta01/TokSmart/blob/main/docs/CLI.md"
+              ><span>REFERENCE / 01</span><strong>CLI commands</strong
+              ><small>Projects, context, backup and restore</small><b aria-hidden="true">→</b></a
+            >
+            <a href="https://github.com/ArshitGupta01/TokSmart/blob/main/docs/BENCHMARK_PILOT.md"
+              ><span>EVIDENCE / 02</span><strong>Benchmark results</strong
+              ><small>Measured trials and their limitations</small><b aria-hidden="true">→</b></a
+            >
+            <a href="https://github.com/ArshitGupta01/TokSmart/blob/main/docs/MOBILE_PROMPTS.md"
+              ><span>PROTOCOL / 03</span><strong>Phone prompt modes</strong
+              ><small>Prompt details and fair comparisons</small><b aria-hidden="true">→</b></a
+            >
+            <a href="https://github.com/ArshitGupta01/TokSmart/blob/main/docs/DEVELOPMENT.md"
+              ><span>BUILD / 04</span><strong>Developer guide</strong
+              ><small>Architecture, source map and tests</small><b aria-hidden="true">→</b></a
+            >
+            <a href="https://github.com/ArshitGupta01/TokSmart/blob/main/docs/MIGRATION.md"
+              ><span>DATA / 05</span><strong>Migration guide</strong
+              ><small>Moving an existing local index</small><b aria-hidden="true">→</b></a
+            >
+            <a href="https://github.com/ArshitGupta01/TokSmart/blob/main/POLICY.md"
+              ><span>TRUST / 06</span><strong>Security policy</strong
+              ><small>Local boundaries and disclosure</small><b aria-hidden="true">→</b></a
+            >
+          </div>
+        </section>
+        <section id="faq" class="faq-section section-spacing" aria-labelledby="faq-title">
+          <div class="section-heading compact">
+            <p class="overline">Good to know</p>
+            <h2 id="faq-title">Questions, answered.</h2>
+          </div>
+          <div class="faq-list">
+            <details>
+              <summary>Why is the setup page still waiting for the server?</summary>
+              <p>
+                Keep <code>serve</code> running on the same computer and check the address printed
+                in the terminal. The hosted setup page checks port 8765. If you chose another port,
+                open its local address directly. Run
+                <code>npx toksmart@latest doctor --format text</code> for environment checks.
+              </p>
+            </details>
+            <details>
+              <summary>Does TokSmart send my repository to the website?</summary>
+              <p>
+                No. Indexing and storage happen locally in SQLite. The website checks the health
+                endpoint at 127.0.0.1 in your browser. If you use a cloud assistant, only send the
+                context you choose and follow that provider’s data policy.
+              </p>
+            </details>
+            <details>
+              <summary>Will it always save tokens?</summary>
+              <p>
+                No fixed savings are promised. Context is budgeted and can suppress unchanged
+                results within a session. In small matched agent trials, token use was mixed and
+                some agents did not call the tools. Measure your own tasks and quality before
+                drawing conclusions.
+              </p>
+            </details>
+            <details>
+              <summary>Which languages and files does it index?</summary>
+              <p>
+                Coverage varies by language and relationship type. Run
+                <code>toksmart capabilities</code> for the current support list. Ignored, sensitive,
+                oversized or unsupported files can be excluded; notebook code cells are outside
+                source indexing.
+              </p>
+            </details>
+          </div>
+        </section>
+        <section class="end-cta" aria-labelledby="end-title">
+          <p class="overline">Ready when you are</p>
+          <h2 id="end-title">Give your next change<br /><em>some context.</em></h2>
+          <a class="pill pill-primary" href="setup.html"
+            >Get started <span class="arrow-disc" aria-hidden="true">→</span></a
+          >
+        </section>
+      </div>
+    </div>
+    <footer class="home-footer">
+      <div class="home-container">
+        <a class="brand-badge" href="#top"
+          ><img class="toksmart-logo" src="logo.svg" alt="" />TokSmart<span class="brand-period"
+            >.</span
+          ></a
+        ><span>Local code intelligence, on your terms.</span>
+        <nav aria-label="Footer links">
+          <a href="setup.html">Setup</a><a href="mobile.html">Phone prompts</a
+          ><a href="https://github.com/ArshitGupta01/TokSmart">GitHub →</a>
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>

@@ -7,15 +7,6 @@
   let checking = false;
 
   function start() {
-    if (
-      new URLSearchParams(window.location.search).get('desktop') !== '1' &&
-      (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
-    ) {
-      window.location.replace('mobile.html');
-      return;
-    }
-
     const card = document.getElementById('server-status');
     if (!card) return;
     const state = document.getElementById('server-state');

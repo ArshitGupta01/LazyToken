@@ -363,7 +363,7 @@ test('website, mobile page and local dashboard use the same logo', () => {
   const root = join(__dirname, '..');
   const logo = readFileSync(join(root, 'logo.svg'), 'utf8');
   assert.equal(readFileSync(join(root, 'web/logo.svg'), 'utf8'), logo);
-  for (const name of ['index.html', 'web/index.html', 'web/mobile.html']) {
+  for (const name of ['index.html', 'web/index.html', 'web/setup.html', 'web/mobile.html']) {
     const html = readFileSync(join(root, name), 'utf8');
     assert.match(html, /rel="icon" type="image\/svg\+xml" href="logo\.svg"/);
     assert.match(html, /class="toksmart-logo" src="logo\.svg"/);
@@ -375,7 +375,7 @@ for (const device of [
   { userAgent: 'Android', platform: 'Linux arm', maxTouchPoints: 5 },
   { userAgent: 'Mozilla Macintosh', platform: 'MacIntel', maxTouchPoints: 5 }
 ]) {
-  test(`mobile ${device.platform} routes to prompt hub without loopback polling`, () => {
+  test(`mobile ${device.platform} keeps the setup page visible when opened deliberately`, () => {
     const listeners = {};
     const redirects = [];
     let requests = 0;
@@ -399,7 +399,7 @@ for (const device of [
       }
     });
     listeners.DOMContentLoaded();
-    assert.deepEqual(redirects, ['mobile.html']);
+    assert.deepEqual(redirects, []);
     assert.equal(requests, 0);
   });
 }

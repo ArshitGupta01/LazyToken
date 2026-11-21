@@ -299,7 +299,7 @@
   background: var(--paper);
 }
 #copy-fallback::backdrop {
-  background: #211b15a6;
+  background: #071725bc;
 }
 #copy-fallback h2 {
   margin: 0;

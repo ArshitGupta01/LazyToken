@@ -70,7 +70,7 @@ class AccessibilityContractTests(unittest.TestCase):
         return page
 
     def test_primary_pages_keep_main_landmarks_and_named_controls(self):
-        for path in ("index.html", "web/index.html", "web/mobile.html"):
+        for path in ("index.html", "web/index.html", "web/setup.html", "web/mobile.html"):
             with self.subTest(path=path):
                 page = self.parse(path)
                 self.assertTrue(page.mains)

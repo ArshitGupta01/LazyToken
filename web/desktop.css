@@ -1,10 +1,10 @@
 .setup-page {
-  --lime: #bcf778;
-  --window: #101815;
-  --window-line: #355041;
-  --window-muted: #b0c2b7;
-  --window-ink: #f1f7ed;
-  --hero-wash: rgba(90, 156, 72, 0.105);
+  --lime: #91ddff;
+  --window: #0b1c2b;
+  --window-line: #335a72;
+  --window-muted: #b1cbdc;
+  --window-ink: #edf7ff;
+  --hero-wash: rgba(56, 133, 185, 0.13);
   padding-inline: clamp(16px, 5.4vw, 76px);
   background-image: radial-gradient(ellipse at 50% 44%, var(--hero-wash), transparent 58%);
   background-repeat: no-repeat;
@@ -94,7 +94,7 @@
 }
 
 :root[data-theme='dark'] .setup-page .toksmart-logo {
-  filter: grayscale(1) sepia(1) saturate(3) hue-rotate(35deg) brightness(1.25);
+  filter: none;
 }
 
 .desktop-theme {
@@ -127,7 +127,7 @@
   border-radius: 12px;
   background: var(--window);
   color: var(--window-ink);
-  box-shadow: 0 18px 48px -34px #3d682b;
+  box-shadow: 0 18px 48px -34px #1e5273;
 }
 
 .sample-header,
@@ -168,9 +168,9 @@
   padding: 0;
   border: 0;
   background:
-    radial-gradient(ellipse at 43% 60%, #16291f, transparent 72%),
-    radial-gradient(#36473d 0.7px, transparent 0.9px) 50% 50% / 18px 18px,
-    #0c1411;
+    radial-gradient(ellipse at 43% 60%, #102e43, transparent 72%),
+    radial-gradient(#2f536b 0.7px, transparent 0.9px) 50% 50% / 18px 18px,
+    #091827;
 }
 
 .sample-edges {
@@ -179,7 +179,7 @@
   width: 100%;
   height: 100%;
   fill: none;
-  stroke: #4d6b61;
+  stroke: #568ba9;
   stroke-width: 1.5;
 }
 
@@ -188,7 +188,7 @@
 }
 
 .sample-edges .is-active {
-  stroke: #a3d976;
+  stroke: #9bdfff;
 }
 
 .sample-node {
@@ -208,7 +208,7 @@
 .sample-node > span:last-child {
   padding: 2px 4px;
   border-radius: 3px;
-  background: #111c16;
+  background: #0c2030;
   white-space: nowrap;
 }
 
@@ -217,10 +217,10 @@
   place-items: center;
   width: 46px;
   height: 46px;
-  border: 1px solid #4a655a;
+  border: 1px solid #41647c;
   border-radius: 10px;
-  background: #1b2b24;
-  color: #d4e6d9;
+  background: #142f43;
+  color: #d4ecfa;
   font-size: 22px;
 }
 
@@ -234,16 +234,16 @@
 }
 
 .sample-node :checked + .node-icon {
-  border-color: #b8f082;
-  background: #253e26;
+  border-color: #b2ebff;
+  background: #17425b;
   color: var(--lime);
   box-shadow:
-    0 0 0 5px #a5dc6f19,
-    0 0 23px #a5dc6f38;
+    0 0 0 5px #91ddff19,
+    0 0 23px #91ddff38;
 }
 
 .sample-node :focus-visible + .node-icon {
-  outline: 2px solid #e0f3e0;
+  outline: 2px solid #e0f5ff;
   outline-offset: 3px;
 }
 
@@ -283,7 +283,7 @@
   border: 1px solid var(--line);
   border-radius: 17px;
   background: var(--surface);
-  box-shadow: 0 22px 65px -34px #1c2d1b8c;
+  box-shadow: 0 22px 65px -34px #081c2b8c;
 }
 
 .setup-intro,
@@ -454,9 +454,9 @@
   min-width: 58px;
   min-height: 38px;
   padding-inline: 9px;
-  border: 1px solid #527243;
+  border: 1px solid #3d728c;
   border-radius: 5px;
-  background: #223325;
+  background: #173a50;
   color: var(--lime);
   font-size: 12px;
   font-weight: 650;
@@ -734,8 +734,8 @@
 }
 
 .preview-switch button[aria-selected='true'] {
-  border-color: #607c4d;
-  background: #233521;
+  border-color: #4883a1;
+  background: #173a50;
 }
 
 .preview-switch button:focus-visible,
@@ -859,6 +859,13 @@
     gap: 4px;
     padding-inline: 7px;
     font-size: 12px;
+  }
+}
+
+@media (max-width: 390px) {
+  .setup-page .site-header nav a[href^='https://github.com']
+  {
+    display: none;
   }
 }
 

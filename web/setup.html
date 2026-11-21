@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en" data-default-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#081321" />
+    <meta
+      name="description"
+      content="Search a local repository, trace relationships, and review project memory with TokSmart."
+    />
+    <title>Start TokSmart · Local server setup</title>
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="desktop.css" />
+    <script src="app.js" defer></script>
+    <script src="desktop-ui.js" type="module"></script>
+  </head>
+  <body class="setup-page">
+    <!-- Lucide icons (see vendor/lucide-LICENSE.txt). -->
+    <svg class="visually-hidden" aria-hidden="true">
+      <symbol id="icon-arrow-up-right" viewBox="0 0 24 24">
+        <path d="M7 7h10v10" />
+        <path d="M7 17 17 7" />
+      </symbol>
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+      <symbol id="icon-database" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="5" rx="9" ry="3" />
+        <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+        <path d="M3 12A9 3 0 0 0 21 12" />
+      </symbol>
+      <symbol id="icon-file-code" viewBox="0 0 24 24">
+        <path
+          d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
+        />
+        <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+        <path d="M10 12.5 8 15l2 2.5" />
+        <path d="m14 12.5 2 2.5-2 2.5" />
+      </symbol>
+      <symbol id="icon-git-fork" viewBox="0 0 24 24">
+        <circle cx="12" cy="18" r="3" />
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="6" r="3" />
+        <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+        <path d="M12 12v3" />
+      </symbol>
+      <symbol id="icon-layers" viewBox="0 0 24 24">
+        <path
+          d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"
+        />
+        <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+        <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+      </symbol>
+      <symbol id="icon-network" viewBox="0 0 24 24">
+        <rect x="16" y="16" width="6" height="6" rx="1" />
+        <rect x="2" y="16" width="6" height="6" rx="1" />
+        <rect x="9" y="2" width="6" height="6" rx="1" />
+        <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+        <path d="M12 12V8" />
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <path d="m21 21-4.34-4.34" />
+        <circle cx="11" cy="11" r="8" />
+      </symbol>
+      <symbol id="icon-smartphone" viewBox="0 0 24 24">
+        <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+        <path d="M12 18h.01" />
+      </symbol>
+      <symbol id="icon-terminal" viewBox="0 0 24 24">
+        <path d="M12 19h8" />
+        <path d="m4 17 6-6-6-6" />
+      </symbol>
+    </svg>
+
+    <header class="site-header">
+      <a class="brand-badge" href="index.html" aria-label="TokSmart home">
+        <img class="toksmart-logo" src="logo.svg" alt="" />
+        <span>Tok<span class="brand-accent">Smart</span></span>
+      </a>
+      <div class="site-header-actions">
+        <a class="back-home" href="index.html">Overview</a>
+        <nav aria-label="Site links">
+          <a class="phone-link" href="mobile.html"
+            ><svg class="site-icon" aria-hidden="true">
+              <use href="#icon-smartphone"></use>
+            </svg>
+            Phone prompts</a
+          >
+          <a href="https://github.com/ArshitGupta01/TokSmart"
+            >GitHub
+            <svg class="site-icon" aria-hidden="true">
+              <use href="#icon-arrow-up-right"></use></svg
+          ></a>
+        </nav>
+        <label class="theme-control desktop-theme">
+          <span class="visually-hidden">Theme</span
+          ><svg class="site-icon" aria-hidden="true">
+            <use href="#icon-chevron-down"></use>
+          </svg>
+          <select data-theme-control aria-label="Theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
+    </header>
+    <main class="setup-layout">
+      <section class="setup-stage" aria-labelledby="setup-title">
+        <div class="launch-console">
+          <header class="setup-intro">
+            <span class="setup-icon"
+              ><svg class="site-icon" aria-hidden="true"><use href="#icon-terminal"></use></svg
+            ></span>
+            <div>
+              <h1 id="setup-title">Start your local dashboard</h1>
+              <p>Run TokSmart in your terminal and keep it open while you work.</p>
+            </div>
+          </header>
+
+          <ol class="launch-stages" role="list" aria-label="Setup progress">
+            <li
+              class="launch-step setup-instructions"
+              id="launch-step-run"
+              data-progress="current"
+              aria-current="step"
+            >
+              <div class="step-heading">
+                <span class="stage-number" aria-hidden="true">1</span>
+                <h2>Copy a launch command</h2>
+              </div>
+              <div class="step-body">
+                <p class="command-label" id="quick-start-label">Quick start</p>
+                <div class="terminal-card" role="group" aria-labelledby="quick-start-label">
+                  <span class="terminal-prompt" aria-hidden="true">$</span>
+                  <code id="launch-command"
+                    >npx toksmart@latest serve <span>--no-browser</span></code
+                  >
+                  <button
+                    type="button"
+                    class="copy-button"
+                    data-starts-server
+                    aria-label="Copy launch command"
+                  >
+                    Copy
+                  </button>
+                </div>
+
+                <p class="command-label" id="global-install-label">Or install globally</p>
+                <div class="terminal-stack" role="group" aria-labelledby="global-install-label">
+                  <div class="terminal-card">
+                    <span class="terminal-prompt" aria-hidden="true">$</span>
+                    <code>npm install --global toksmart</code>
+                    <button type="button" class="copy-button" aria-label="Copy install command">
+                      Copy
+                    </button>
+                  </div>
+                  <div class="terminal-card">
+                    <span class="terminal-prompt" aria-hidden="true">$</span>
+                    <code>toksmart serve <span>--no-browser</span></code>
+                    <button
+                      type="button"
+                      class="copy-button"
+                      data-starts-server
+                      aria-label="Copy installed launch command"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <p id="step-1-badge" class="copy-hint" role="status"></p>
+              </div>
+            </li>
+
+            <li class="launch-step" id="launch-step-connect">
+              <div class="step-heading">
+                <span class="stage-number" aria-hidden="true">2</span>
+                <h2 id="server-title">Detect the server</h2>
+              </div>
+              <div
+                class="step-body server-card"
+                id="server-status"
+                data-state="checking"
+                role="group"
+                aria-labelledby="server-title"
+              >
+                <div class="server-monitor">
+                  <div class="server-signal">
+                    <span class="signal-dot" aria-hidden="true"></span>
+                    <strong id="server-state" role="status">Checking server…</strong>
+                  </div>
+                  <p id="server-detail">Looking for TokSmart on this computer.</p>
+                  <div class="server-monitor-footer">
+                    <dl class="server-metrics">
+                      <div>
+                        <dt>Ping</dt>
+                        <dd id="server-ping">—</dd>
+                      </div>
+                      <div>
+                        <dt>Last checked</dt>
+                        <dd id="server-checked">—</dd>
+                      </div>
+                    </dl>
+                    <button type="button" id="check-server">Check now</button>
+                  </div>
+                </div>
+              </div>
+            </li>
+
+            <li class="launch-step" id="launch-step-open">
+              <div class="step-heading">
+                <span class="stage-number" aria-hidden="true">3</span>
+                <h2>Open the dashboard</h2>
+              </div>
+              <div class="step-body">
+                <div class="launch-actions">
+                  <a
+                    class="open-dashboard"
+                    id="open-dashboard"
+                    href="http://127.0.0.1:8765/"
+                    target="_blank"
+                    rel="noopener"
+                    >Open dashboard
+                    <svg class="site-icon" aria-hidden="true">
+                      <use href="#icon-arrow-up-right"></use>
+                    </svg>
+                  </a>
+                  <label class="auto-open"
+                    ><input type="checkbox" id="auto-open" /> <span>Open when ready</span></label
+                  >
+                </div>
+                <details class="setup-help">
+                  <summary>Server running but still waiting?</summary>
+                  <p>
+                    Allow local network access if your browser asks. If you used a different port,
+                    open the address printed in your terminal.
+                  </p>
+                </details>
+              </div>
+            </li>
+          </ol>
+
+          <footer class="setup-footer">
+            <div class="setup-requirements">
+              <span>Node.js 18+ · Python 3.11+</span>
+              <code>127.0.0.1:8765</code>
+            </div>
+            <a class="secondary-action" href="#dashboard-preview"
+              >Preview dashboard
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-arrow-up-right"></use>
+              </svg>
+            </a>
+          </footer>
+        </div>
+      </section>
+
+      <tab-container id="dashboard-preview" class="desktop-preview" tabindex="-1">
+        <div class="preview-header" slot="tablist-wrapper">
+          <span class="preview-heading"
+            ><svg class="site-icon" aria-hidden="true">
+              <use href="#icon-git-fork"></use>
+            </svg>
+            Dashboard preview</span
+          >
+          <div class="preview-switch" role="tablist" aria-label="Dashboard preview views">
+            <button
+              type="button"
+              id="graph-tab"
+              role="tab"
+              aria-controls="graph-preview"
+              aria-selected="true"
+            >
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-network"></use>
+              </svg>
+              Graph
+            </button>
+            <button
+              type="button"
+              id="search-tab"
+              role="tab"
+              aria-controls="search-preview"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-search"></use>
+              </svg>
+              Code search
+            </button>
+            <button
+              type="button"
+              id="project-tab"
+              role="tab"
+              aria-controls="project-preview"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              <svg class="site-icon" aria-hidden="true">
+                <use href="#icon-layers"></use>
+              </svg>
+              Project view
+            </button>
+          </div>
+        </div>
+        <div
+          id="graph-preview"
+          role="tabpanel"
+          aria-labelledby="graph-tab"
+          data-tab-container-no-tabstop
+        >
+          <a
+            class="preview-full-size"
+            href="desktop-preview.webp"
+            target="_blank"
+            rel="noopener"
+            aria-label="Open graph preview at full size"
+          >
+            <img
+              src="desktop-preview.webp"
+              alt="TokSmart knowledge graph with the Session store node selected and its relationships in the inspector."
+              width="1064"
+              height="665"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div
+          id="search-preview"
+          role="tabpanel"
+          aria-labelledby="search-tab"
+          data-tab-container-no-tabstop
+          hidden
+        >
+          <a
+            class="preview-full-size"
+            href="search-preview.webp"
+            target="_blank"
+            rel="noopener"
+            aria-label="Open code search preview at full size"
+          >
+            <img
+              src="search-preview.webp"
+              alt="TokSmart code search for SessionStore showing the matching symbol and source file."
+              width="600"
+              height="665"
+              loading="lazy"
+            />
+          </a>
+        </div>
+        <div
+          id="project-preview"
+          role="tabpanel"
+          aria-labelledby="project-tab"
+          data-tab-container-no-tabstop
+          hidden
+        >
+          <a
+            class="preview-full-size"
+            href="project-preview.webp"
+            target="_blank"
+            rel="noopener"
+            aria-label="Open project preview at full size"
+          >
+            <img
+              src="project-preview.webp"
+              alt="TokSmart dashboard showing the sample API project, its connected graph, and the selected node inspector."
+              width="1280"
+              height="720"
+              loading="lazy"
+            />
+          </a>
+        </div>
+      </tab-container>
+      <details class="sample-disclosure">
+        <summary>Try the interactive sample graph</summary>
+        <section class="sample-graph" aria-labelledby="sample-title">
+          <header class="sample-header">
+            <h2 id="sample-title">
+              <svg class="site-icon" aria-hidden="true"><use href="#icon-git-fork"></use></svg>
+              sample-api
+            </h2>
+            <span>Select a file</span>
+          </header>
+          <fieldset class="sample-canvas">
+            <legend class="visually-hidden">Inspect a file in the sample repository</legend>
+            <svg
+              class="sample-edges"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path class="is-active" data-connects="router auth" d="M15 31H24L37 64" />
+              <path class="is-active" data-connects="auth sessions" d="M37 64H46L63 31" />
+              <path data-connects="sessions storage" d="M63 31H72L85 64" />
+            </svg>
+            <label class="sample-node" style="--x: 15%; --y: 31%">
+              <input type="radio" name="sample-file" value="router" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-network"></use></svg
+              ></span>
+              <span>router.py</span>
+            </label>
+            <label class="sample-node" style="--x: 37%; --y: 64%">
+              <input type="radio" name="sample-file" value="auth" class="visually-hidden" checked />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-file-code"></use></svg
+              ></span>
+              <span>auth.py</span>
+            </label>
+            <label class="sample-node" style="--x: 63%; --y: 31%">
+              <input type="radio" name="sample-file" value="sessions" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-layers"></use></svg
+              ></span>
+              <span>sessions.py</span>
+            </label>
+            <label class="sample-node" style="--x: 85%; --y: 64%">
+              <input type="radio" name="sample-file" value="storage" class="visually-hidden" />
+              <span class="node-icon"
+                ><svg class="site-icon" aria-hidden="true"><use href="#icon-database"></use></svg
+              ></span>
+              <span>storage.py</span>
+            </label>
+          </fieldset>
+          <output class="sample-evidence">
+            <span class="evidence-meta"
+              ><strong>auth.py:1</strong><span>Imports sessions.py</span></span
+            >
+            <code>from sessions import SessionStore</code>
+          </output>
+        </section>
+      </details>
+    </main>
+  </body>
+</html>

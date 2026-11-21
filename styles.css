@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --canvas: #edf1e9;
-  --panel: #f7f9f4;
-  --control: #e5ece2;
-  --line: #b9c8bb;
-  --ink: #18221c;
-  --muted: #4c5d51;
-  --accent: #355c1d;
-  --active: #dce8d3;
-  --graph-surface: #eff4ec;
-  --graph-grid: #cbdacb;
-  --online: #376334;
+  --canvas: #e6f0f6;
+  --panel: #f7fbfe;
+  --control: #dcecf5;
+  --line: #b1ccdb;
+  --ink: #17354a;
+  --muted: #48687b;
+  --accent: #135d83;
+  --active: #d8eaf4;
+  --graph-surface: #edf6fb;
+  --graph-grid: #ccdfec;
+  --online: #216685;
   --logo-brightness: 0.6;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   --sans: 'Segoe UI', system-ui, sans-serif;
@@ -19,17 +19,17 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --canvas: #0e1211;
-  --panel: #131b16;
-  --control: #1b2720;
-  --line: #34463a;
-  --ink: #f1f7ed;
-  --muted: #a8b9ad;
-  --accent: #c3f670;
-  --active: #293d21;
-  --graph-surface: #111914;
-  --graph-grid: #2a3c31;
-  --online: #a5ca91;
+  --canvas: #081321;
+  --panel: #102536;
+  --control: #1a3549;
+  --line: #31546b;
+  --ink: #edf7ff;
+  --muted: #b1c9d8;
+  --accent: #91ddff;
+  --active: #173a52;
+  --graph-surface: #0b1d2b;
+  --graph-grid: #274256;
+  --online: #88cce8;
   --logo-brightness: 1.45;
 }
 
@@ -154,7 +154,7 @@ body.server-connected .app-shell {
   width: 22px;
   height: 22px;
   flex: none;
-  filter: grayscale(1) brightness(var(--logo-brightness));
+  filter: none;
 }
 .topnav {
   display: flex;
