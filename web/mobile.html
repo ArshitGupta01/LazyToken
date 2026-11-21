@@ -61,8 +61,19 @@
       <main>
         <section id="prompts-panel" aria-labelledby="pocket-title">
           <div class="pocket-hero">
-            <h1 id="pocket-title" tabindex="-1">Prompts</h1>
-            <p>Copy a prompt into your AI assistant, then send your task.</p>
+            <p class="pocket-kicker">TOKSMART / IN YOUR POCKET</p>
+            <h1 id="pocket-title" tabindex="-1">A sharper start<br /><em>for every task.</em></h1>
+            <p>
+              Choose a mode, copy its instructions, and get to the actual work. No account or
+              desktop server needed.
+            </p>
+            <div class="pocket-hero-links">
+              <a href="#task-studio">Write a task →</a><span>3 modes · One tap to copy</span>
+            </div>
+          </div>
+          <div class="mode-heading">
+            <span>01 / PICK YOUR MODE</span>
+            <p>Use the smallest mode that fits your task.</p>
           </div>
           <div id="prompt-cards" class="prompt-cards" aria-busy="true"></div>
           <p id="copy-status" class="copy-status" role="status" aria-live="polite">
@@ -71,6 +82,75 @@
           <button id="retry-prompts" class="launch-btn" type="button" hidden>
             Retry loading prompts
           </button>
+          <section id="task-studio" class="task-studio" aria-labelledby="task-studio-title">
+            <div class="task-studio-heading">
+              <span>02 / MAKE IT YOURS</span>
+              <h2 id="task-studio-title">Add your actual task.</h2>
+              <p>
+                We’ll put your task after the mode instructions. Your draft stays in this browser.
+              </p>
+            </div>
+            <label for="task-mode">Mode</label>
+            <select id="task-mode">
+              <option value="lite">Lite · everyday</option>
+              <option value="pro">Pro · complex</option>
+              <option value="coding">Coding · build and fix</option>
+            </select>
+            <label for="task-text">What do you want the assistant to do?</label>
+            <textarea
+              id="task-text"
+              rows="5"
+              maxlength="4000"
+              placeholder="Example: Explain this error and suggest the smallest fix…"
+            ></textarea>
+            <div class="task-meta">
+              <span id="task-count">0 / 4000</span
+              ><button type="button" id="clear-task">Clear draft</button>
+            </div>
+            <button type="button" id="copy-task" class="task-copy" disabled>
+              Copy mode + task <span aria-hidden="true">→</span>
+            </button>
+            <p id="task-status" role="status" aria-live="polite"></p>
+          </section>
+          <section id="example-ideas" class="phone-ideas" aria-labelledby="ideas-title">
+            <span>03 / WHEN TO USE IT</span>
+            <h2 id="ideas-title">Good prompts begin with a clear job.</h2>
+            <div class="idea-grid">
+              <article>
+                <b>01</b><strong>Understand</strong>
+                <p>Ask Lite to explain a concept or compare two options clearly.</p>
+                <button
+                  type="button"
+                  data-example="Explain recursion with one small Python example."
+                  data-mode="lite"
+                >
+                  Use example →
+                </button>
+              </article>
+              <article>
+                <b>02</b><strong>Plan</strong>
+                <p>Use Pro when sources, tradeoffs or several steps matter.</p>
+                <button
+                  type="button"
+                  data-example="Plan a two-week study schedule for my exam topics."
+                  data-mode="pro"
+                >
+                  Use example →
+                </button>
+              </article>
+              <article>
+                <b>03</b><strong>Build</strong>
+                <p>Give Coding Mode your stack, relevant files and constraints.</p>
+                <button
+                  type="button"
+                  data-example="Fix this React form validation using the components already in my project."
+                  data-mode="coding"
+                >
+                  Use example →
+                </button>
+              </article>
+            </div>
+          </section>
           <noscript
             ><p class="mobile-note">
               Enable JavaScript for the copy buttons. You can also open

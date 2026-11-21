@@ -107,6 +107,34 @@
     </header>
     <main class="setup-layout">
       <section class="setup-stage" aria-labelledby="setup-title">
+        <div class="setup-story">
+          <p class="setup-kicker"><span></span> DESKTOP CONNECTION</p>
+          <h2>Your codebase,<br /><em>ready to explore.</em></h2>
+          <p class="setup-story-lead">
+            Start TokSmart on this computer. This page watches for your local server, shows its
+            latest ping, and gives you a direct path into the dashboard.
+          </p>
+          <div class="connection-map" aria-label="How the local connection works">
+            <div>
+              <span class="map-icon">⌘</span><strong>Your terminal</strong
+              ><small>Starts TokSmart</small>
+            </div>
+            <span class="map-line" aria-hidden="true"></span>
+            <div>
+              <span class="map-icon">◎</span><strong>Local server</strong
+              ><small>127.0.0.1:8765</small>
+            </div>
+            <span class="map-line" aria-hidden="true"></span>
+            <div>
+              <span class="map-icon">→</span><strong>Dashboard</strong
+              ><small>Opens when ready</small>
+            </div>
+          </div>
+          <p class="setup-privacy">
+            <span aria-hidden="true">◆</span> Your repository is indexed locally. The hosted page
+            only checks the health endpoint in your browser.
+          </p>
+        </div>
         <div class="launch-console">
           <header class="setup-intro">
             <span class="setup-icon"
@@ -252,6 +280,39 @@
               </svg>
             </a>
           </footer>
+        </div>
+      </section>
+
+      <section class="setup-support" aria-labelledby="setup-support-title">
+        <div class="setup-support-heading">
+          <span>BEFORE YOU BEGIN</span>
+          <h2 id="setup-support-title">A few things to know.</h2>
+        </div>
+        <div class="setup-support-grid">
+          <article>
+            <span>01 / RUNTIME</span>
+            <h3>Check your tools</h3>
+            <p>
+              Install Node.js 18+ and Python 3.11+, then reopen your terminal. Run
+              <code>npx toksmart@latest doctor --format text</code> if startup fails.
+            </p>
+          </article>
+          <article>
+            <span>02 / REPOSITORY</span>
+            <h3>Add your project</h3>
+            <p>
+              After the dashboard opens, run <code>toksmart add /path/to/project</code> in a second
+              terminal. Only the path you choose is indexed.
+            </p>
+          </article>
+          <article>
+            <span>03 / OTHER PORT</span>
+            <h3>Changed the port?</h3>
+            <p>
+              This page checks port 8765. If you started TokSmart on another port, open the address
+              printed by your terminal directly.
+            </p>
+          </article>
         </div>
       </section>
 

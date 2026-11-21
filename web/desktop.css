@@ -882,3 +882,223 @@
 .sample-disclosure .sample-graph {
   max-width: 710px;
 }
+
+/* The setup page balances the live monitor with an explanation of the local flow. */
+.setup-stage {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 572px);
+  gap: clamp(36px, 5vw, 90px);
+  place-items: center stretch;
+  min-height: min(790px, calc(100svh - 66px));
+}
+.setup-story {
+  min-width: 0;
+  padding: 20px 0 36px;
+}
+.setup-kicker {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 30px;
+  color: var(--accent);
+  font: 600 11px var(--mono);
+  letter-spacing: 0.17em;
+}
+.setup-kicker span {
+  width: 26px;
+  height: 1px;
+  background: currentColor;
+}
+.setup-story h2 {
+  max-width: 600px;
+  margin: 0;
+  font: 500 clamp(43px, 5vw, 76px) / 1.04 var(--sans);
+  letter-spacing: -0.065em;
+}
+.setup-story h2 em {
+  font-family: Georgia, serif;
+  font-weight: 400;
+}
+.setup-story-lead {
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.65;
+  margin: 23px 0 38px;
+}
+.connection-map {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 510px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.connection-map > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.connection-map strong {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.connection-map small {
+  color: var(--muted);
+  font: 10px var(--mono);
+  white-space: nowrap;
+}
+.map-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--accent);
+  font-size: 19px;
+}
+.map-line {
+  flex: 1;
+  min-width: 8px;
+  height: 1px;
+  margin-top: -20px;
+  background: var(--line);
+}
+.setup-privacy {
+  display: flex;
+  gap: 10px;
+  max-width: 45ch;
+  margin: 22px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.setup-privacy span {
+  color: var(--accent);
+}
+.setup-support {
+  padding: 8px 0 66px;
+}
+.setup-support-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  border-top: 1px solid var(--line);
+  padding: 25px 0 21px;
+}
+.setup-support-heading span,
+.setup-support-grid article > span {
+  color: var(--accent);
+  font: 11px var(--mono);
+  letter-spacing: 0.06em;
+}
+.setup-support-heading h2 {
+  font-size: 26px;
+  letter-spacing: -0.045em;
+  margin: 0;
+}
+.setup-support-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+}
+.setup-support-grid article {
+  min-width: 0;
+  padding: 23px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+}
+.setup-support-grid h3 {
+  margin: 25px 0 9px;
+  font-size: 18px;
+}
+.setup-support-grid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.setup-support-grid code {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1050px) {
+  .setup-stage {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    min-height: 0;
+    padding-block: 70px 45px;
+  }
+  .setup-story {
+    width: min(100%, 700px);
+    padding: 0;
+  }
+  .launch-console {
+    margin-inline: auto;
+  }
+}
+@media (max-width: 650px) {
+  .setup-stage {
+    padding-block: 58px 40px;
+    gap: 32px;
+  }
+  .setup-story h2 {
+    font-size: clamp(42px, 10vw, 60px);
+  }
+  .setup-story-lead {
+    font-size: 15px;
+    margin: 16px 0 24px;
+  }
+  .connection-map {
+    padding: 15px;
+    gap: 4px;
+  }
+  .connection-map strong {
+    font-size: 10px;
+  }
+  .connection-map small {
+    font-size: 9px;
+  }
+  .map-icon {
+    width: 29px;
+    height: 29px;
+  }
+  .setup-support-grid {
+    grid-template-columns: 1fr;
+  }
+  .setup-support-heading {
+    display: block;
+  }
+  .setup-support-heading h2 {
+    margin-top: 9px;
+  }
+  .setup-support-grid h3 {
+    margin-top: 16px;
+  }
+}
+@media (max-width: 360px) {
+  .connection-map {
+    flex-wrap: wrap;
+  }
+  .map-line {
+    display: none;
+  }
+  .connection-map > div {
+    width: 31%;
+  }
+}
+
+@media (max-width: 650px) {
+  .setup-story {
+    display: none;
+  }
+  .setup-stage {
+    padding-block: 28px 40px;
+  }
+}

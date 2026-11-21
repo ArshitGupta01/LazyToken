@@ -330,3 +330,324 @@
     overflow: hidden;
   }
 }
+
+/* Pocket tools share the landing page's cobalt palette and prioritize the next action. */
+.mobile-page {
+  padding-inline: clamp(12px, 3vw, 24px);
+  background: var(--paper);
+}
+.pocket-shell {
+  max-width: 840px;
+}
+.pocket-header {
+  min-height: 76px;
+}
+.pocket-header .toksmart-logo {
+  filter: none;
+  width: 27px;
+  height: 27px;
+}
+.pocket-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  gap: 6px;
+  padding: 8px 0;
+  background: var(--paper);
+  backdrop-filter: blur(12px);
+}
+.pocket-nav button {
+  flex: 1;
+  border: 1px solid transparent;
+  border-radius: 30px;
+  font-size: 13px;
+}
+.pocket-nav button[aria-pressed='true'] {
+  background: var(--accent-tint);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.pocket-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 22px 0 30px;
+  padding: clamp(25px, 6vw, 55px);
+  min-height: 340px;
+  border: 1px solid #3c7596;
+  border-radius: 20px;
+  background: #0c2d49;
+  color: #f5fbff;
+}
+.pocket-hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(95deg, #081b30ef, #0b2c4ac2 60%, #0b2638a0),
+    url('hero-night.webp') center/cover;
+}
+.pocket-kicker,
+.mode-heading > span,
+.task-studio-heading > span,
+.phone-ideas > span {
+  margin: 0 0 26px !important;
+  color: #9cdef9 !important;
+  font: 11px var(--mono) !important;
+  letter-spacing: 0.11em;
+}
+.pocket-hero h1 {
+  color: #f6fbff;
+  font: 500 clamp(42px, 7vw, 72px) / 1.04 var(--sans);
+  letter-spacing: -0.065em;
+}
+.pocket-hero h1 em {
+  font-family: Georgia, serif;
+  font-weight: 400;
+}
+.pocket-hero > p:not(.pocket-kicker) {
+  max-width: 48ch;
+  margin: 20px 0 24px;
+  color: #c9e0ef;
+  font-size: 16px;
+}
+.pocket-hero-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+.pocket-hero-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 43px;
+  padding: 9px 16px;
+  border-radius: 25px;
+  background: white;
+  color: #0d2a40;
+  text-decoration: none;
+  font-weight: 650;
+  font-size: 13px;
+}
+.pocket-hero-links span {
+  color: #a9cde1;
+  font-size: 12px;
+}
+.mode-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: baseline;
+  margin: 0 0 15px;
+}
+.mode-heading > span {
+  margin: 0 !important;
+  color: var(--accent) !important;
+}
+.mode-heading p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+.prompt-cards {
+  display: grid;
+  gap: 12px;
+  border: 0;
+}
+.prompt-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 13px 28px -26px #000a1c;
+  border-bottom: 1px solid var(--line);
+}
+.prompt-card::before {
+  content: 'MODE';
+  grid-column: 1/-1;
+  color: var(--accent);
+  font: 10px var(--mono);
+  letter-spacing: 0.14em;
+}
+.prompt-card h2 {
+  font: 600 clamp(28px, 5vw, 39px) / 1 var(--sans);
+  letter-spacing: -0.055em;
+}
+.prompt-card p {
+  grid-column: 1/-1;
+  max-width: 50ch;
+  margin: 8px 0;
+  color: var(--muted);
+}
+.prompt-card .launch-btn {
+  grid-row: 2;
+  grid-column: 2;
+  border-radius: 30px;
+  min-width: 90px;
+}
+.prompt-card details {
+  grid-row: 4;
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+.prompt-card summary {
+  font-size: 12px;
+}
+.task-studio {
+  margin: 65px 0 45px;
+  padding: clamp(22px, 5vw, 43px);
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: var(--surface);
+}
+.task-studio-heading > span,
+.phone-ideas > span {
+  color: var(--accent) !important;
+  margin: 0 !important;
+}
+.task-studio h2,
+.phone-ideas h2 {
+  font-size: clamp(29px, 5vw, 42px);
+  line-height: 1.1;
+  letter-spacing: -0.055em;
+  margin: 18px 0 9px;
+}
+.task-studio-heading p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 28px;
+}
+.task-studio > label {
+  display: block;
+  margin: 18px 0 7px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.task-studio select,
+.task-studio textarea {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.5;
+}
+.task-studio textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+.task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 17px;
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+.task-meta button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.task-copy {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 19px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.task-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+#task-status {
+  min-height: 1.5em;
+  margin: 9px 0 0;
+  color: var(--accent);
+  font-size: 12px;
+}
+.phone-ideas {
+  margin: 0 0 70px;
+}
+.idea-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 26px;
+}
+.idea-grid article {
+  display: flex;
+  flex-direction: column;
+  min-height: 185px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.idea-grid b {
+  color: var(--accent);
+  font: 12px var(--mono);
+}
+.idea-grid strong {
+  font-size: 19px;
+  margin-top: 15px;
+  letter-spacing: -0.03em;
+}
+.idea-grid p {
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+.idea-grid button {
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-align: left;
+  font-weight: 650;
+  cursor: pointer;
+}
+@media (max-width: 620px) {
+  .pocket-hero {
+    min-height: 0;
+  }
+  .idea-grid {
+    grid-template-columns: 1fr;
+  }
+  .idea-grid article {
+    min-height: 135px;
+  }
+  .mode-heading {
+    display: block;
+  }
+  .mode-heading p {
+    margin-top: 8px;
+  }
+}
+@media (max-width: 360px) {
+  .pocket-hero {
+    padding: 24px 18px;
+  }
+  .pocket-header .desktop-link {
+    font-size: 11px;
+  }
+  .prompt-card {
+    padding: 17px;
+  }
+  .prompt-card .launch-btn {
+    min-width: 71px;
+  }
+}

@@ -12,6 +12,7 @@
   let history = { schema: 'toksmart-prompt-benchmark-v1', runs: [] };
   let copying = false;
   let fallbackOpener = null;
+  let loadedModes = null;
 
   async function copyPrompt(prompt, button) {
     if (copying) return;
@@ -60,6 +61,8 @@
         throw Error('Invalid prompt file');
       }
       cards.replaceChildren();
+      loadedModes = data.modes;
+      get('copy-task').disabled = !get('task-text').value.trim();
       ['lite', 'pro', 'coding'].forEach((mode) => {
         const item = data.modes[mode];
         const card = el('article', undefined, 'prompt-card');
@@ -77,6 +80,8 @@
       });
       status.textContent = '';
     } catch {
+      loadedModes = null;
+      get('copy-task').disabled = true;
       status.textContent = 'Prompts could not load. Check your connection and retry.';
       get('retry-prompts').hidden = false;
     } finally {
@@ -130,6 +135,59 @@
   });
   get('close-fallback').addEventListener('click', () => get('copy-fallback').close());
   get('retry-prompts').addEventListener('click', loadPrompts);
+
+  const taskText = get('task-text');
+  const taskMode = get('task-mode');
+  const taskStatus = get('task-status');
+  const draftKey = 'toksmart_phone_task_draft';
+  try {
+    taskText.value = localStorage.getItem(draftKey) || '';
+  } catch {
+    // Drafts remain usable when storage is unavailable.
+  }
+  function updateTask() {
+    get('task-count').textContent = `${taskText.value.length} / 4000`;
+    get('copy-task').disabled = !loadedModes || !taskText.value.trim();
+    try {
+      if (taskText.value) localStorage.setItem(draftKey, taskText.value);
+      else localStorage.removeItem(draftKey);
+    } catch {
+      // Copy still works without stored drafts.
+    }
+  }
+  taskText.addEventListener('input', updateTask);
+  get('clear-task').addEventListener('click', () => {
+    taskText.value = '';
+    taskStatus.textContent = 'Draft cleared.';
+    updateTask();
+    taskText.focus();
+  });
+  get('copy-task').addEventListener('click', async () => {
+    if (!loadedModes || !taskText.value.trim()) return;
+    const prompt = `${loadedModes[taskMode.value].prompt}\n\nMy task:\n${taskText.value.trim()}`;
+    try {
+      await navigator.clipboard.writeText(prompt);
+      taskStatus.textContent = 'Mode and task copied. Paste them into your assistant.';
+    } catch {
+      const input = get('fallback-text');
+      input.value = prompt;
+      fallbackOpener = get('copy-task');
+      if (!get('copy-fallback').open) get('copy-fallback').showModal();
+      input.focus();
+      input.select();
+      taskStatus.textContent = 'Use your device’s Copy action on the selected text.';
+    }
+  });
+  get('example-ideas').addEventListener('click', (event) => {
+    const example = event.target.closest('[data-example]');
+    if (!example) return;
+    taskMode.value = example.dataset.mode;
+    taskText.value = example.dataset.example;
+    updateTask();
+    get('task-studio').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    taskText.focus({ preventScroll: true });
+  });
+  updateTask();
 
   const fmt = (value, digits = 1) =>
     value === null

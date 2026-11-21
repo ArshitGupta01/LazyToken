@@ -188,6 +188,23 @@ test('each of the three modes has one copy button using the exact canonical prom
   assert.match(page.node('copy-status').textContent, /Copied/);
 });
 
+test('task studio copies the selected canonical mode with the typed task and saves its draft', async () => {
+  const page = setup();
+  await flush();
+  const task = page.node('task-text');
+  const mode = page.node('task-mode');
+  task.value = 'Fix the login form using existing components.';
+  mode.value = 'coding';
+  task.listeners.input();
+  assert.equal(page.node('copy-task').disabled, false);
+  assert.equal(page.saved.get('toksmart_phone_task_draft'), task.value);
+  await page.node('copy-task').listeners.click();
+  assert.equal(page.copied.at(-1), `${prompts.modes.coding.prompt}\n\nMy task:\n${task.value}`);
+  page.node('clear-task').listeners.click();
+  assert.equal(page.node('copy-task').disabled, true);
+  assert.equal(page.saved.has('toksmart_phone_task_draft'), false);
+});
+
 test('clipboard denial reveals selected prompt and failure to load is retryable', async () => {
   const page = setup({ denyClipboard: true });
   await flush();
