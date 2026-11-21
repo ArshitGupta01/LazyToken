@@ -12,7 +12,7 @@
     <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <script>
       if (new URLSearchParams(location.search).get('desktop') === '1')
-        location.replace('setup.html' + location.hash);
+        location.replace('/setup' + location.hash);
     </script>
     <script src="theme.js"></script>
     <link rel="stylesheet" href="styles.css" />
@@ -33,7 +33,7 @@
         >
         <nav class="home-nav" aria-label="Primary navigation">
           <a href="#platform">Platform</a><a href="#workflow">How it works</a
-          ><a href="#docs">Docs</a><a href="mobile.html">Phone prompts</a>
+          ><a href="#docs">Docs</a><a href="/mobile">Phone prompts</a>
         </nav>
         <div class="header-right">
           <label class="theme-control home-theme"
@@ -44,7 +44,7 @@
               <option value="dark">Dark</option>
             </select></label
           >
-          <a class="header-cta" href="setup.html">Get started <span aria-hidden="true">→</span></a>
+          <a class="header-cta" href="/setup">Get started <span aria-hidden="true">→</span></a>
         </div>
       </header>
       <main id="main">
@@ -58,7 +58,7 @@
               focused task brief.
             </p>
             <div class="hero-actions">
-              <a class="pill pill-primary" href="setup.html"
+              <a class="pill pill-primary" href="/setup"
                 >Get started <span class="arrow-disc" aria-hidden="true">→</span></a
               ><a class="pill pill-secondary" href="#platform"
                 >Explore the platform <span aria-hidden="true">↓</span></a
@@ -66,7 +66,7 @@
             </div>
             <p class="hero-aside">
               Runs on your computer · Node.js 18+ · Python 3.11+ <span aria-hidden="true">·</span>
-              <a href="mobile.html">Using a phone? Try prompts →</a>
+              <a href="/mobile">Using a phone? Try prompts →</a>
             </p>
           </div>
           <div class="hero-product" aria-label="TokSmart dashboard preview">
@@ -178,7 +178,7 @@
                 Run TokSmart on your computer. The setup page watches the local health endpoint,
                 shows ping and opens the dashboard when you choose.
               </p>
-              <a href="setup.html">Open guided setup →</a>
+              <a href="/setup">Open guided setup →</a>
             </article>
             <article class="workflow-step">
               <span>02</span>
@@ -222,7 +222,7 @@
                 </button>
               </div>
               <p id="command-feedback" role="status" aria-live="polite"></p>
-              <a href="setup.html">Continue to server setup <span aria-hidden="true">→</span></a>
+              <a href="/setup">Continue to server setup <span aria-hidden="true">→</span></a>
             </div>
           </div>
         </section>
@@ -346,7 +346,7 @@
                     Prefer a stable command? Run <code>npm install --global toksmart</code>, then
                     <code>toksmart serve --no-browser</code>.
                   </p>
-                  <a href="setup.html">Start guided setup →</a>
+                  <a href="/setup">Start guided setup →</a>
                 </div>
               </article>
               <article id="index-project" class="doc-block">
@@ -424,7 +424,7 @@ toksmart setup --test-connection</code></pre>
                     reuse-first development. Copy a prompt and paste it into your AI assistant
                     before your task. This page does not require TokSmart to be running.
                   </p>
-                  <a href="mobile.html">Explore phone prompts →</a>
+                  <a href="/mobile">Explore phone prompts →</a>
                 </div>
               </article>
             </div>
@@ -506,7 +506,7 @@ toksmart setup --test-connection</code></pre>
         <section class="end-cta" aria-labelledby="end-title">
           <p class="overline">Ready when you are</p>
           <h2 id="end-title">Give your next change<br /><em>some context.</em></h2>
-          <a class="pill pill-primary" href="setup.html"
+          <a class="pill pill-primary" href="/setup"
             >Get started <span class="arrow-disc" aria-hidden="true">→</span></a
           >
         </section>
@@ -520,7 +520,7 @@ toksmart setup --test-connection</code></pre>
           ></a
         ><span>Local code intelligence, on your terms.</span>
         <nav aria-label="Footer links">
-          <a href="setup.html">Setup</a><a href="mobile.html">Phone prompts</a
+          <a href="/setup">Setup</a><a href="/mobile">Phone prompts</a
           ><a href="https://github.com/ArshitGupta01/TokSmart">GitHub →</a>
         </nav>
       </div>

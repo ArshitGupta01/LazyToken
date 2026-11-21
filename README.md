@@ -9,7 +9,7 @@
 [![Verify TokSmart](https://github.com/ArshitGupta01/TokSmart/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/ArshitGupta01/TokSmart/actions/workflows/checks.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-[Website](https://toksmart.vercel.app) · [Desktop setup](https://toksmart.vercel.app/setup.html) · [Phone prompts](https://toksmart.vercel.app/mobile.html) · [CLI reference](docs/CLI.md) · [Benchmarks](#benchmarks)
+[Website](https://toksmart.vercel.app) · [Desktop setup](https://toksmart.vercel.app/setup) · [Phone prompts](https://toksmart.vercel.app/mobile) · [CLI reference](docs/CLI.md) · [Benchmarks](#benchmarks)
 
 </div>
 
@@ -27,7 +27,7 @@ You need **Node.js 18+**, **Python 3.11+**, and a local repository. The npm pack
 npx toksmart@latest serve
 ```
 
-Keep this terminal open. The [hosted launcher](https://toksmart.vercel.app/setup.html) shows the last health check and ping once the server responds. When it says **Server ready**, click **Open dashboard** or use **Open when ready**. The hosted launcher provides a `--no-browser` variant of the command so it can handle opening the dashboard. You can also open [http://127.0.0.1:8765](http://127.0.0.1:8765) on the same computer.
+Keep this terminal open. The [hosted launcher](https://toksmart.vercel.app/setup) shows the last health check and ping once the server responds. When it says **Server ready**, click **Open dashboard** or use **Open when ready**. The hosted launcher provides a `--no-browser` variant of the command so it can handle opening the dashboard. You can also open [http://127.0.0.1:8765](http://127.0.0.1:8765) on the same computer.
 
 **2. Index a repository.** In a second terminal, change to your repository root and run the matching command.
 
@@ -108,7 +108,7 @@ See the [development guide](docs/DEVELOPMENT.md) for the source map and [migrati
 
 ## Use TokSmart on a phone
 
-Open the [phone prompt page](https://toksmart.vercel.app/mobile.html), copy a mode, and paste it into your AI assistant before sending your task.
+Open the [phone prompt page](https://toksmart.vercel.app/mobile), copy a mode, and paste it into your AI assistant before sending your task.
 
 | Mode | Use it for |
 | --- | --- |
